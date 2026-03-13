@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.book import Book, BookHash
 from app.models.shelf import Shelf
 from app.services.hash_service import compute_hashes
-from app.services.scanner import discover_books
+from app.services.scanner import discover_books, find_sdr_folder
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +27,8 @@ class ImportProgress:
     updated: int = 0
     skipped: int = 0
     errors: list[str] = field(default_factory=list)
+    sdr_imported: int = 0
+    sdr_errors: list[str] = field(default_factory=list)
 
 
 ProgressCallback = Callable[[ImportProgress], None]
@@ -38,6 +40,7 @@ async def import_shelf(
     covers_dir: str | Path,
     progress_cb: ProgressCallback | None = None,
     mtime_cache: dict[str, float] | None = None,
+    stats_db_path: str | Path | None = None,
 ) -> ImportProgress:
     """
     Scan a shelf directory and import/update all books found.
@@ -78,6 +81,12 @@ async def import_shelf(
                 progress.updated += 1
             else:
                 progress.skipped += 1
+
+            # Ingest .sdr data if adjacent folder exists
+            sdr_folder = find_sdr_folder(book_path)
+            if sdr_folder:
+                await _ingest_sdr(session, shelf, book_path, sdr_folder, progress)
+
         except Exception as e:
             log.error("Failed to import %s: %s", book_path, e)
             progress.errors.append(f"{book_path.name}: {e}")
@@ -86,7 +95,58 @@ async def import_shelf(
         if progress_cb:
             progress_cb(progress)
 
+    # Import stats DB sessions if path provided
+    if stats_db_path is not None:
+        await _ingest_stats_db(session, stats_db_path, progress)
+
     return progress
+
+
+async def _ingest_sdr(
+    session: AsyncSession,
+    shelf: Shelf,
+    book_path: Path,
+    sdr_folder: Path,
+    progress: ImportProgress,
+) -> None:
+    """Read and import .sdr data for a book."""
+    try:
+        from app.koreader.sdr_reader import read_sdr
+        from app.koreader.sdr_importer import import_sdr, find_book_for_sdr
+
+        sdr_data = read_sdr(sdr_folder)
+        if sdr_data is None:
+            return
+
+        # Find book in DB
+        book = await _find_by_path(session, shelf.id, book_path, shelf.path)
+        if book is None:
+            sdr_data_for_search = sdr_data
+            book = await find_book_for_sdr(session, sdr_data_for_search, sdr_folder)
+        if book is None:
+            log.debug("Could not find book for .sdr: %s", sdr_folder)
+            return
+
+        counts = await import_sdr(session, book, sdr_data)
+        progress.sdr_imported += counts.get("sessions", 0)
+    except Exception as e:
+        log.error("Failed to import .sdr %s: %s", sdr_folder, e)
+        progress.sdr_errors.append(f"{sdr_folder.name}: {e}")
+
+
+async def _ingest_stats_db(
+    session: AsyncSession,
+    stats_db_path: str | Path,
+    progress: ImportProgress,
+) -> None:
+    """Import sessions from a KOReader statistics.sqlite3."""
+    try:
+        from app.koreader.stats_db_importer import import_stats_db
+        result = await import_stats_db(session, stats_db_path)
+        progress.sdr_imported += result.get("imported", 0)
+    except Exception as e:
+        log.error("Failed to import stats DB %s: %s", stats_db_path, e)
+        progress.sdr_errors.append(f"stats_db: {e}")
 
 
 async def _process_file(

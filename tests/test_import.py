@@ -312,3 +312,119 @@ async def test_import_shelfloom_id_reidentification(tmp_path, db_session):
     books = result.scalars().all()
     assert len(books) == 1
     assert progress2.created == 0
+
+
+# ── sdr + stats_db integration ────────────────────────────────────────────────
+
+async def test_import_shelf_with_sdr_folder(tmp_path, db_session):
+    """Full scan with .sdr folder present → reading data imported."""
+    import sqlite3
+    from app.services.import_service import import_shelf
+    from app.models.reading import ReadingSession
+
+    shelf_path = tmp_path / "shelf"
+    shelf_path.mkdir()
+    covers = tmp_path / "covers"
+
+    book_path = shelf_path / "book.epub"
+    _make_epub(book_path, "Test Book", "Test Author")
+    shelf = await _make_shelf_in_db(db_session, str(shelf_path))
+
+    # Create .sdr folder with metadata
+    sdr_dir = shelf_path / "book.epub.sdr"
+    sdr_dir.mkdir()
+    lua_content = """return {
+        ["partial_md5_checksum"] = "test_sdr_md5",
+        ["percent_finished"] = 0.5,
+        ["doc_path"] = "/mnt/us/book.epub",
+        ["doc_props"] = {
+            ["title"] = "Test Book",
+            ["authors"] = "Test Author",
+        },
+        ["stats"] = {
+            ["performance_in_pages"] = {
+                [1705359000] = 10,
+                [1705359060] = 5,
+            },
+            ["total_time_in_sec"] = 900,
+        },
+        ["summary"] = { ["status"] = "reading" },
+    }"""
+    (sdr_dir / "metadata.epub.lua").write_text(lua_content)
+
+    progress = await import_shelf(db_session, shelf, covers)
+
+    assert progress.created == 1
+    assert progress.sdr_imported >= 1  # at least 1 session imported
+    assert progress.sdr_errors == []
+
+    # Verify sessions in DB
+    result = await db_session.execute(select(ReadingSession))
+    sessions = result.scalars().all()
+    assert len(sessions) >= 1
+    assert sessions[0].source == "sdr"
+
+
+async def test_import_shelf_with_stats_db(tmp_path, db_session):
+    """stats_db_path passed → stats DB sessions imported."""
+    import sqlite3
+    from app.services.import_service import import_shelf
+    from app.models.reading import ReadingSession
+
+    shelf_path = tmp_path / "shelf"
+    shelf_path.mkdir()
+    covers = tmp_path / "covers"
+
+    book_path = shelf_path / "book.epub"
+    _make_epub(book_path, "Stats Book", "Stats Author")
+    shelf = await _make_shelf_in_db(db_session, str(shelf_path))
+
+    # First import the book
+    progress = await import_shelf(db_session, shelf, covers)
+    assert progress.created == 1
+
+    # Get the imported book's MD5
+    result = await db_session.execute(select(Book))
+    book = result.scalar_one()
+
+    # Create stats DB
+    stats_db_path = tmp_path / "statistics.sqlite3"
+    conn = sqlite3.connect(str(stats_db_path))
+    conn.execute("""CREATE TABLE book (
+        id INTEGER PRIMARY KEY, title TEXT, authors TEXT, md5 TEXT,
+        series TEXT, language TEXT, total_read_time INTEGER,
+        total_read_pages INTEGER, last_open INTEGER
+    )""")
+    conn.execute("""CREATE TABLE page_stat_data (
+        id_book INTEGER, page INTEGER, start_time INTEGER,
+        period INTEGER, total_pages INTEGER
+    )""")
+    conn.execute(
+        "INSERT INTO book VALUES (1, ?, ?, ?, NULL, NULL, 3600, 100, 1705000000)",
+        (book.title, book.author, book.file_hash_md5),
+    )
+    conn.execute(
+        "INSERT INTO page_stat_data VALUES (1, 1, 1705359000, 120, 300)"
+    )
+    conn.commit()
+    conn.close()
+
+    progress2 = await import_shelf(db_session, shelf, covers, stats_db_path=stats_db_path)
+
+    assert progress2.sdr_imported >= 1
+    assert progress2.sdr_errors == []
+
+    result = await db_session.execute(select(ReadingSession))
+    sessions = result.scalars().all()
+    assert any(s.source == "stats_db" for s in sessions)
+
+
+async def test_import_progress_has_sdr_fields(tmp_path, db_session):
+    """ImportProgress dataclass has sdr_imported and sdr_errors fields."""
+    from app.services.import_service import ImportProgress
+
+    p = ImportProgress()
+    assert hasattr(p, "sdr_imported")
+    assert hasattr(p, "sdr_errors")
+    assert p.sdr_imported == 0
+    assert p.sdr_errors == []
