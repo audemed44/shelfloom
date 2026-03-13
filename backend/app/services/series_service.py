@@ -145,6 +145,37 @@ async def get_series_tree(session: AsyncSession) -> list[dict]:
     ]
 
 
+async def purge_empty_series(session: AsyncSession) -> list[str]:
+    """
+    Delete all series that have no books and no child series.
+    Runs in repeated passes until nothing is left to delete, so that
+    removing a child (e.g. Stormlight Archive) can cascade up to an
+    empty parent (e.g. Cosmere) in the next pass.
+    Returns the names of every series that was deleted.
+    """
+    deleted: list[str] = []
+    while True:
+        # Series with at least one book
+        has_books = select(BookSeries.series_id).distinct()
+        # Series with at least one child
+        has_children = select(Series.parent_id).where(Series.parent_id.isnot(None)).distinct()
+
+        result = await session.execute(
+            select(Series).where(
+                Series.id.not_in(has_books),
+                Series.id.not_in(has_children),
+            )
+        )
+        empty = result.scalars().all()
+        if not empty:
+            break
+        for s in empty:
+            deleted.append(s.name)
+            await session.delete(s)
+        await session.commit()
+    return deleted
+
+
 # ── reading orders ────────────────────────────────────────────────────────────
 
 async def create_reading_order(session: AsyncSession, data: ReadingOrderCreate) -> ReadingOrder:

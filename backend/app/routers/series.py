@@ -27,6 +27,7 @@ from app.services.series_service import (
     get_series,
     get_series_tree,
     list_series,
+    purge_empty_series,
     remove_book_from_series,
     reorder_entries,
     update_series,
@@ -53,6 +54,13 @@ async def series_tree_endpoint(session: AsyncSession = Depends(get_session)):
         data["children"] = []
         result.append(data)
     return result
+
+
+@router.delete("/series/empty", status_code=status.HTTP_200_OK)
+async def purge_empty_series_endpoint(session: AsyncSession = Depends(get_session)):
+    """Delete all series with no books and no children, cascading up to empty parents."""
+    deleted = await purge_empty_series(session)
+    return {"deleted": deleted, "count": len(deleted)}
 
 
 @router.get("/series/{series_id}", response_model=SeriesResponse)

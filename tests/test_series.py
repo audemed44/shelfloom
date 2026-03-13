@@ -305,3 +305,63 @@ async def test_delete_reading_order_books_unaffected(client, db_session, tmp_pat
 
     result = await db_session.execute(select(Book).where(Book.id == book.id))
     assert result.scalar_one_or_none() is not None
+
+
+# ── purge empty series ────────────────────────────────────────────────────────
+
+async def test_purge_empty_series_removes_empty(client):
+    """Series with no books and no children is deleted."""
+    s = (await client.post("/api/series", json={"name": "Empty Series"})).json()
+    resp = await client.delete("/api/series/empty")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "Empty Series" in data["deleted"]
+    assert data["count"] >= 1
+    assert (await client.get(f"/api/series/{s['id']}")).status_code == 404
+
+
+async def test_purge_empty_series_cascades_to_parent(client):
+    """Deleting empty child makes parent empty, which is then also deleted."""
+    parent = (await client.post("/api/series", json={"name": "Cosmere"})).json()
+    child = (await client.post("/api/series", json={"name": "Stormlight Archive", "parent_id": parent["id"]})).json()
+
+    resp = await client.delete("/api/series/empty")
+    assert resp.status_code == 200
+    deleted = resp.json()["deleted"]
+    assert "Stormlight Archive" in deleted
+    assert "Cosmere" in deleted
+
+
+async def test_purge_empty_series_keeps_series_with_books(client, db_session, tmp_path):
+    """Series that has a book is not deleted."""
+    shelf = await _create_shelf(db_session, tmp_path)
+    book = await _create_book(db_session, shelf.id, "Keep Me")
+    s = (await client.post("/api/series", json={"name": "Has Books"})).json()
+    await client.post(f"/api/series/{s['id']}/books/{book.id}")
+
+    resp = await client.delete("/api/series/empty")
+    assert s["name"] not in resp.json()["deleted"]
+    assert (await client.get(f"/api/series/{s['id']}")).status_code == 200
+
+
+async def test_purge_empty_series_keeps_parent_with_books(client, db_session, tmp_path):
+    """Parent series is kept if a sibling child still has books."""
+    shelf = await _create_shelf(db_session, tmp_path)
+    book = await _create_book(db_session, shelf.id, "A Book")
+    parent = (await client.post("/api/series", json={"name": "Parent"})).json()
+    child_with = (await client.post("/api/series", json={"name": "Child With Books", "parent_id": parent["id"]})).json()
+    await client.post("/api/series", json={"name": "Child Empty", "parent_id": parent["id"]})
+    await client.post(f"/api/series/{child_with['id']}/books/{book.id}")
+
+    resp = await client.delete("/api/series/empty")
+    deleted = resp.json()["deleted"]
+    assert "Child Empty" in deleted
+    assert "Parent" not in deleted
+    assert "Child With Books" not in deleted
+
+
+async def test_purge_empty_series_noop_when_nothing_empty(client):
+    """Returns empty list when nothing to delete."""
+    resp = await client.delete("/api/series/empty")
+    assert resp.status_code == 200
+    assert resp.json()["count"] == 0
