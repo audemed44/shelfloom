@@ -31,7 +31,7 @@ def _create_stats_db(path: Path, books=None, page_stats=None) -> Path:
             id_book INTEGER,
             page INTEGER,
             start_time INTEGER,
-            period INTEGER,
+            duration INTEGER,
             total_pages INTEGER
         )
     """)
@@ -44,7 +44,7 @@ def _create_stats_db(path: Path, books=None, page_stats=None) -> Path:
         )
     if page_stats:
         conn.executemany(
-            "INSERT INTO page_stat_data (id_book, page, start_time, period, total_pages) "
+            "INSERT INTO page_stat_data (id_book, page, start_time, duration, total_pages) "
             "VALUES (?,?,?,?,?)",
             page_stats,
         )

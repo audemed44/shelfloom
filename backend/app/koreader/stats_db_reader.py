@@ -136,7 +136,7 @@ def read_stats_db(db_path: str | Path) -> tuple[list[StatsBook], dict[int, list[
         if book_ids:
             placeholders = ",".join("?" * len(book_ids))
             cursor = conn.execute(
-                f"SELECT id_book, page, start_time, period, total_pages "
+                f"SELECT id_book, page, start_time, duration, total_pages "
                 f"FROM page_stat_data WHERE id_book IN ({placeholders}) "
                 f"ORDER BY id_book, start_time",
                 book_ids,
@@ -147,7 +147,7 @@ def read_stats_db(db_path: str | Path) -> tuple[list[StatsBook], dict[int, list[
                 bid = row["id_book"]
                 if bid not in raw_by_book:
                     raw_by_book[bid] = []
-                raw_by_book[bid].append((row["page"], row["start_time"], row["period"]))
+                raw_by_book[bid].append((row["page"], row["start_time"], row["duration"]))
 
             # Aggregate sessions per book
             book_md5_map = {b.id: b.md5 for b in books}

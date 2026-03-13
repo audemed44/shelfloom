@@ -397,7 +397,7 @@ async def test_import_shelf_with_stats_db(tmp_path, db_session):
     )""")
     conn.execute("""CREATE TABLE page_stat_data (
         id_book INTEGER, page INTEGER, start_time INTEGER,
-        period INTEGER, total_pages INTEGER
+        duration INTEGER, total_pages INTEGER
     )""")
     conn.execute(
         "INSERT INTO book VALUES (1, ?, ?, ?, NULL, NULL, 3600, 100, 1705000000)",
