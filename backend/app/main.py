@@ -14,7 +14,19 @@ async def lifespan(app: FastAPI):  # pragma: no cover
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Start background scan scheduler
+    from app.services.scheduler import Scheduler
+    from app.database import get_session_factory
+
+    settings = get_settings()
+    scheduler = Scheduler()
+    app.state.scheduler = scheduler
+    await scheduler.start(get_session_factory(), settings, settings.covers_dir)
+
     yield
+
+    await scheduler.stop()
     await engine.dispose()
 
 
@@ -28,11 +40,14 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    from app.routers import health, shelves, books, series
+    from app.routers import health, shelves, books, series, organizer, tags, import_
     application.include_router(health.router, prefix="/api")
     application.include_router(shelves.router, prefix="/api")
     application.include_router(books.router, prefix="/api")
     application.include_router(series.router, prefix="/api")
+    application.include_router(organizer.router, prefix="/api")
+    application.include_router(tags.router, prefix="/api")
+    application.include_router(import_.router, prefix="/api")
 
     return application
 

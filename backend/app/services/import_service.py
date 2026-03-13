@@ -37,9 +37,13 @@ async def import_shelf(
     shelf: Shelf,
     covers_dir: str | Path,
     progress_cb: ProgressCallback | None = None,
+    mtime_cache: dict[str, float] | None = None,
 ) -> ImportProgress:
     """
     Scan a shelf directory and import/update all books found.
+
+    mtime_cache: if provided, files whose mtime is unchanged and already in the
+    DB are skipped without re-hashing (incremental scan optimisation).
     """
     progress = ImportProgress()
     book_paths = discover_books(shelf.path)
@@ -49,7 +53,25 @@ async def import_shelf(
 
     for book_path in book_paths:
         try:
+            # Incremental skip: if mtime unchanged and book exists in DB
+            cache_key = str(book_path)
+            if mtime_cache is not None:
+                current_mtime = book_path.stat().st_mtime
+                if mtime_cache.get(cache_key) == current_mtime:
+                    existing = await _find_by_path(session, shelf.id, book_path, shelf.path)
+                    if existing is not None:
+                        progress.skipped += 1
+                        progress.processed += 1
+                        if progress_cb:
+                            progress_cb(progress)
+                        continue
+
             action = await _process_file(session, shelf, book_path, covers_dir)
+
+            # Update mtime cache after successful processing
+            if mtime_cache is not None:
+                mtime_cache[cache_key] = book_path.stat().st_mtime
+
             if action == "created":
                 progress.created += 1
             elif action == "updated":

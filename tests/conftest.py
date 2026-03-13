@@ -35,9 +35,14 @@ async def client(db_engine):
     application = create_app()
     application.dependency_overrides[get_session] = override_get_session
 
+    # Attach a fresh scheduler so import endpoints work without a real lifespan
+    from app.services.scheduler import Scheduler
+    application.state.scheduler = Scheduler()
+
     async with AsyncClient(
         transport=ASGITransport(app=application), base_url="http://test"
     ) as ac:
+        ac.app = application  # expose app for tests that need app.state
         yield ac
 
 
