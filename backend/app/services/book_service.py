@@ -113,7 +113,13 @@ async def move_book(
     book_id: str,
     target_shelf_id: int,
 ) -> Book:
-    """Move a book file to a different shelf (safe copy-verify-delete)."""
+    """
+    Move a book file to a different shelf (safe copy-verify-delete).
+
+    If the destination shelf is a sync target, the shelf's organization
+    template is applied to determine the destination path. Otherwise the
+    book's existing relative path is preserved unchanged.
+    """
     book = await get_book(session, book_id)
     if book.shelf_id == target_shelf_id:
         return book
@@ -133,8 +139,17 @@ async def move_book(
         raise ShelfNotFound(f"Target shelf {target_shelf_id} not found")
 
     src_path = Path(src_shelf.path) / book.file_path
-    dst_path = Path(dst_shelf.path) / book.file_path
 
+    # Resolve destination path: apply template only for sync-target shelves
+    if dst_shelf.is_sync_target:
+        from app.services.organizer import _get_series_info, _get_shelf_template, resolve_template
+        template, seq_pad = await _get_shelf_template(session, target_shelf_id)
+        series_name, series_path, sequence = await _get_series_info(session, book.id)
+        new_rel_path = resolve_template(template, book, series_name, series_path, sequence, seq_pad)
+    else:
+        new_rel_path = book.file_path
+
+    dst_path = Path(dst_shelf.path) / new_rel_path
     dst_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Copy-verify-delete
@@ -152,7 +167,19 @@ async def move_book(
 
     src_path.unlink()
 
+    # Log rename if path changed (sync-target move with template applied)
+    if dst_shelf.is_sync_target and new_rel_path != book.file_path:
+        from app.models.organize import RenameLog
+        session.add(RenameLog(
+            book_id=book.id,
+            shelf_id=target_shelf_id,
+            template=template,
+            old_path=book.file_path,
+            new_path=new_rel_path,
+        ))
+
     book.shelf_id = target_shelf_id
+    book.file_path = new_rel_path
     await session.commit()
     await session.refresh(book)
     return book

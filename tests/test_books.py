@@ -397,3 +397,75 @@ async def test_move_book_same_shelf_noop(client, db_session, tmp_path):
 async def test_move_book_not_found(client):
     resp = await client.post(f"/api/books/{uuid.uuid4()}/move", json={"shelf_id": 1})
     assert resp.status_code == 404
+
+
+async def test_move_book_non_sync_shelf_preserves_path(client, db_session, tmp_path):
+    """Moving to a non-sync-target shelf keeps the original relative path."""
+    src_path = tmp_path / "src"
+    dst_path = tmp_path / "dst"
+    src_path.mkdir()
+    dst_path.mkdir()
+    shelf1 = await _create_shelf(db_session, src_path, "Src")
+    shelf2 = Shelf(name="Dst", path=str(dst_path), is_sync_target=False)
+    db_session.add(shelf2)
+    await db_session.commit()
+    await db_session.refresh(shelf2)
+
+    book_file = src_path / "subdir" / "my_book.epub"
+    book_file.parent.mkdir()
+    _make_epub(book_file)
+    book = Book(
+        id=str(uuid.uuid4()),
+        title="My Book",
+        author="Author",
+        format="epub",
+        file_path="subdir/my_book.epub",
+        shelf_id=shelf1.id,
+    )
+    db_session.add(book)
+    await db_session.commit()
+
+    resp = await client.post(f"/api/books/{book.id}/move", json={"shelf_id": shelf2.id})
+    assert resp.status_code == 200
+    assert resp.json()["file_path"] == "subdir/my_book.epub"
+    assert (dst_path / "subdir" / "my_book.epub").exists()
+
+
+async def test_move_book_sync_shelf_applies_template(client, db_session, tmp_path):
+    """Moving to a sync-target shelf applies the shelf's organization template."""
+    from app.models.shelf import ShelfTemplate
+
+    src_path = tmp_path / "src"
+    dst_path = tmp_path / "dst"
+    src_path.mkdir()
+    dst_path.mkdir()
+    shelf1 = await _create_shelf(db_session, src_path, "Src")
+    shelf2 = Shelf(name="Sync", path=str(dst_path), is_sync_target=True)
+    db_session.add(shelf2)
+    await db_session.commit()
+    await db_session.refresh(shelf2)
+
+    # Set a simple template on the sync shelf
+    tmpl = ShelfTemplate(shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2)
+    db_session.add(tmpl)
+    await db_session.commit()
+
+    book_file = src_path / "random_name.epub"
+    _make_epub(book_file)
+    book = Book(
+        id=str(uuid.uuid4()),
+        title="Great Book",
+        author="Jane Doe",
+        format="epub",
+        file_path="random_name.epub",
+        shelf_id=shelf1.id,
+    )
+    db_session.add(book)
+    await db_session.commit()
+
+    resp = await client.post(f"/api/books/{book.id}/move", json={"shelf_id": shelf2.id})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["file_path"] == "Jane Doe/Great Book.epub"
+    assert (dst_path / "Jane Doe" / "Great Book.epub").exists()
+    assert not book_file.exists()
