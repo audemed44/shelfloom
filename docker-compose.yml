@@ -1,0 +1,21 @@
+services:
+  shelfloom:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - shelves_library:/shelves/library
+      - data:/data
+      - koreader:/koreader
+    environment:
+      SHELFLOOM_DB_PATH: /data/shelfloom.db
+      SHELFLOOM_COVERS_DIR: /data/covers
+      SHELFLOOM_DEFAULT_SHELF_PATH: /shelves/library
+      SHELFLOOM_KOREADER_PATH: /koreader
+    restart: unless-stopped
+
+volumes:
+  shelves_library:
+  data:
+  koreader:
