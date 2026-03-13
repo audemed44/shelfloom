@@ -7,7 +7,7 @@ from app.database import get_engine, Base
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):  # pragma: no cover
+async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
     # Import all models so their tables are registered on Base.metadata
     import app.models  # noqa: F401
 
@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):  # pragma: no cover
 
     settings = get_settings()
     scheduler = Scheduler()
-    app.state.scheduler = scheduler
+    fastapi_app.state.scheduler = scheduler
     await scheduler.start(get_session_factory(), settings, settings.covers_dir)
 
     yield

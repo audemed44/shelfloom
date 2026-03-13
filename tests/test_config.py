@@ -6,7 +6,8 @@ from app.config import Settings
 
 
 def test_default_values():
-    s = Settings()
+    # Pass _env_file=None so a local .env doesn't override the hardcoded defaults
+    s = Settings(_env_file=None)
     assert s.db_path == "/data/shelfloom.db"
     assert s.scan_interval == 300
     assert s.debug is False
