@@ -28,9 +28,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    from app.routers import health, shelves
+    from app.routers import health, shelves, books
     application.include_router(health.router, prefix="/api")
     application.include_router(shelves.router, prefix="/api")
+    application.include_router(books.router, prefix="/api")
 
     return application
 

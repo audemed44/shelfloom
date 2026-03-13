@@ -1,0 +1,48 @@
+from datetime import datetime
+
+from pydantic import BaseModel
+
+
+class BookResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: str
+    title: str
+    author: str | None
+    isbn: str | None
+    format: str
+    file_path: str
+    shelf_id: int
+    file_hash: str | None
+    file_size: int | None
+    cover_path: str | None
+    publisher: str | None
+    language: str | None
+    description: str | None
+    page_count: int | None
+    date_added: datetime
+    date_published: str | None
+
+
+class BookUpdate(BaseModel):
+    title: str | None = None
+    author: str | None = None
+    isbn: str | None = None
+    publisher: str | None = None
+    language: str | None = None
+    description: str | None = None
+    date_published: str | None = None
+
+
+class BookListResponse(BaseModel):
+    model_config = {"from_attributes": True}
+
+    items: list[BookResponse]
+    total: int
+    page: int
+    per_page: int
+    pages: int
+
+
+class BookMoveRequest(BaseModel):
+    shelf_id: int
