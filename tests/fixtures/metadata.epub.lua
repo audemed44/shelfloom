@@ -1,30 +1,55 @@
--- exported by KOreader
-local Page = {
-    ["authors"] = "Brandon Sanderson",
-    ["title"] = "The Way of Kings",
-    ["series"] = "The Stormlight Archive",
-    ["series_index"] = 1,
-    ["language"] = "en",
-    ["description"] = "An epic fantasy novel.",
-    ["percent_finished"] = 0.73,
-    ["last_page"] = 912,
-    ["total_pages"] = 1258,
-    ["highlights"] = {
+-- /mnt/us/BookloreLibrary/The Way of Kings - Brandon Sanderson (2010).sdr/metadata.epub.lua
+return {
+    ["annotations"] = {
         [1] = {
-            ["text"] = "Life before death.",
-            ["note"] = "Interesting motto",
-            ["chapter"] = "Prelude",
-            ["pos0"] = "1/5",
-            ["pos1"] = "1/6",
+            ["chapter"] = "Prelude to the Stormlight Archive",
             ["datetime"] = "2024-01-15 20:30:00",
+            ["note"] = "Interesting motto",
+            ["pageno"] = 5,
+            ["pos0"] = "1/5/1:0",
+            ["pos1"] = "1/5/1:18",
+            ["text"] = "Life before death.",
+        },
+        [2] = {
+            ["chapter"] = "Chapter 1",
+            ["datetime"] = "2024-01-16 18:45:00",
+            ["note"] = "",
+            ["pageno"] = 42,
+            ["pos0"] = "2/1/1:0",
+            ["pos1"] = "2/1/1:52",
+            ["text"] = "The question was not how to survive.",
         },
     },
-    ["bookmarks"] = {
-        [1] = {
-            ["page"] = 912,
-            ["notes"] = "My bookmark",
-            ["datetime"] = "2024-01-15 21:00:00",
+    ["doc_pages"] = 1258,
+    ["doc_path"] = "/mnt/us/BookloreLibrary/The Way of Kings - Brandon Sanderson (2010).epub",
+    ["doc_props"] = {
+        ["authors"] = "Brandon Sanderson",
+        ["description"] = "An epic fantasy novel.",
+        ["identifiers"] = "urn:uuid:12345678-1234-1234-1234-123456789012",
+        ["language"] = "en",
+        ["title"] = "The Way of Kings",
+    },
+    ["last_xpointer"] = "/body/DocFragment[120]/body/div/p[3].42",
+    ["partial_md5_checksum"] = "abc123def456abc1",
+    ["percent_finished"] = 0.73,
+    ["stats"] = {
+        ["authors"] = "Brandon Sanderson",
+        ["highlights"] = 2,
+        ["language"] = "en",
+        ["notes"] = 1,
+        ["pages"] = 1258,
+        ["performance_in_pages"] = {
+            [1705359000] = 30,
+            [1705359060] = 25,
+            [1705365600] = 45,
+            [1705451400] = 60,
         },
+        ["series"] = "The Stormlight Archive",
+        ["title"] = "The Way of Kings",
+        ["total_time_in_sec"] = 72000,
+    },
+    ["summary"] = {
+        ["modified"] = "2024-01-16",
+        ["status"] = "reading",
     },
 }
-return Page

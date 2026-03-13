@@ -272,30 +272,42 @@ def test_parse_semicolon_separator():
 
 
 def test_parse_metadata_lua_fixture():
+    """Parse the real-format metadata.epub.lua fixture (return { ... } style)."""
     src = (FIXTURES_DIR / "metadata.epub.lua").read_text(encoding="utf-8")
     result = parse_lua(src)
 
-    assert result["authors"] == "Brandon Sanderson"
-    assert result["title"] == "The Way of Kings"
-    assert result["series"] == "The Stormlight Archive"
-    assert result["series_index"] == 1
-    assert result["language"] == "en"
+    # Top-level fields in real KOReader format
+    assert result["partial_md5_checksum"] == "abc123def456abc1"
     assert result["percent_finished"] == pytest.approx(0.73)
-    assert result["last_page"] == 912
-    assert result["total_pages"] == 1258
+    assert result["doc_pages"] == 1258
+    assert result["last_xpointer"].startswith("/body/")
 
-    highlights = result["highlights"]
-    assert isinstance(highlights, dict)
-    h1 = highlights[1]
-    assert h1["text"] == "Life before death."
-    assert h1["note"] == "Interesting motto"
-    assert h1["chapter"] == "Prelude"
-    assert h1["datetime"] == "2024-01-15 20:30:00"
+    # doc_props nested table
+    doc_props = result["doc_props"]
+    assert doc_props["authors"] == "Brandon Sanderson"
+    assert doc_props["title"] == "The Way of Kings"
+    assert doc_props["language"] == "en"
 
-    bookmarks = result["bookmarks"]
-    b1 = bookmarks[1]
-    assert b1["page"] == 912
-    assert b1["notes"] == "My bookmark"
+    # stats nested table
+    stats = result["stats"]
+    assert stats["title"] == "The Way of Kings"
+    assert stats["total_time_in_sec"] == 72000
+    perf = stats["performance_in_pages"]
+    assert isinstance(perf, dict)
+    assert perf[1705359000] == 30
+
+    # summary
+    summary = result["summary"]
+    assert summary["status"] == "reading"
+
+    # annotations
+    annotations = result["annotations"]
+    assert isinstance(annotations, dict)
+    ann1 = annotations[1]
+    assert ann1["text"] == "Life before death."
+    assert ann1["note"] == "Interesting motto"
+    assert ann1["chapter"] == "Prelude to the Stormlight Archive"
+    assert ann1["datetime"] == "2024-01-15 20:30:00"
 
 
 def test_parse_stats_lua_fixture():
