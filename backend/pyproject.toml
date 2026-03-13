@@ -36,6 +36,7 @@ testpaths = ["../tests"]
 addopts = "--cov=app --cov-report=term-missing"
 
 [tool.coverage.run]
+concurrency = ["greenlet", "thread"]
 omit = [
     "alembic/*",
     "app/__main__.py",

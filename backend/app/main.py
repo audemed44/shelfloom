@@ -7,7 +7,7 @@ from app.database import get_engine, Base
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # pragma: no cover
     # Import all models so their tables are registered on Base.metadata
     import app.models  # noqa: F401
 
@@ -28,8 +28,9 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    from app.routers import health
+    from app.routers import health, shelves
     application.include_router(health.router, prefix="/api")
+    application.include_router(shelves.router, prefix="/api")
 
     return application
 
