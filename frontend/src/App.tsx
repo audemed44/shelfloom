@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import Home from './pages/Home'
@@ -9,12 +10,33 @@ import SeriesList from './pages/SeriesList'
 import SeriesDetail from './pages/SeriesDetail'
 import Settings from './pages/Settings'
 import NotFound from './pages/NotFound'
+import SetupWizard from './components/SetupWizard'
 
 export default function App() {
+  const [showWizard, setShowWizard] = useState(false)
+  const [wizardChecked, setWizardChecked] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/shelves')
+      .then((r) => r.json())
+      .then((data: unknown[]) => {
+        if (Array.isArray(data) && data.length === 0) {
+          setShowWizard(true)
+        }
+      })
+      .catch(() => {
+        // Non-blocking — skip wizard on error
+      })
+      .finally(() => setWizardChecked(true))
+  }, [])
+
   return (
     <BrowserRouter
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
+      {showWizard && wizardChecked && (
+        <SetupWizard onComplete={() => setShowWizard(false)} />
+      )}
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />

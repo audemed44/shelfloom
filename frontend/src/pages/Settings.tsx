@@ -16,7 +16,12 @@ import {
 import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
 import ShelfModal from '../components/settings/ShelfModal'
-import type { Shelf, OrganizerResult, ScanStatus } from '../types/api'
+import type {
+  Shelf,
+  OrganizerResult,
+  ScanStatus,
+  BackfillCoversResponse,
+} from '../types/api'
 
 // ── Section header ─────────────────────────────────────────────────────────────
 
@@ -241,6 +246,12 @@ export default function Settings() {
   const [scanError, setScanError] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // ── Backfill-covers state ──
+  const [backfillLoading, setBackfillLoading] = useState(false)
+  const [backfillResult, setBackfillResult] =
+    useState<BackfillCoversResponse | null>(null)
+  const [backfillError, setBackfillError] = useState<string | null>(null)
+
   // Auto-select first shelf when shelves load
   useEffect(() => {
     if (shelves && shelves.length > 0 && !organizeShelfId) {
@@ -372,6 +383,24 @@ export default function Settings() {
       setOrganizeError(apiErr.data?.detail ?? 'Apply failed.')
     } finally {
       setApplyLoading(false)
+    }
+  }
+
+  const handleBackfillCovers = async () => {
+    setBackfillLoading(true)
+    setBackfillResult(null)
+    setBackfillError(null)
+    try {
+      const result = await api.post<BackfillCoversResponse>(
+        '/api/import/backfill-covers',
+        {}
+      )
+      if (result) setBackfillResult(result)
+    } catch (err) {
+      const apiErr = err as { data?: { detail?: string } }
+      setBackfillError(apiErr.data?.detail ?? 'Backfill failed.')
+    } finally {
+      setBackfillLoading(false)
     }
   }
 
@@ -694,6 +723,42 @@ export default function Settings() {
             )}
             {scanStatus?.is_running ? 'Scanning…' : 'Trigger Scan'}
           </button>
+
+          {/* Backfill covers */}
+          <div className="pt-4 border-t border-white/5">
+            <p className="text-[10px] text-white/30 normal-case mb-3">
+              Re-extract cover images for all books that have no cover or a
+              missing cover file.
+            </p>
+            {backfillError && (
+              <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 mb-3 normal-case">
+                {backfillError}
+              </p>
+            )}
+            {backfillResult && (
+              <div className="flex items-center gap-2 px-4 py-3 border border-primary/20 bg-primary/5 mb-3">
+                <CheckCircle2 size={14} className="text-primary shrink-0" />
+                <p className="text-xs text-primary font-black tracking-widest uppercase">
+                  {backfillResult.refreshed} refreshed ·{' '}
+                  {backfillResult.skipped} already had cover ·{' '}
+                  {backfillResult.failed} failed
+                </p>
+              </div>
+            )}
+            <button
+              onClick={handleBackfillCovers}
+              disabled={backfillLoading}
+              data-testid="backfill-covers-btn"
+              className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 disabled:opacity-40 transition-colors"
+            >
+              {backfillLoading ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <RefreshCw size={13} />
+              )}
+              Backfill Missing Covers
+            </button>
+          </div>
         </div>
       </section>
 

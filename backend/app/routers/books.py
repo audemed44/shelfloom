@@ -7,7 +7,13 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.schemas.book import BookListResponse, BookMoveRequest, BookResponse, BookSeriesMembership, BookUpdate
+from app.schemas.book import (
+    BookListResponse,
+    BookMoveRequest,
+    BookResponse,
+    BookSeriesMembership,
+    BookUpdate,
+)
 from app.services.book_service import (
     BookNotFound,
     FileOperationError,
@@ -17,6 +23,7 @@ from app.services.book_service import (
     get_book_series_memberships,
     list_books,
     move_book,
+    refresh_book_cover,
     update_book,
 )
 
@@ -99,6 +106,7 @@ async def upload_book_endpoint(
     # Import
     from app.services.import_service import _process_file
     from app.config import get_settings
+
     settings = get_settings()
     try:
         await _process_file(session, shelf, dest, settings.covers_dir)
@@ -109,6 +117,7 @@ async def upload_book_endpoint(
     # Find the created book
     from sqlalchemy import select as _select
     from app.models.book import Book
+
     rel_path = str(dest.relative_to(shelf.path))
     result2 = await session.execute(
         _select(Book).where(Book.shelf_id == shelf.id, Book.file_path == rel_path)
@@ -176,6 +185,23 @@ async def download_book_endpoint(book_id: str, session: AsyncSession = Depends(g
 
     media_type = "application/epub+zip" if book.format == "epub" else "application/pdf"
     return FileResponse(str(full_path), media_type=media_type, filename=full_path.name)
+
+
+@router.post("/{book_id}/refresh-cover", response_model=BookResponse)
+async def refresh_cover_endpoint(
+    book_id: str,
+    session: AsyncSession = Depends(get_session),
+):
+    from app.config import get_settings
+
+    settings = get_settings()
+    try:
+        book = await refresh_book_cover(session, book_id, settings.covers_dir)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except (ShelfNotFound, FileOperationError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return BookResponse.model_validate(book)
 
 
 @router.post("/{book_id}/move", response_model=BookResponse)

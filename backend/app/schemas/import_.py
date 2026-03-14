@@ -17,3 +17,9 @@ class ScanStatusResponse(BaseModel):
     last_scan_at: datetime | None
     progress: ScanProgressResponse | None
     error: str | None
+
+
+class BackfillCoversResponse(BaseModel):
+    refreshed: int
+    failed: int
+    skipped: int

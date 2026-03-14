@@ -1,4 +1,5 @@
 """Tests for Book CRUD API."""
+
 import uuid
 from pathlib import Path
 
@@ -17,6 +18,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
+
 def _make_epub(path: Path, title: str = "Book", author: str = "Author") -> Path:
     book = epub.EpubBook()
     book.set_identifier(f"id-{uuid.uuid4()}")
@@ -32,7 +34,9 @@ def _make_epub(path: Path, title: str = "Book", author: str = "Author") -> Path:
     return path
 
 
-async def _create_shelf(db_session, tmp_path, name: str = "Shelf", is_default: bool = False) -> Shelf:
+async def _create_shelf(
+    db_session, tmp_path, name: str = "Shelf", is_default: bool = False
+) -> Shelf:
     shelf = Shelf(name=name, path=str(tmp_path), is_default=is_default)
     db_session.add(shelf)
     await db_session.commit()
@@ -40,7 +44,9 @@ async def _create_shelf(db_session, tmp_path, name: str = "Shelf", is_default: b
     return shelf
 
 
-async def _create_book(db_session, shelf_id: int, title: str = "Book", author: str = "A") -> Book:
+async def _create_book(
+    db_session, shelf_id: int, title: str = "Book", author: str = "A"
+) -> Book:
     book = Book(
         id=str(uuid.uuid4()),
         title=title,
@@ -56,6 +62,7 @@ async def _create_book(db_session, shelf_id: int, title: str = "Book", author: s
 
 
 # ── list ──────────────────────────────────────────────────────────────────────
+
 
 async def test_list_books_empty(client):
     resp = await client.get("/api/books")
@@ -125,12 +132,18 @@ async def test_list_books_filter_shelf(client, db_session, tmp_path):
 async def test_list_books_filter_format(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)
     epub_book = Book(
-        id=str(uuid.uuid4()), title="EPUB", format="epub",
-        file_path="a.epub", shelf_id=shelf.id
+        id=str(uuid.uuid4()),
+        title="EPUB",
+        format="epub",
+        file_path="a.epub",
+        shelf_id=shelf.id,
     )
     pdf_book = Book(
-        id=str(uuid.uuid4()), title="PDF", format="pdf",
-        file_path="b.pdf", shelf_id=shelf.id
+        id=str(uuid.uuid4()),
+        title="PDF",
+        format="pdf",
+        file_path="b.pdf",
+        shelf_id=shelf.id,
     )
     db_session.add(epub_book)
     db_session.add(pdf_book)
@@ -175,6 +188,7 @@ async def test_list_books_filter_series(client, db_session, tmp_path):
 
 # ── get ───────────────────────────────────────────────────────────────────────
 
+
 async def test_get_book(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)
     book = await _create_book(db_session, shelf.id, "Test Book")
@@ -191,13 +205,18 @@ async def test_get_book_not_found(client):
 
 # ── update ────────────────────────────────────────────────────────────────────
 
+
 async def test_update_book_metadata(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)
     book = await _create_book(db_session, shelf.id, "Old Title")
 
     resp = await client.patch(
         f"/api/books/{book.id}",
-        json={"title": "New Title", "author": "New Author", "publisher": "New Publisher"},
+        json={
+            "title": "New Title",
+            "author": "New Author",
+            "publisher": "New Publisher",
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -212,6 +231,7 @@ async def test_update_book_not_found(client):
 
 
 # ── delete ────────────────────────────────────────────────────────────────────
+
 
 async def test_delete_book(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)
@@ -252,6 +272,7 @@ async def test_delete_book_with_file(client, db_session, tmp_path):
 
 # ── upload ────────────────────────────────────────────────────────────────────
 
+
 async def test_upload_invalid_format(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path, is_default=True)
     resp = await client.post(
@@ -285,6 +306,7 @@ async def test_upload_epub(client, db_session, tmp_path):
 
 
 # ── cover & download ──────────────────────────────────────────────────────────
+
 
 async def test_cover_not_found(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)
@@ -327,6 +349,7 @@ async def test_download_book_not_found(client):
 
 # ── move ──────────────────────────────────────────────────────────────────────
 
+
 async def test_move_book_between_shelves(client, db_session, tmp_path):
     src_path = tmp_path / "src"
     dst_path = tmp_path / "dst"
@@ -347,9 +370,7 @@ async def test_move_book_between_shelves(client, db_session, tmp_path):
     db_session.add(book)
     await db_session.commit()
 
-    resp = await client.post(
-        f"/api/books/{book.id}/move", json={"shelf_id": shelf2.id}
-    )
+    resp = await client.post(f"/api/books/{book.id}/move", json={"shelf_id": shelf2.id})
     assert resp.status_code == 200
     assert resp.json()["shelf_id"] == shelf2.id
     assert (dst_path / "move_me.epub").exists()
@@ -446,7 +467,9 @@ async def test_move_book_sync_shelf_applies_template(client, db_session, tmp_pat
     await db_session.refresh(shelf2)
 
     # Set a simple template on the sync shelf
-    tmpl = ShelfTemplate(shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2)
+    tmpl = ShelfTemplate(
+        shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2
+    )
     db_session.add(tmpl)
     await db_session.commit()
 
@@ -471,7 +494,9 @@ async def test_move_book_sync_shelf_applies_template(client, db_session, tmp_pat
     assert not book_file.exists()
 
 
-async def test_move_book_auto_organize_shelf_applies_template(client, db_session, tmp_path):
+async def test_move_book_auto_organize_shelf_applies_template(
+    client, db_session, tmp_path
+):
     """Moving to an auto_organize shelf (not sync-target) also applies the template."""
     from app.models.shelf import ShelfTemplate
 
@@ -480,12 +505,16 @@ async def test_move_book_auto_organize_shelf_applies_template(client, db_session
     src_path.mkdir()
     dst_path.mkdir()
     shelf1 = await _create_shelf(db_session, src_path, "Src2")
-    shelf2 = Shelf(name="AutoOrg", path=str(dst_path), is_sync_target=False, auto_organize=True)
+    shelf2 = Shelf(
+        name="AutoOrg", path=str(dst_path), is_sync_target=False, auto_organize=True
+    )
     db_session.add(shelf2)
     await db_session.commit()
     await db_session.refresh(shelf2)
 
-    tmpl = ShelfTemplate(shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2)
+    tmpl = ShelfTemplate(
+        shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2
+    )
     db_session.add(tmpl)
     await db_session.commit()
 
@@ -507,3 +536,90 @@ async def test_move_book_auto_organize_shelf_applies_template(client, db_session
     data = resp.json()
     assert data["file_path"] == "Test Author/Auto Book.epub"
     assert (dst_path / "Test Author" / "Auto Book.epub").exists()
+
+
+# ── refresh-cover ─────────────────────────────────────────────────────────────
+
+
+async def test_refresh_cover_unknown_book(client):
+    resp = await client.post("/api/books/no-such-id/refresh-cover")
+    assert resp.status_code == 404
+
+
+async def test_refresh_cover_file_missing(client, db_session, tmp_path):
+    """Returns 422 when the book file is not on disk."""
+    shelf = await _create_shelf(db_session, tmp_path)
+    book = await _create_book(db_session, shelf.id, "NoCoverBook")
+    resp = await client.post(f"/api/books/{book.id}/refresh-cover")
+    assert resp.status_code == 422
+
+
+async def test_refresh_cover_epub_no_cover_image(client, db_session, tmp_path):
+    """EPUB without a cover image sets cover_path to null but returns 200."""
+    shelf = await _create_shelf(db_session, tmp_path)
+    book_file = tmp_path / "nocov.epub"
+    _make_epub(book_file, "NoCov", "Writer")
+    book = Book(
+        id=str(uuid.uuid4()),
+        title="NoCov",
+        author="Writer",
+        format="epub",
+        file_path="nocov.epub",
+        shelf_id=shelf.id,
+    )
+    db_session.add(book)
+    await db_session.commit()
+
+    resp = await client.post(f"/api/books/{book.id}/refresh-cover")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["cover_path"] is None
+
+
+async def test_refresh_cover_epub_with_cover(client, db_session, tmp_path):
+    """EPUB with a cover image extracts and sets cover_path."""
+    from ebooklib import epub
+    from PIL import Image
+    import io
+
+    shelf = await _create_shelf(db_session, tmp_path)
+    book_file = tmp_path / "withcov.epub"
+
+    eb = epub.EpubBook()
+    eb.set_identifier(f"id-{uuid.uuid4()}")
+    eb.set_title("WithCov")
+    eb.add_author("Writer")
+    # Create a tiny cover image
+    img = Image.new("RGB", (60, 80), color=(100, 0, 0))
+    buf = io.BytesIO()
+    img.save(buf, "JPEG")
+    cover_item = epub.EpubItem(
+        uid="cover-img",
+        file_name="cover.jpg",  # "cover" in name triggers fallback extractor
+        media_type="image/jpeg",
+        content=buf.getvalue(),
+    )
+    eb.add_item(cover_item)
+    c1 = epub.EpubHtml(title="C1", file_name="c1.xhtml")
+    c1.content = "<p>hi</p>"
+    eb.add_item(c1)
+    eb.spine = ["nav", c1]
+    eb.add_item(epub.EpubNcx())
+    eb.add_item(epub.EpubNav())
+    epub.write_epub(str(book_file), eb)
+
+    book = Book(
+        id=str(uuid.uuid4()),
+        title="WithCov",
+        author="Writer",
+        format="epub",
+        file_path="withcov.epub",
+        shelf_id=shelf.id,
+    )
+    db_session.add(book)
+    await db_session.commit()
+
+    resp = await client.post(f"/api/books/{book.id}/refresh-cover")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["cover_path"] is not None

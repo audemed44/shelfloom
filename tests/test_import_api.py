@@ -1,4 +1,5 @@
 """Tests for scan trigger, status, and incremental scan (Step 1.10)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -101,6 +102,7 @@ async def test_scheduler_loop_runs_scan_then_sleeps():
         raise asyncio.CancelledError()
 
     import asyncio
+
     with patch.object(s, "_run_scan", fake_run):
         with patch("app.services.scheduler.asyncio.sleep", fake_sleep):
             try:
@@ -125,6 +127,7 @@ async def test_scheduler_stop_cancels_loop():
     await s.start(factory, settings, "/tmp")
     # Give the loop task a moment to start
     import asyncio
+
     await asyncio.sleep(0)
     await s.stop()
     assert s._loop_task is None
@@ -142,6 +145,7 @@ async def test_incremental_unchanged_skipped(db_session, tmp_path):
 
     # Create a real EPUB file
     from ebooklib import epub
+
     book_path = tmp_path / "book.epub"
     eb = epub.EpubBook()
     eb.set_identifier("id-inc")
@@ -298,3 +302,83 @@ async def test_scan_status_after_scan(client, tmp_path):
     assert data["progress"] is not None
 
 
+# ── backfill-covers ───────────────────────────────────────────────────────────
+
+
+async def test_backfill_covers_no_books(client):
+    """With no books in DB, backfill returns all zeros."""
+    resp = await client.post("/api/import/backfill-covers")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["refreshed"] == 0
+    assert data["failed"] == 0
+    assert data["skipped"] == 0
+
+
+async def test_backfill_covers_skips_books_with_existing_cover(
+    client, db_session, tmp_path
+):
+    """Books whose cover file already exists on disk are skipped."""
+    import uuid as _uuid
+    from app.models.book import Book
+    from app.models.shelf import Shelf
+
+    shelf = Shelf(name="BFShelf", path=str(tmp_path))
+    db_session.add(shelf)
+    await db_session.commit()
+    await db_session.refresh(shelf)
+
+    covers = tmp_path / "covers"
+    covers.mkdir()
+    cover_file = covers / "existing.jpg"
+    cover_file.write_bytes(b"fakejpeg")
+
+    book = Book(
+        id=str(_uuid.uuid4()),
+        title="HasCover",
+        author="A",
+        format="epub",
+        file_path="x.epub",
+        shelf_id=shelf.id,
+        cover_path=str(cover_file),
+    )
+    db_session.add(book)
+    await db_session.commit()
+
+    resp = await client.post("/api/import/backfill-covers")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["skipped"] == 1
+    assert data["refreshed"] == 0
+
+
+async def test_backfill_covers_fails_book_with_missing_file(
+    client, db_session, tmp_path
+):
+    """Books whose file doesn't exist on disk count as failed, not errored."""
+    import uuid as _uuid
+    from app.models.book import Book
+    from app.models.shelf import Shelf
+
+    shelf = Shelf(name="BFShelf2", path=str(tmp_path))
+    db_session.add(shelf)
+    await db_session.commit()
+    await db_session.refresh(shelf)
+
+    book = Book(
+        id=str(_uuid.uuid4()),
+        title="MissingFile",
+        author="A",
+        format="epub",
+        file_path="ghost.epub",
+        shelf_id=shelf.id,
+        cover_path=None,
+    )
+    db_session.add(book)
+    await db_session.commit()
+
+    resp = await client.post("/api/import/backfill-covers")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["failed"] == 1
+    assert data["refreshed"] == 0

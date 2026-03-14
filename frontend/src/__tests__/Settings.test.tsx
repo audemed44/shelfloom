@@ -135,6 +135,14 @@ function mockFetch(overrides: Record<string, any> = {}): any {
         json: async () => null,
       }) as Promise<Response>
     }
+    if (u.includes('/api/import/backfill-covers') && method === 'POST') {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () =>
+          overrides.backfill ?? { refreshed: 3, failed: 0, skipped: 5 },
+      }) as Promise<Response>
+    }
     if (u.includes('/api/organize/preview')) {
       return Promise.resolve({
         ok: true,
@@ -328,5 +336,25 @@ describe('Settings', () => {
       expect(screen.getByTestId('scan-progress')).toBeInTheDocument()
     )
     expect(screen.getByText('40 / 100 files')).toBeInTheDocument()
+  })
+
+  // ── Backfill covers ──
+
+  it('backfill covers button calls API and shows result', async () => {
+    renderSettings()
+    await waitFor(() => screen.getByTestId('backfill-covers-btn'))
+    await userEvent.click(screen.getByTestId('backfill-covers-btn'))
+    await waitFor(() => {
+      const calls = fetchSpy.mock.calls
+      const backfillCall = calls.find(
+        ([url, opts]: [string, RequestInit]) =>
+          url.toString().includes('/api/import/backfill-covers') &&
+          (opts?.method ?? 'GET').toUpperCase() === 'POST'
+      )
+      expect(backfillCall).toBeDefined()
+    })
+    await waitFor(() =>
+      expect(screen.getByText(/3 refreshed/i)).toBeInTheDocument()
+    )
   })
 })

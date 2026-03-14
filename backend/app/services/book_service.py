@@ -1,4 +1,5 @@
 """Book CRUD and search service."""
+
 from __future__ import annotations
 
 import os
@@ -41,23 +42,25 @@ async def list_books(
 
     if search:
         pattern = f"%{search}%"
-        query = query.where(
-            Book.title.ilike(pattern) | Book.author.ilike(pattern)
-        )
+        query = query.where(Book.title.ilike(pattern) | Book.author.ilike(pattern))
     if shelf_id is not None:
         query = query.where(Book.shelf_id == shelf_id)
     if format is not None:
         query = query.where(Book.format == format)
     if series_id is not None:
         from app.models.series import BookSeries
+
         query = query.join(BookSeries, Book.id == BookSeries.book_id).where(
             BookSeries.series_id == series_id
         )
     if tag is not None:
         from app.models.tag import BookTag, Tag
-        query = query.join(BookTag, Book.id == BookTag.book_id).join(
-            Tag, BookTag.tag_id == Tag.id
-        ).where(Tag.name == tag)
+
+        query = (
+            query.join(BookTag, Book.id == BookTag.book_id)
+            .join(Tag, BookTag.tag_id == Tag.id)
+            .where(Tag.name == tag)
+        )
 
     # Count
     count_result = await session.execute(select(func.count()).select_from(query.subquery()))
@@ -102,13 +105,27 @@ async def get_book_series_memberships(session: AsyncSession, book_id: str) -> li
         idx = next((i for i, (b, _) in enumerate(all_books) if b.book_id == book_id), None)
         prev_entry = all_books[idx - 1] if idx is not None and idx > 0 else None
         next_entry = all_books[idx + 1] if idx is not None and idx < len(all_books) - 1 else None
-        result.append({
-            "series_id": series.id,
-            "series_name": series.name,
-            "sequence": bs.sequence,
-            "prev_book": {"id": prev_entry[1].id, "title": prev_entry[1].title, "sequence": prev_entry[0].sequence} if prev_entry else None,
-            "next_book": {"id": next_entry[1].id, "title": next_entry[1].title, "sequence": next_entry[0].sequence} if next_entry else None,
-        })
+        result.append(
+            {
+                "series_id": series.id,
+                "series_name": series.name,
+                "sequence": bs.sequence,
+                "prev_book": {
+                    "id": prev_entry[1].id,
+                    "title": prev_entry[1].title,
+                    "sequence": prev_entry[0].sequence,
+                }
+                if prev_entry
+                else None,
+                "next_book": {
+                    "id": next_entry[1].id,
+                    "title": next_entry[1].title,
+                    "sequence": next_entry[0].sequence,
+                }
+                if next_entry
+                else None,
+            }
+        )
     return result
 
 
@@ -121,14 +138,10 @@ async def update_book(session: AsyncSession, book_id: str, data: BookUpdate) -> 
     return book
 
 
-async def delete_book(
-    session: AsyncSession, book_id: str, delete_file: bool = False
-) -> None:
+async def delete_book(session: AsyncSession, book_id: str, delete_file: bool = False) -> None:
     book = await get_book(session, book_id)
     if delete_file:
-        shelf_result = await session.execute(
-            select(Shelf).where(Shelf.id == book.shelf_id)
-        )
+        shelf_result = await session.execute(select(Shelf).where(Shelf.id == book.shelf_id))
         shelf = shelf_result.scalar_one_or_none()
         if shelf:
             full_path = Path(shelf.path) / book.file_path
@@ -140,6 +153,98 @@ async def delete_book(
                 shutil.rmtree(sdr)
     await session.delete(book)
     await session.commit()
+
+
+async def refresh_book_cover(
+    session: AsyncSession,
+    book_id: str,
+    covers_dir: str | Path,
+) -> Book:
+    """Re-extract the cover from the book file and update book.cover_path."""
+    book = await get_book(session, book_id)
+
+    shelf_result = await session.execute(select(Shelf).where(Shelf.id == book.shelf_id))
+    shelf = shelf_result.scalar_one_or_none()
+    if shelf is None:
+        raise ShelfNotFound(f"Shelf {book.shelf_id} not found")
+
+    full_path = Path(shelf.path) / book.file_path
+    if not full_path.exists():
+        raise FileOperationError(f"File not found: {full_path}")
+
+    output = Path(covers_dir) / f"{book.id}.jpg"
+    try:
+        if book.format == "epub":
+            from app.services.metadata.cover import extract_epub_cover
+
+            success = extract_epub_cover(full_path, output)
+        else:
+            from app.services.metadata.cover import extract_pdf_cover
+
+            success = extract_pdf_cover(full_path, output)
+        book.cover_path = str(output) if success else None
+    except Exception as e:
+        raise FileOperationError(f"Cover extraction failed: {e}") from e
+
+    await session.commit()
+    await session.refresh(book)
+    return book
+
+
+async def backfill_covers(
+    session: AsyncSession,
+    covers_dir: str | Path,
+) -> dict[str, int]:
+    """
+    Re-extract covers for all books that have no cover or a missing cover file.
+    Returns {'refreshed': n, 'failed': n, 'skipped': n}.
+    """
+    import logging
+
+    log = logging.getLogger(__name__)
+
+    result = await session.execute(select(Book))
+    books = result.scalars().all()
+
+    refreshed = 0
+    failed = 0
+    skipped = 0
+
+    for book in books:
+        # Skip if cover already exists on disk
+        if book.cover_path and os.path.exists(book.cover_path):
+            skipped += 1
+            continue
+
+        shelf_result = await session.execute(select(Shelf).where(Shelf.id == book.shelf_id))
+        shelf = shelf_result.scalar_one_or_none()
+        if shelf is None:
+            failed += 1
+            continue
+
+        full_path = Path(shelf.path) / book.file_path
+        if not full_path.exists():
+            failed += 1
+            continue
+
+        output = Path(covers_dir) / f"{book.id}.jpg"
+        try:
+            if book.format == "epub":
+                from app.services.metadata.cover import extract_epub_cover
+
+                success = extract_epub_cover(full_path, output)
+            else:
+                from app.services.metadata.cover import extract_pdf_cover
+
+                success = extract_pdf_cover(full_path, output)
+            book.cover_path = str(output) if success else None
+            refreshed += 1
+        except Exception as e:
+            log.warning("Cover backfill failed for %s: %s", book.id, e)
+            failed += 1
+
+    await session.commit()
+    return {"refreshed": refreshed, "failed": failed, "skipped": skipped}
 
 
 async def move_book(
@@ -158,16 +263,12 @@ async def move_book(
     if book.shelf_id == target_shelf_id:
         return book
 
-    src_shelf_result = await session.execute(
-        select(Shelf).where(Shelf.id == book.shelf_id)
-    )
+    src_shelf_result = await session.execute(select(Shelf).where(Shelf.id == book.shelf_id))
     src_shelf = src_shelf_result.scalar_one_or_none()
     if src_shelf is None:
         raise ShelfNotFound(f"Source shelf {book.shelf_id} not found")
 
-    dst_shelf_result = await session.execute(
-        select(Shelf).where(Shelf.id == target_shelf_id)
-    )
+    dst_shelf_result = await session.execute(select(Shelf).where(Shelf.id == target_shelf_id))
     dst_shelf = dst_shelf_result.scalar_one_or_none()
     if dst_shelf is None:
         raise ShelfNotFound(f"Target shelf {target_shelf_id} not found")
@@ -177,6 +278,7 @@ async def move_book(
     # Resolve destination path: apply template for auto-organize or sync-target shelves
     if dst_shelf.auto_organize or dst_shelf.is_sync_target:
         from app.services.organizer import _get_series_info, _get_shelf_template, resolve_template
+
         template, seq_pad = await _get_shelf_template(session, target_shelf_id)
         series_name, series_path, sequence = await _get_series_info(session, book.id)
         new_rel_path = resolve_template(template, book, series_name, series_path, sequence, seq_pad)
@@ -204,13 +306,16 @@ async def move_book(
     # Log rename if path changed (template was applied during move)
     if (dst_shelf.auto_organize or dst_shelf.is_sync_target) and new_rel_path != book.file_path:
         from app.models.organize import RenameLog
-        session.add(RenameLog(
-            book_id=book.id,
-            shelf_id=target_shelf_id,
-            template=template,
-            old_path=book.file_path,
-            new_path=new_rel_path,
-        ))
+
+        session.add(
+            RenameLog(
+                book_id=book.id,
+                shelf_id=target_shelf_id,
+                template=template,
+                old_path=book.file_path,
+                new_path=new_rel_path,
+            )
+        )
 
     book.shelf_id = target_shelf_id
     book.file_path = new_rel_path

@@ -149,3 +149,9 @@ export interface SeriesBook {
   author: string | null
   format: string | null
 }
+
+export interface BackfillCoversResponse {
+  refreshed: number
+  failed: number
+  skipped: number
+}

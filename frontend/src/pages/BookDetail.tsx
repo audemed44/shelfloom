@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   ArrowRight,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
@@ -117,6 +119,8 @@ export default function BookDetailPage() {
   const [seriesRefreshKey, setSeriesRefreshKey] = useState(0)
   const [moveOpen, setMoveOpen] = useState(false)
   const [movingTo, setMovingTo] = useState<number | null>(null)
+  const [coverRefreshing, setCoverRefreshing] = useState(false)
+  const [coverKey, setCoverKey] = useState(0)
 
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
   const { data: summary } = useApi<ReadingSummary>(
@@ -174,6 +178,25 @@ export default function BookDetailPage() {
   useEffect(() => {
     fetchBook()
   }, [fetchBook])
+
+  const handleRefreshCover = async () => {
+    if (!id) return
+    setCoverRefreshing(true)
+    try {
+      const updated = await api.post<BookDetail>(
+        `/api/books/${id}/refresh-cover`,
+        {}
+      )
+      if (updated) {
+        setBook(updated)
+        setCoverKey((k) => k + 1)
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setCoverRefreshing(false)
+    }
+  }
 
   const handleMove = async (shelfId: number) => {
     setMoveOpen(false)
@@ -306,8 +329,9 @@ export default function BookDetailPage() {
         {/* ── Left Column ── */}
         <div className="lg:col-span-5 space-y-6">
           {/* Cover */}
-          <div className="aspect-[2/3] w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 shadow-2xl shadow-primary/5">
+          <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 shadow-2xl shadow-primary/5">
             <img
+              key={coverKey}
               src={`/api/books/${book.id}/cover`}
               alt={book.title}
               className="w-full h-full object-cover"
@@ -315,6 +339,19 @@ export default function BookDetailPage() {
                 e.currentTarget.style.display = 'none'
               }}
             />
+            <button
+              onClick={handleRefreshCover}
+              disabled={coverRefreshing}
+              data-testid="refresh-cover-btn"
+              title="Refresh cover"
+              className="absolute bottom-2 right-2 p-2 bg-black/60 border border-white/10 text-white/50 hover:text-white hover:border-white/30 rounded-lg transition-all disabled:opacity-40"
+            >
+              {coverRefreshing ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <RefreshCw size={13} />
+              )}
+            </button>
           </div>
 
           {/* Progress card */}

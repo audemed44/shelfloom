@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_session
-from app.schemas.import_ import ScanProgressResponse, ScanStatusResponse
+from app.schemas.import_ import BackfillCoversResponse, ScanProgressResponse, ScanStatusResponse
 from app.services.scheduler import Scheduler
 
 router = APIRouter(prefix="/import", tags=["import"])
@@ -25,6 +25,18 @@ async def trigger_scan_endpoint(
 
     await scheduler.trigger(get_session_factory(), settings, settings.covers_dir)
     return {"message": "Scan triggered"}
+
+
+@router.post("/backfill-covers", response_model=BackfillCoversResponse)
+async def backfill_covers_endpoint(
+    session: AsyncSession = Depends(get_session),
+):
+    """Re-extract covers for all books missing a cover image."""
+    from app.services.book_service import backfill_covers
+
+    settings = get_settings()
+    counts = await backfill_covers(session, settings.covers_dir)
+    return BackfillCoversResponse(**counts)
 
 
 @router.get("/status", response_model=ScanStatusResponse)
