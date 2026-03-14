@@ -1,93 +1,184 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Edit2, Trash2, PlusCircle } from 'lucide-react'
-import { useApi } from '../hooks/useApi'
+import { BookOpen, Edit2, PlusCircle, Search, Trash2 } from 'lucide-react'
 import { api } from '../api/client'
+import { useApi } from '../hooks/useApi'
 import SeriesModal from '../components/series/SeriesModal'
 import type { SeriesWithCount } from '../types/api'
 
-interface TreeNode extends SeriesWithCount {
-  children: TreeNode[]
+const PER_PAGE = 20
+
+interface SeriesGroup {
+  parent: SeriesWithCount
+  children: SeriesWithCount[]
+  totalBooks: number
 }
 
-function buildTree(flat: SeriesWithCount[]): TreeNode[] {
-  const map = new Map<number, TreeNode>()
-  const roots: TreeNode[] = []
+function buildGroups(flat: SeriesWithCount[]): SeriesGroup[] {
+  const roots = flat.filter((s) => s.parent_id == null)
+  const addedIds = new Set<number>()
+  const groups: SeriesGroup[] = []
 
-  for (const s of flat) {
-    map.set(s.id, { ...s, children: [] })
+  for (const root of roots) {
+    const children = flat.filter((s) => s.parent_id === root.id)
+    const totalBooks =
+      root.book_count + children.reduce((sum, c) => sum + c.book_count, 0)
+    groups.push({ parent: root, children, totalBooks })
+    addedIds.add(root.id)
+    children.forEach((c) => addedIds.add(c.id))
   }
-  for (const node of map.values()) {
-    if (node.parent_id != null && map.has(node.parent_id)) {
-      map.get(node.parent_id)!.children.push(node)
-    } else {
-      roots.push(node)
+
+  // Orphaned children (parent was deleted etc.)
+  for (const s of flat) {
+    if (!addedIds.has(s.id)) {
+      groups.push({ parent: s, children: [], totalBooks: s.book_count })
     }
   }
-  return roots
+
+  return groups
 }
 
-interface SeriesRowProps {
-  node: TreeNode
-  depth: number
-  allSeries: SeriesWithCount[]
-  onEdit: (s: SeriesWithCount) => void
-  onDelete: (s: SeriesWithCount) => void
+function CoverThumb({
+  bookId,
+  size = 'md',
+}: {
+  bookId: string | null
+  size?: 'sm' | 'md'
+}) {
+  const dims = size === 'sm' ? 'w-8 h-[44px]' : 'w-9 h-[52px]'
+  return bookId ? (
+    <img
+      src={`/api/books/${bookId}/cover`}
+      alt=""
+      className={`${dims} object-cover bg-white/5 shrink-0`}
+    />
+  ) : (
+    <div
+      className={`${dims} bg-white/5 border border-white/10 flex items-center justify-center shrink-0`}
+    >
+      <BookOpen size={12} className="text-white/20" />
+    </div>
+  )
 }
 
-function SeriesRow({
-  node,
-  depth,
-  allSeries,
+function RowActions({
+  series,
   onEdit,
   onDelete,
-}: SeriesRowProps) {
+}: {
+  series: SeriesWithCount
+  onEdit: (s: SeriesWithCount) => void
+  onDelete: (s: SeriesWithCount) => void
+}) {
   return (
-    <>
-      <div
-        className="flex items-center justify-between py-2.5 border-b border-white/5"
-        style={{ paddingLeft: `${depth * 16 + 12}px` }}
-        data-testid={`series-row-${node.id}`}
+    <div className="flex items-center gap-1 shrink-0">
+      <button
+        onClick={() => onEdit(series)}
+        aria-label={`Edit ${series.name}`}
+        className="p-1.5 text-white/40 hover:text-white transition-colors"
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <Edit2 size={13} />
+      </button>
+      <button
+        onClick={() => onDelete(series)}
+        aria-label={`Delete ${series.name}`}
+        className="p-1.5 text-white/40 hover:text-red-400 transition-colors"
+      >
+        <Trash2 size={13} />
+      </button>
+    </div>
+  )
+}
+
+function GroupCard({
+  group,
+  onEdit,
+  onDelete,
+}: {
+  group: SeriesGroup
+  onEdit: (s: SeriesWithCount) => void
+  onDelete: (s: SeriesWithCount) => void
+}) {
+  const { parent, children, totalBooks } = group
+  const hasChildren = children.length > 0
+
+  if (!hasChildren) {
+    // Standalone series — simple flat row
+    return (
+      <div
+        className="flex items-center gap-4 px-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors"
+        data-testid={`series-row-${parent.id}`}
+      >
+        <Link to={`/series/${parent.id}`} className="shrink-0">
+          <CoverThumb bookId={parent.first_book_id} />
+        </Link>
+        <div className="flex-1 min-w-0">
           <Link
-            to={`/series/${node.id}`}
-            className="text-sm text-white/80 normal-case hover:text-white transition-colors truncate"
+            to={`/series/${parent.id}`}
+            className="text-sm text-white/80 normal-case hover:text-white transition-colors truncate block"
           >
-            {node.name}
+            {parent.name}
           </Link>
-          <span className="shrink-0 text-[10px] font-black tracking-widest uppercase text-white/30 bg-white/5 px-1.5 py-0.5 rounded">
-            {node.book_count}
-          </span>
         </div>
-        <div className="flex items-center gap-1 shrink-0 ml-2">
-          <button
-            onClick={() => onEdit(node)}
-            aria-label={`Edit ${node.name}`}
-            className="p-1.5 text-white/40 hover:text-white transition-colors"
-          >
-            <Edit2 size={13} />
-          </button>
-          <button
-            onClick={() => onDelete(node)}
-            aria-label={`Delete ${node.name}`}
-            className="p-1.5 text-white/40 hover:text-red-400 transition-colors"
-          >
-            <Trash2 size={13} />
-          </button>
-        </div>
+        <span className="shrink-0 text-[10px] font-black tracking-widest uppercase text-white/30 bg-white/5 px-1.5 py-0.5">
+          {totalBooks} {totalBooks === 1 ? 'book' : 'books'}
+        </span>
+        <RowActions series={parent} onEdit={onEdit} onDelete={onDelete} />
       </div>
-      {node.children.map((child) => (
-        <SeriesRow
+    )
+  }
+
+  // Parent + children grouped card
+  return (
+    <div
+      className="border-b border-white/5 last:border-0"
+      data-testid={`series-row-${parent.id}`}
+    >
+      {/* Parent header */}
+      <div className="flex items-center gap-4 px-4 py-3 bg-white/[0.03] border-b border-white/10">
+        <Link to={`/series/${parent.id}`} className="shrink-0">
+          <CoverThumb bookId={parent.first_book_id} />
+        </Link>
+        <div className="flex-1 min-w-0">
+          <Link
+            to={`/series/${parent.id}`}
+            className="text-sm font-bold text-white normal-case hover:text-primary transition-colors truncate block"
+          >
+            {parent.name}
+          </Link>
+          <p className="text-[10px] font-black tracking-widest uppercase text-white/30 mt-0.5">
+            {children.length} {children.length === 1 ? 'series' : 'series'} ·{' '}
+            {totalBooks} {totalBooks === 1 ? 'book' : 'books'} total
+          </p>
+        </div>
+        <RowActions series={parent} onEdit={onEdit} onDelete={onDelete} />
+      </div>
+
+      {/* Children */}
+      {children.map((child) => (
+        <div
           key={child.id}
-          node={child}
-          depth={depth + 1}
-          allSeries={allSeries}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
+          className="flex items-center gap-4 pl-8 pr-4 py-3 border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors"
+          data-testid={`series-row-${child.id}`}
+        >
+          <Link to={`/series/${child.id}`} className="shrink-0">
+            <CoverThumb bookId={child.first_book_id} size="sm" />
+          </Link>
+          <div className="flex-1 min-w-0">
+            <Link
+              to={`/series/${child.id}`}
+              className="text-sm text-white/70 normal-case hover:text-white transition-colors truncate block"
+            >
+              {child.name}
+            </Link>
+          </div>
+          <span className="shrink-0 text-[10px] font-black tracking-widest uppercase text-white/30 bg-white/5 px-1.5 py-0.5">
+            {child.book_count} {child.book_count === 1 ? 'book' : 'books'}
+          </span>
+          <RowActions series={child} onEdit={onEdit} onDelete={onDelete} />
+        </div>
       ))}
-    </>
+    </div>
   )
 }
 
@@ -98,12 +189,36 @@ export default function SeriesList() {
   >(undefined)
   const [showCreate, setShowCreate] = useState(false)
   const [purgeResult, setPurgeResult] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
   const { data: flatList } = useApi<SeriesWithCount[]>(
     `/api/series/tree?_k=${refreshKey}`
   )
-  const allSeries: SeriesWithCount[] = flatList ?? []
-  const tree = buildTree(allSeries)
+  const allSeries = useMemo<SeriesWithCount[]>(() => flatList ?? [], [flatList])
+  const groups = useMemo(() => buildGroups(allSeries), [allSeries])
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return groups
+    const q = search.toLowerCase()
+    return groups.filter(
+      (g) =>
+        g.parent.name.toLowerCase().includes(q) ||
+        g.children.some((c) => c.name.toLowerCase().includes(q))
+    )
+  }, [groups, search])
+
+  const pages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
+  const currentPage = Math.min(page, pages)
+  const pageItems = filtered.slice(
+    (currentPage - 1) * PER_PAGE,
+    currentPage * PER_PAGE
+  )
+
+  const handleSearch = (q: string) => {
+    setSearch(q)
+    setPage(1)
+  }
 
   const handleDelete = async (s: SeriesWithCount) => {
     if (!window.confirm(`Delete series "${s.name}"?`)) return
@@ -121,7 +236,7 @@ export default function SeriesList() {
         '/api/series/empty'
       )
       if (result && result.count > 0) {
-        setPurgeResult(`Deleted: ${result.deleted.join(', ')}`)
+        setPurgeResult(`Deleted ${result.count}: ${result.deleted.join(', ')}`)
       } else {
         setPurgeResult('No empty series found')
       }
@@ -175,35 +290,75 @@ export default function SeriesList() {
       {/* Purge result banner */}
       {purgeResult && (
         <div
-          className="px-4 py-3 mb-6 border border-white/10 bg-white/5 rounded-lg text-sm text-white/70 normal-case"
+          className="px-4 py-3 mb-6 border border-white/10 bg-white/5 text-sm text-white/70 normal-case"
           data-testid="purge-result"
         >
           {purgeResult}
         </div>
       )}
 
-      {/* Series tree */}
+      {/* Search */}
+      <div className="relative max-w-5xl mb-4">
+        <Search
+          size={14}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30"
+        />
+        <input
+          type="text"
+          placeholder="Search series..."
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+          className="w-full bg-black border border-white/10 pl-9 pr-4 py-2.5 text-sm text-white placeholder-white/20 focus:border-primary focus:outline-none normal-case"
+        />
+      </div>
+
+      {/* Series list */}
       <div
-        className="border border-white/10 rounded-lg bg-black max-w-5xl"
+        className="border border-white/10 bg-black max-w-5xl"
         data-testid="series-list"
       >
-        {tree.length === 0 ? (
+        {pageItems.length === 0 ? (
           <p className="text-sm text-white/30 text-center py-12 normal-case">
-            No series yet
+            {search ? 'No series match your search' : 'No series yet'}
           </p>
         ) : (
-          tree.map((node) => (
-            <SeriesRow
-              key={node.id}
-              node={node}
-              depth={0}
-              allSeries={allSeries}
+          pageItems.map((group) => (
+            <GroupCard
+              key={group.parent.id}
+              group={group}
               onEdit={(s) => setEditingSeries(s)}
               onDelete={handleDelete}
             />
           ))
         )}
       </div>
+
+      {/* Pagination */}
+      {pages > 1 && (
+        <div className="flex items-center justify-between max-w-5xl mt-4">
+          <span className="text-[10px] font-black tracking-widest uppercase text-white/30">
+            {(currentPage - 1) * PER_PAGE + 1}–
+            {Math.min(currentPage * PER_PAGE, filtered.length)} of{' '}
+            {filtered.length}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-xs font-bold border border-white/10 text-white/40 hover:text-white hover:border-white/30 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+            >
+              Prev
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(pages, p + 1))}
+              disabled={currentPage === pages}
+              className="px-3 py-1.5 text-xs font-bold border border-white/10 text-white/40 hover:text-white hover:border-white/30 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       {showCreate && (

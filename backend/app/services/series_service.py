@@ -128,14 +128,42 @@ async def remove_book_from_series(session: AsyncSession, series_id: int, book_id
 
 
 async def get_series_tree(session: AsyncSession) -> list[dict]:
-    """Return all series as a flat list, clients can build the tree."""
-    result = await session.execute(
-        select(Series, func.count(BookSeries.book_id).label("book_count"))
-        .outerjoin(BookSeries, Series.id == BookSeries.series_id)
-        .group_by(Series.id)
-        .order_by(Series.parent_id, Series.sort_order)
+    """Return all series as a flat list with book counts, first book ID, and parent name."""
+    from sqlalchemy.orm import aliased
+
+    ParentSeries = aliased(Series)
+
+    # Correlated subquery: ID of first book with a cover in this series (by sequence)
+    first_book_sq = (
+        select(BookSeries.book_id)
+        .join(Book, Book.id == BookSeries.book_id)
+        .where(BookSeries.series_id == Series.id, Book.cover_path.isnot(None))
+        .order_by(nullslast(BookSeries.sequence), BookSeries.book_id)
+        .limit(1)
+        .scalar_subquery()
     )
-    return [{"series": row.Series, "book_count": row.book_count} for row in result]
+
+    result = await session.execute(
+        select(
+            Series,
+            func.count(BookSeries.book_id).label("book_count"),
+            first_book_sq.label("first_book_id"),
+            ParentSeries.name.label("parent_name"),
+        )
+        .outerjoin(BookSeries, Series.id == BookSeries.series_id)
+        .outerjoin(ParentSeries, Series.parent_id == ParentSeries.id)
+        .group_by(Series.id)
+        .order_by(nullslast(Series.parent_id), Series.sort_order, Series.name)
+    )
+    return [
+        {
+            "series": row.Series,
+            "book_count": row.book_count,
+            "first_book_id": row.first_book_id,
+            "parent_name": row.parent_name,
+        }
+        for row in result
+    ]
 
 
 async def purge_empty_series(session: AsyncSession) -> list[str]:

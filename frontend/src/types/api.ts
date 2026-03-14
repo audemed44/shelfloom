@@ -126,9 +126,11 @@ export interface SeriesWithCount {
   name: string
   description: string | null
   parent_id: number | null
+  parent_name: string | null
   sort_order: number
   cover_path: string | null
   book_count: number
+  first_book_id: string | null
 }
 
 export interface ReadingOrder {

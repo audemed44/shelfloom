@@ -55,7 +55,8 @@ async def series_tree_endpoint(session: AsyncSession = Depends(get_session)):
     for row in rows:
         data = SeriesResponse.model_validate(row["series"]).model_dump()
         data["book_count"] = row["book_count"]
-        data["children"] = []
+        data["first_book_id"] = row["first_book_id"]
+        data["parent_name"] = row["parent_name"]
         result.append(data)
     return result
 
