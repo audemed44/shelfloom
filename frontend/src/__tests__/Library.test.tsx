@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, createEvent, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import Library from '../pages/Library'
@@ -18,14 +18,22 @@ interface MockFetchOptions {
   books?: typeof MOCK_BOOKS
   total?: number
   shelves?: typeof MOCK_SHELVES
+  uploadResponse?: typeof MOCK_BOOKS[0] | null
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mockFetch({ books = MOCK_BOOKS, total = MOCK_BOOKS.length, shelves = MOCK_SHELVES }: MockFetchOptions = {}): any {
-  return vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+function mockFetch({ books = MOCK_BOOKS, total = MOCK_BOOKS.length, shelves = MOCK_SHELVES, uploadResponse = null }: MockFetchOptions = {}): any {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => {
     const u = url.toString()
+    const method = ((options as RequestInit)?.method ?? 'GET').toUpperCase()
     if (u.includes('/api/shelves')) {
       return Promise.resolve({ ok: true, status: 200, json: async () => shelves }) as Promise<Response>
+    }
+    if (u.includes('/api/books') && method === 'POST') {
+      if (uploadResponse) {
+        return Promise.resolve({ ok: true, status: 201, json: async () => uploadResponse }) as Promise<Response>
+      }
+      return Promise.resolve({ ok: false, status: 422, json: async () => ({ detail: 'Upload failed' }) }) as Promise<Response>
     }
     return Promise.resolve({
       ok: true,
@@ -156,5 +164,93 @@ describe('Library', () => {
     mockFetch({ total: 50 })
     renderLibrary()
     await waitFor(() => expect(screen.getByLabelText('Next page')).toBeInTheDocument())
+  })
+})
+
+describe('Upload', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fetchSpy: any
+
+  beforeEach(() => { fetchSpy = mockFetch({ uploadResponse: MOCK_BOOKS[0] }) })
+  afterEach(() => fetchSpy.mockRestore())
+
+  it('file drop triggers upload', async () => {
+    renderLibrary()
+    await waitFor(() => screen.getByTestId('upload-zone'))
+
+    const file = new File(['content'], 'dune.epub', { type: 'application/epub+zip' })
+    const dropEvent = createEvent.drop(screen.getByTestId('upload-zone'))
+    Object.defineProperty(dropEvent, 'dataTransfer', { value: { files: [file] } })
+    fireEvent(screen.getByTestId('upload-zone'), dropEvent)
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/api/books'),
+        expect.objectContaining({ method: 'POST' }),
+      )
+    )
+  })
+
+  it('shows progress spinner during upload', async () => {
+    const user = userEvent.setup()
+    let resolveUpload!: (v: unknown) => void
+    fetchSpy.mockImplementation((url: string, options?: RequestInit) => {
+      const u = url.toString()
+      const method = ((options as RequestInit)?.method ?? 'GET').toUpperCase()
+      if (u.includes('/api/shelves')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_SHELVES }) as Promise<Response>
+      }
+      if (u.includes('/api/books') && method === 'POST') {
+        return new Promise((r) => { resolveUpload = r })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ items: MOCK_BOOKS, total: MOCK_BOOKS.length, page: 1, per_page: 24 }) }) as Promise<Response>
+    })
+
+    renderLibrary()
+    const input = screen.getByTestId('file-input')
+    await user.upload(input, new File(['content'], 'dune.epub', { type: 'application/epub+zip' }))
+
+    await waitFor(() => expect(screen.getByTestId('upload-spinner')).toBeInTheDocument())
+
+    // Resolve so upload doesn't leak into other tests
+    resolveUpload({ ok: true, status: 201, json: async () => MOCK_BOOKS[0] })
+  })
+
+  it('shows error for invalid file type', async () => {
+    // applyAccept: false simulates bypassing the file picker filter (e.g. via drag-and-drop)
+    const user = userEvent.setup({ applyAccept: false })
+    renderLibrary()
+    const input = screen.getByTestId('file-input')
+    await user.upload(input, new File(['content'], 'notes.txt', { type: 'text/plain' }))
+
+    await waitFor(() => expect(screen.getByTestId('upload-error')).toBeInTheDocument())
+    expect(screen.getByTestId('upload-error')).toHaveTextContent(/epub.*pdf/i)
+  })
+
+  it('refreshes book list after successful upload', async () => {
+    const user = userEvent.setup()
+    let bookCount = 0
+    fetchSpy.mockImplementation((url: string, options?: RequestInit) => {
+      const u = url.toString()
+      const method = ((options as RequestInit)?.method ?? 'GET').toUpperCase()
+      if (u.includes('/api/shelves')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_SHELVES }) as Promise<Response>
+      }
+      if (u.includes('/api/books') && method === 'POST') {
+        bookCount = 1
+        return Promise.resolve({ ok: true, status: 201, json: async () => MOCK_BOOKS[0] }) as Promise<Response>
+      }
+      const books = bookCount > 0 ? [MOCK_BOOKS[0]] : []
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ items: books, total: books.length, page: 1, per_page: 24 }) }) as Promise<Response>
+    })
+
+    renderLibrary()
+    await waitFor(() => expect(screen.getByTestId('empty-state')).toBeInTheDocument())
+
+    const input = screen.getByTestId('file-input')
+    await user.upload(input, new File(['content'], 'dune.epub', { type: 'application/epub+zip' }))
+
+    await waitFor(() => expect(screen.queryByTestId('upload-spinner')).not.toBeInTheDocument())
+    await waitFor(() => expect(screen.getAllByTestId('book-card')).toHaveLength(1))
   })
 })

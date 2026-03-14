@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { Search, LayoutGrid, LayoutList, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
 import BookCard from '../components/library/BookCard'
 import BookRow from '../components/library/BookRow'
 import { SkeletonCard, SkeletonRow } from '../components/library/SkeletonCard'
+import UploadZone from '../components/library/UploadZone'
 import type { Book, Shelf, PaginatedResponse } from '../types'
 
 const PER_PAGE = 24
@@ -205,15 +206,36 @@ export default function Library() {
   const [selectedShelfId, setSelectedShelfId] = useState<number | null>(null)
   const [sort, setSort] = useState('created_at')
   const [page, setPage] = useState(1)
+  const [rev, setRev] = useState(0)
+  const [isDraggingOver, setIsDraggingOver] = useState(false)
+  const dragCounter = useRef(0)
 
   const debouncedSearch = useDebounce(search, 300)
 
   const resetPage = () => setPage(1)
 
+  const handleUploadSuccess = useCallback(() => {
+    setRev((r) => r + 1)
+  }, [])
+
+  // Page-level drag detection to highlight the upload zone
+  const handleDragEnter = () => {
+    dragCounter.current++
+    setIsDraggingOver(true)
+  }
+  const handleDragLeave = () => {
+    dragCounter.current--
+    if (dragCounter.current === 0) setIsDraggingOver(false)
+  }
+  const handlePageDrop = () => {
+    dragCounter.current = 0
+    setIsDraggingOver(false)
+  }
+
   // Shelves for tab bar
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
 
-  // Books — re-fetches whenever any filter/sort/page changes
+  // Books — re-fetches whenever any filter/sort/page/rev changes
   const booksPath = useMemo(() => {
     const params = new URLSearchParams({
       page: String(page),
@@ -222,8 +244,9 @@ export default function Library() {
     })
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (selectedShelfId) params.set('shelf_id', String(selectedShelfId))
+    if (rev > 0) params.set('_rev', String(rev))
     return `/api/books?${params}`
-  }, [page, debouncedSearch, selectedShelfId, sort])
+  }, [page, debouncedSearch, selectedShelfId, sort, rev])
 
   const { data: booksData, loading } = useApi<PaginatedResponse<Book>>(booksPath)
   const books = booksData?.items ?? []
@@ -231,7 +254,13 @@ export default function Library() {
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
 
   return (
-    <div className="p-4 sm:p-6 lg:p-12">
+    <div
+      className="p-4 sm:p-6 lg:p-12"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handlePageDrop}
+      onDragOver={(e) => e.preventDefault()}
+    >
       {/* Header */}
       <header className="mb-6 sm:mb-8">
         <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
@@ -243,6 +272,9 @@ export default function Library() {
           </p>
         )}
       </header>
+
+      {/* Upload zone */}
+      <UploadZone onSuccess={handleUploadSuccess} highlighted={isDraggingOver} />
 
       {/* Shelf tabs */}
       {shelves && shelves.length > 0 && (
