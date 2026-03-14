@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { api } from '../api/client'
 
 describe('api client', () => {
-  let fetchSpy
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fetchSpy: any
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, 'fetch')
@@ -41,7 +42,8 @@ describe('api client', () => {
       json: async () => ({ detail: 'Validation error' }),
     })
 
-    let err
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let err: any
     try {
       await api.get('/api/books')
     } catch (e) {
@@ -72,7 +74,8 @@ describe('api client', () => {
 
     await api.post('/api/shelves', { name: 'Test' })
 
-    const [, options] = fetchSpy.mock.calls[0]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [, options]: [string, any] = fetchSpy.mock.calls[0]
     expect(options.method).toBe('POST')
     expect(options.body).toBe(JSON.stringify({ name: 'Test' }))
     expect(options.headers['Content-Type']).toBe('application/json')
@@ -90,7 +93,8 @@ describe('api client', () => {
 
     await api.upload('/api/books', formData)
 
-    const [, options] = fetchSpy.mock.calls[0]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [, options]: [string, any] = fetchSpy.mock.calls[0]
     expect(options.body).toBe(formData)
     expect(options.headers['Content-Type']).toBeUndefined()
   })
@@ -104,7 +108,8 @@ describe('api client', () => {
 
     await api.patch('/api/books/1', { title: 'Updated' })
 
-    const [, options] = fetchSpy.mock.calls[0]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [, options]: [string, any] = fetchSpy.mock.calls[0]
     expect(options.method).toBe('PATCH')
     expect(options.body).toBe(JSON.stringify({ title: 'Updated' }))
   })

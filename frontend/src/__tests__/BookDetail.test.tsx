@@ -5,11 +5,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import BookDetail from '../pages/BookDetail'
 
 const BOOK = {
-  id: 'book-1',
+  id: 1,
   title: 'The Way of Kings',
   author: 'Brandon Sanderson',
   format: 'epub',
   shelf_id: 10,
+  shelf_name: 'Main Library',
   page_count: 1007,
   language: 'en',
   publisher: 'Tor Books',
@@ -17,30 +18,29 @@ const BOOK = {
   description: 'An epic fantasy novel.',
   isbn: null,
   file_path: 'way-of-kings.epub',
-  file_hash: null,
-  file_size: null,
-  cover_path: null,
-  date_added: '2024-01-15T00:00:00',
+  shelfloom_id: null,
+  created_at: '2024-01-15T00:00:00',
+  updated_at: '2024-01-15T00:00:00',
 }
 
 const SHELVES = [
-  { id: 10, name: 'Main Library', book_count: 5 },
-  { id: 20, name: 'Kobo', book_count: 2 },
+  { id: 10, name: 'Main Library', book_count: 5, path: '/books', is_default: true, is_sync_target: false },
+  { id: 20, name: 'Kobo', book_count: 2, path: '/kobo', is_default: false, is_sync_target: true },
 ]
 
-const SUMMARY = { total_sessions: 3, total_time_seconds: 7200, percent_finished: 42 }
+const SUMMARY = { total_sessions: 3, total_time_seconds: 7200, percent_finished: 42 as number | null }
 
 const SESSIONS = {
   items: [
-    { id: 1, book_id: 'book-1', start_time: '2024-06-01T20:00:00', duration: 3600, pages_read: 60, device: 'Kobo Libra', source: 'sdr', dismissed: false },
-    { id: 2, book_id: 'book-1', start_time: '2024-06-03T21:00:00', duration: 1800, pages_read: 30, device: null, source: 'sdr', dismissed: false },
+    { id: 1, book_id: 1, started_at: '2024-06-01T20:00:00', start_time: '2024-06-01T20:00:00', duration_seconds: 3600, duration: 3600, pages_read: 60, device: 'Kobo Libra', source: 'sdr', dismissed: false },
+    { id: 2, book_id: 1, started_at: '2024-06-03T21:00:00', start_time: '2024-06-03T21:00:00', duration_seconds: 1800, duration: 1800, pages_read: 30, device: null, source: 'sdr', dismissed: false },
   ],
   total: 2, page: 1, per_page: 5,
 }
 
 const HIGHLIGHTS = {
   items: [
-    { id: 1, book_id: 'book-1', text: 'Life before death.', note: 'First ideal', chapter: 'Prologue', page: 1, created: '2024-06-01T20:30:00' },
+    { id: 1, book_id: 1, text: 'Life before death.', note: 'First ideal', chapter: 'Prologue', created_at: '2024-06-01T20:30:00' },
   ],
   total: 1, page: 1, per_page: 5,
 }
@@ -51,36 +51,34 @@ const SERIES = [
     series_name: 'Stormlight Archive',
     sequence: 1,
     prev_book: null,
-    next_book: { id: 'book-2', title: 'Words of Radiance', sequence: 2 },
+    next_book: { id: 2, title: 'Words of Radiance' },
   },
 ]
 
-function mockFetch({ book = BOOK, shelves = SHELVES, summary = SUMMARY, sessions = SESSIONS, highlights = HIGHLIGHTS, series = SERIES } = {}) {
+interface MockFetchOptions {
+  book?: typeof BOOK
+  shelves?: typeof SHELVES
+  summary?: typeof SUMMARY
+  sessions?: typeof SESSIONS
+  highlights?: typeof HIGHLIGHTS
+  series?: typeof SERIES
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockFetch({ book = BOOK, shelves = SHELVES, summary = SUMMARY, sessions = SESSIONS, highlights = HIGHLIGHTS, series = SERIES }: MockFetchOptions = {}): any {
   return vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
     const u = url.toString()
-    if (u.includes('/api/shelves')) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => shelves })
-    }
-    if (u.includes('/reading-summary')) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => summary })
-    }
-    if (u.includes('/sessions')) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => sessions })
-    }
-    if (u.includes('/highlights')) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => highlights })
-    }
-    if (u.match(/\/api\/books\/[^/]+\/series/)) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => series })
-    }
-    if (u.match(/\/api\/books\/[^/]+$/)) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => book })
-    }
-    return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+    if (u.includes('/api/shelves')) return Promise.resolve({ ok: true, status: 200, json: async () => shelves }) as Promise<Response>
+    if (u.includes('/reading-summary')) return Promise.resolve({ ok: true, status: 200, json: async () => summary }) as Promise<Response>
+    if (u.includes('/sessions')) return Promise.resolve({ ok: true, status: 200, json: async () => sessions }) as Promise<Response>
+    if (u.includes('/highlights')) return Promise.resolve({ ok: true, status: 200, json: async () => highlights }) as Promise<Response>
+    if (u.match(/\/api\/books\/[^/]+\/series/)) return Promise.resolve({ ok: true, status: 200, json: async () => series }) as Promise<Response>
+    if (u.match(/\/api\/books\/[^/]+$/)) return Promise.resolve({ ok: true, status: 200, json: async () => book }) as Promise<Response>
+    return Promise.resolve({ ok: true, status: 200, json: async () => ({}) }) as Promise<Response>
   })
 }
 
-function renderDetail(bookId = 'book-1') {
+function renderDetail(bookId: string | number = 1) {
   return render(
     <MemoryRouter
       initialEntries={[`/books/${bookId}`]}
@@ -95,7 +93,8 @@ function renderDetail(bookId = 'book-1') {
 }
 
 describe('BookDetail', () => {
-  let fetchSpy
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fetchSpy: any
 
   beforeEach(() => { fetchSpy = mockFetch() })
   afterEach(() => fetchSpy.mockRestore())
@@ -124,7 +123,7 @@ describe('BookDetail', () => {
     renderDetail()
     await waitFor(() => expect(screen.getByTestId('series-nav')).toBeInTheDocument())
     const nextLink = screen.getByTestId('next-book-link')
-    expect(nextLink).toHaveAttribute('href', '/books/book-2')
+    expect(nextLink).toHaveAttribute('href', '/books/2')
     expect(nextLink).toHaveTextContent('Words of Radiance')
   })
 
@@ -156,9 +155,9 @@ describe('BookDetail', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
       const u = url.toString()
       if (u.match(/\/api\/books\/[^/]+$/) && !u.includes('/series') && !u.includes('/sessions') && !u.includes('/highlights') && !u.includes('/reading-summary')) {
-        return Promise.resolve({ ok: false, status: 404, json: async () => ({ detail: 'Not found' }) })
+        return Promise.resolve({ ok: false, status: 404, json: async () => ({ detail: 'Not found' }) }) as Promise<Response>
       }
-      return Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] }) as Promise<Response>
     })
     renderDetail('missing-id')
     await waitFor(() => expect(screen.getByTestId('not-found')).toBeInTheDocument())
@@ -184,29 +183,11 @@ describe('BookDetail', () => {
   it('edit modal saves changes via PATCH and updates book', async () => {
     const user = userEvent.setup()
     fetchSpy.mockRestore()
-    fetchSpy = mockFetch()
-    vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => {
-      const u = url.toString()
-      if (options?.method === 'PATCH') {
-        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...BOOK, title: 'Updated Title' }) })
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, _options) => {
+      if ((_options as RequestInit)?.method === 'PATCH') {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...BOOK, title: 'Updated Title' }) }) as Promise<Response>
       }
-      return fetchSpy['_impl']?.(url, options) ?? mockFetch()['_impl']?.(url, options)
-    })
-
-    // Use a fresh mock that handles PATCH
-    fetchSpy.mockRestore()
-    vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => {
-      const u = url.toString()
-      if (options?.method === 'PATCH') {
-        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...BOOK, title: 'Updated Title' }) })
-      }
-      if (u.includes('/api/shelves')) return Promise.resolve({ ok: true, status: 200, json: async () => SHELVES })
-      if (u.includes('/reading-summary')) return Promise.resolve({ ok: true, status: 200, json: async () => SUMMARY })
-      if (u.includes('/sessions')) return Promise.resolve({ ok: true, status: 200, json: async () => SESSIONS })
-      if (u.includes('/highlights')) return Promise.resolve({ ok: true, status: 200, json: async () => HIGHLIGHTS })
-      if (u.match(/\/api\/books\/[^/]+\/series/)) return Promise.resolve({ ok: true, status: 200, json: async () => SERIES })
-      if (u.match(/\/api\/books\/[^/]+$/)) return Promise.resolve({ ok: true, status: 200, json: async () => BOOK })
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+      return fetchSpy['_impl']?.(url, _options) ?? mockFetch()['_impl']?.(url, _options)
     })
 
     renderDetail()
@@ -232,18 +213,18 @@ describe('BookDetail', () => {
   it('navigates to library after confirmed delete', async () => {
     const user = userEvent.setup()
     fetchSpy.mockRestore()
-    vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, _options) => {
       const u = url.toString()
-      if (options?.method === 'DELETE') {
-        return Promise.resolve({ ok: true, status: 204, json: async () => null })
+      if ((_options as RequestInit)?.method === 'DELETE') {
+        return Promise.resolve({ ok: true, status: 204, json: async () => null }) as Promise<Response>
       }
-      if (u.includes('/api/shelves')) return Promise.resolve({ ok: true, status: 200, json: async () => SHELVES })
-      if (u.includes('/reading-summary')) return Promise.resolve({ ok: true, status: 200, json: async () => SUMMARY })
-      if (u.includes('/sessions')) return Promise.resolve({ ok: true, status: 200, json: async () => SESSIONS })
-      if (u.includes('/highlights')) return Promise.resolve({ ok: true, status: 200, json: async () => HIGHLIGHTS })
-      if (u.match(/\/api\/books\/[^/]+\/series/)) return Promise.resolve({ ok: true, status: 200, json: async () => SERIES })
-      if (u.match(/\/api\/books\/[^/]+$/)) return Promise.resolve({ ok: true, status: 200, json: async () => BOOK })
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+      if (u.includes('/api/shelves')) return Promise.resolve({ ok: true, status: 200, json: async () => SHELVES }) as Promise<Response>
+      if (u.includes('/reading-summary')) return Promise.resolve({ ok: true, status: 200, json: async () => SUMMARY }) as Promise<Response>
+      if (u.includes('/sessions')) return Promise.resolve({ ok: true, status: 200, json: async () => SESSIONS }) as Promise<Response>
+      if (u.includes('/highlights')) return Promise.resolve({ ok: true, status: 200, json: async () => HIGHLIGHTS }) as Promise<Response>
+      if (u.match(/\/api\/books\/[^/]+\/series/)) return Promise.resolve({ ok: true, status: 200, json: async () => SERIES }) as Promise<Response>
+      if (u.match(/\/api\/books\/[^/]+$/)) return Promise.resolve({ ok: true, status: 200, json: async () => BOOK }) as Promise<Response>
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) }) as Promise<Response>
     })
 
     renderDetail()
@@ -265,18 +246,18 @@ describe('BookDetail', () => {
   it('calls move API and updates shelf badge when shelf is selected', async () => {
     const user = userEvent.setup()
     fetchSpy.mockRestore()
-    vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((url, _options) => {
       const u = url.toString()
       if (u.includes('/move')) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...BOOK, shelf_id: 20 }) })
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...BOOK, shelf_id: 20 }) }) as Promise<Response>
       }
-      if (u.includes('/api/shelves')) return Promise.resolve({ ok: true, status: 200, json: async () => SHELVES })
-      if (u.includes('/reading-summary')) return Promise.resolve({ ok: true, status: 200, json: async () => SUMMARY })
-      if (u.includes('/sessions')) return Promise.resolve({ ok: true, status: 200, json: async () => SESSIONS })
-      if (u.includes('/highlights')) return Promise.resolve({ ok: true, status: 200, json: async () => HIGHLIGHTS })
-      if (u.match(/\/api\/books\/[^/]+\/series/)) return Promise.resolve({ ok: true, status: 200, json: async () => SERIES })
-      if (u.match(/\/api\/books\/[^/]+$/)) return Promise.resolve({ ok: true, status: 200, json: async () => BOOK })
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) })
+      if (u.includes('/api/shelves')) return Promise.resolve({ ok: true, status: 200, json: async () => SHELVES }) as Promise<Response>
+      if (u.includes('/reading-summary')) return Promise.resolve({ ok: true, status: 200, json: async () => SUMMARY }) as Promise<Response>
+      if (u.includes('/sessions')) return Promise.resolve({ ok: true, status: 200, json: async () => SESSIONS }) as Promise<Response>
+      if (u.includes('/highlights')) return Promise.resolve({ ok: true, status: 200, json: async () => HIGHLIGHTS }) as Promise<Response>
+      if (u.match(/\/api\/books\/[^/]+\/series/)) return Promise.resolve({ ok: true, status: 200, json: async () => SERIES }) as Promise<Response>
+      if (u.match(/\/api\/books\/[^/]+$/)) return Promise.resolve({ ok: true, status: 200, json: async () => BOOK }) as Promise<Response>
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) }) as Promise<Response>
     })
 
     renderDetail()

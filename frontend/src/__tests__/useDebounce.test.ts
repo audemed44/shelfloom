@@ -12,7 +12,7 @@ describe('useDebounce', () => {
   })
 
   it('does not update before the delay has passed', () => {
-    const { result, rerender } = renderHook(({ val }) => useDebounce(val, 300), {
+    const { result, rerender } = renderHook(({ val }: { val: string }) => useDebounce(val, 300), {
       initialProps: { val: 'a' },
     })
     rerender({ val: 'ab' })
@@ -21,7 +21,7 @@ describe('useDebounce', () => {
   })
 
   it('updates after the delay has passed', () => {
-    const { result, rerender } = renderHook(({ val }) => useDebounce(val, 300), {
+    const { result, rerender } = renderHook(({ val }: { val: string }) => useDebounce(val, 300), {
       initialProps: { val: 'a' },
     })
     rerender({ val: 'ab' })
@@ -30,7 +30,7 @@ describe('useDebounce', () => {
   })
 
   it('resets the timer on rapid changes', () => {
-    const { result, rerender } = renderHook(({ val }) => useDebounce(val, 300), {
+    const { result, rerender } = renderHook(({ val }: { val: string }) => useDebounce(val, 300), {
       initialProps: { val: 'a' },
     })
     rerender({ val: 'ab' })
@@ -43,7 +43,7 @@ describe('useDebounce', () => {
   })
 
   it('uses 300ms default delay', () => {
-    const { result, rerender } = renderHook(({ val }) => useDebounce(val), {
+    const { result, rerender } = renderHook(({ val }: { val: string }) => useDebounce(val), {
       initialProps: { val: 'x' },
     })
     rerender({ val: 'y' })

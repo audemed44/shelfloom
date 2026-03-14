@@ -1,9 +1,35 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../../api/client'
+import type { BookDetail } from '../../types'
 
-export default function EditBookModal({ book, onClose, onSaved }) {
-  const [form, setForm] = useState({
+interface EditBookModalProps {
+  book: BookDetail
+  onClose: () => void
+  onSaved: (book: BookDetail) => void
+}
+
+interface EditForm {
+  title: string
+  author: string
+  publisher: string
+  language: string
+  isbn: string
+  date_published: string
+  description: string
+}
+
+interface FieldProps {
+  label: string
+  name: keyof EditForm
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  required?: boolean
+  placeholder?: string
+}
+
+export default function EditBookModal({ book, onClose, onSaved }: EditBookModalProps) {
+  const [form, setForm] = useState<EditForm>({
     title: book.title ?? '',
     author: book.author ?? '',
     publisher: book.publisher ?? '',
@@ -13,32 +39,33 @@ export default function EditBookModal({ book, onClose, onSaved }) {
     description: book.description ?? '',
   })
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   // Close on Escape
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
     try {
-      const payload = {}
+      const payload: Partial<EditForm> = {}
       for (const [k, v] of Object.entries(form)) {
-        if (v !== '') payload[k] = v
+        if (v !== '') payload[k as keyof EditForm] = v
       }
-      const updated = await api.patch(`/api/books/${book.id}`, payload)
-      onSaved(updated)
+      const updated = await api.patch<BookDetail>(`/api/books/${book.id}`, payload)
+      onSaved(updated!)
     } catch (err) {
-      setError(err.data?.detail ?? 'Failed to save changes.')
+      const apiErr = err as { data?: { detail?: string } }
+      setError(apiErr.data?.detail ?? 'Failed to save changes.')
     } finally {
       setSaving(false)
     }
@@ -113,7 +140,7 @@ export default function EditBookModal({ book, onClose, onSaved }) {
   )
 }
 
-function Field({ label, name, value, onChange, required, placeholder }) {
+function Field({ label, name, value, onChange, required, placeholder }: FieldProps) {
   return (
     <div>
       <label className="block text-[10px] font-black tracking-widest uppercase text-white/40 mb-1">

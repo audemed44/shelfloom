@@ -1,14 +1,16 @@
 import { Play, Clock, BookOpen, Trophy } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
+import type { Book, PaginatedResponse } from '../types'
+import type { LucideIcon } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Heatmap
 // ---------------------------------------------------------------------------
 
 // Empty 53×7 grid — filled with real data when Phase 4 stats API is ready
-const EMPTY_HEATMAP = Array.from({ length: 53 }, () => Array(7).fill(0))
+const EMPTY_HEATMAP: number[][] = Array.from({ length: 53 }, () => Array(7).fill(0))
 
-function cellClass(level) {
+function cellClass(level: number): string {
   if (!level) return 'bg-white/5 border border-white/10'
   if (level <= 0.25) return 'bg-primary/20'
   if (level <= 0.5) return 'bg-primary/40'
@@ -16,7 +18,12 @@ function cellClass(level) {
   return 'bg-primary'
 }
 
-function ReadingHeatmap({ weeks = EMPTY_HEATMAP, streak = 0 }) {
+interface ReadingHeatmapProps {
+  weeks?: number[][]
+  streak?: number
+}
+
+function ReadingHeatmap({ weeks = EMPTY_HEATMAP, streak = 0 }: ReadingHeatmapProps) {
   const isEmpty = weeks.every((w) => w.every((v) => !v))
   return (
     <div className="bg-white/5 border border-white/10 p-8 h-full">
@@ -70,7 +77,13 @@ function ReadingHeatmap({ weeks = EMPTY_HEATMAP, streak = 0 }) {
 // Stat card
 // ---------------------------------------------------------------------------
 
-function StatCard({ icon: Icon, label, value }) {
+interface StatCardProps {
+  icon: LucideIcon
+  label: string
+  value: string | null
+}
+
+function StatCard({ icon: Icon, label, value }: StatCardProps) {
   const empty = !value
   return (
     <div className="bg-white/5 border border-white/10 p-6 flex items-center gap-6">
@@ -91,7 +104,21 @@ function StatCard({ icon: Icon, label, value }) {
 // Currently Reading card
 // ---------------------------------------------------------------------------
 
-function CurrentlyReadingCard({ book }) {
+interface CurrentlyReadingBook {
+  id: number
+  title: string
+  author: string | null
+  cover_url?: string
+  reading_progress?: number
+  current_page?: number
+  page_count?: number | null
+}
+
+interface CurrentlyReadingCardProps {
+  book: CurrentlyReadingBook | null
+}
+
+function CurrentlyReadingCard({ book }: CurrentlyReadingCardProps) {
   if (!book) {
     return (
       <div className="bg-white/5 border border-white/10 p-8 relative">
@@ -188,20 +215,19 @@ function CurrentlyReadingCard({ book }) {
 
 export default function Home() {
   // Books list — used to find an in-progress book
-  // The list endpoint returns { items, total, page, per_page }
-  const { data: booksData } = useApi('/api/books?per_page=50')
+  const { data: booksData } = useApi<PaginatedResponse<Book & { reading_progress?: number; current_page?: number }>>('/api/books?per_page=50')
 
-  // Find the most recently active in-progress book, if the API returns progress data
+  // Find the most recently active in-progress book
   const currentlyReading =
     booksData?.items?.find(
       (b) => (b.reading_progress ?? 0) > 0 && (b.reading_progress ?? 0) < 100
     ) ?? null
 
   // Stats require Phase 4 (/api/stats/overview) — show empty until then
-  const stats = {
-    timeRead: null,   // e.g. "8h 12m"
-    pages: null,      // e.g. "452 Pages"
-    completion: null, // e.g. "1 Book Finished"
+  const stats: { timeRead: string | null; pages: string | null; completion: string | null } = {
+    timeRead: null,
+    pages: null,
+    completion: null,
   }
 
   // Heatmap + streak require Phase 4 (/api/stats/heatmap)

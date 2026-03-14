@@ -15,10 +15,11 @@ import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import EditBookModal from '../components/book-detail/EditBookModal'
 import DeleteBookModal from '../components/book-detail/DeleteBookModal'
+import type { BookDetail, Shelf, ReadingSession, Highlight } from '../types'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
-function fmtDuration(seconds) {
+function fmtDuration(seconds: number | null | undefined): string {
   if (!seconds || seconds <= 0) return '0 min'
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
@@ -26,14 +27,19 @@ function fmtDuration(seconds) {
   return `${m} min`
 }
 
-function fmtDate(iso) {
+function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 // ── sub-components ─────────────────────────────────────────────────────────────
 
-function Badge({ children, className = '' }) {
+interface BadgeProps {
+  children: React.ReactNode
+  className?: string
+}
+
+function Badge({ children, className = '' }: BadgeProps) {
   return (
     <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-black tracking-widest uppercase border rounded ${className}`}>
       {children}
@@ -41,7 +47,11 @@ function Badge({ children, className = '' }) {
   )
 }
 
-function ProgressBar({ percent }) {
+interface ProgressBarProps {
+  percent: number | null
+}
+
+function ProgressBar({ percent }: ProgressBarProps) {
   const pct = Math.min(100, Math.max(0, percent ?? 0))
   return (
     <div className="relative h-1.5 bg-white/10 rounded-full overflow-hidden">
@@ -53,7 +63,19 @@ function ProgressBar({ percent }) {
   )
 }
 
-function SessionRow({ session }) {
+// Extended session type for display (backend may include extra fields)
+interface SessionDisplay extends ReadingSession {
+  start_time?: string
+  device?: string
+  pages_read?: number
+  duration?: number
+}
+
+interface SessionRowProps {
+  session: SessionDisplay
+}
+
+function SessionRow({ session }: SessionRowProps) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
       <div className="flex items-center gap-3">
@@ -73,7 +95,11 @@ function SessionRow({ session }) {
   )
 }
 
-function HighlightCard({ highlight }) {
+interface HighlightCardProps {
+  highlight: Highlight
+}
+
+function HighlightCard({ highlight }: HighlightCardProps) {
   return (
     <div className="bg-white/5 border border-white/10 rounded p-3 space-y-1">
       <p className="text-sm text-white/90 normal-case leading-relaxed">&ldquo;{highlight.text}&rdquo;</p>
@@ -87,34 +113,58 @@ function HighlightCard({ highlight }) {
   )
 }
 
+// ── reading summary type ────────────────────────────────────────────────────────
+
+interface ReadingSummary {
+  percent_finished: number | null
+  total_time_seconds: number
+  total_sessions: number
+}
+
+// ── series membership with nav ─────────────────────────────────────────────────
+
+interface SeriesNavBook {
+  id: number
+  title: string
+}
+
+interface SeriesMembership {
+  series_id: number
+  series_name: string
+  sequence: number | null
+  prev_book?: SeriesNavBook | null
+  next_book?: SeriesNavBook | null
+}
+
 // ── main component ─────────────────────────────────────────────────────────────
 
 export default function BookDetail() {
-  const { id } = useParams()
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const [book, setBook] = useState(null)
+  const [book, setBook] = useState<BookDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
-  const [movingTo, setMovingTo] = useState(null)
+  const [movingTo, setMovingTo] = useState<number | null>(null)
 
-  const { data: shelves } = useApi('/api/shelves')
-  const { data: summary } = useApi(id ? `/api/books/${id}/reading-summary` : null)
-  const { data: sessionsData } = useApi(id ? `/api/books/${id}/sessions?per_page=5` : null)
-  const { data: highlightsData } = useApi(id ? `/api/books/${id}/highlights?per_page=5` : null)
-  const { data: seriesMemberships } = useApi(id ? `/api/books/${id}/series` : null)
+  const { data: shelves } = useApi<Shelf[]>('/api/shelves')
+  const { data: summary } = useApi<ReadingSummary>(id ? `/api/books/${id}/reading-summary` : null)
+  const { data: sessionsData } = useApi<{ items: SessionDisplay[] }>(id ? `/api/books/${id}/sessions?per_page=5` : null)
+  const { data: highlightsData } = useApi<{ items: Highlight[] }>(id ? `/api/books/${id}/highlights?per_page=5` : null)
+  const { data: seriesMemberships } = useApi<SeriesMembership[]>(id ? `/api/books/${id}/series` : null)
 
   const fetchBook = useCallback(async () => {
     if (!id) return
     setLoading(true)
     try {
-      const data = await api.get(`/api/books/${id}`)
-      setBook(data)
+      const data = await api.get<BookDetail>(`/api/books/${id}`)
+      setBook(data!)
     } catch (err) {
-      if (err.status === 404) setNotFound(true)
+      const apiErr = err as { status?: number }
+      if (apiErr.status === 404) setNotFound(true)
     } finally {
       setLoading(false)
     }
@@ -122,12 +172,12 @@ export default function BookDetail() {
 
   useEffect(() => { fetchBook() }, [fetchBook])
 
-  const handleMove = async (shelfId) => {
+  const handleMove = async (shelfId: number) => {
     setMoveOpen(false)
     setMovingTo(shelfId)
     try {
-      const updated = await api.post(`/api/books/${id}/move`, { shelf_id: shelfId })
-      setBook(updated)
+      const updated = await api.post<BookDetail>(`/api/books/${id}/move`, { shelf_id: shelfId })
+      if (updated) setBook(updated)
     } catch {
       // silently ignore — UI keeps old state
     } finally {
@@ -173,7 +223,7 @@ export default function BookDetail() {
 
   // ── breadcrumb ──────────────────────────────────────────────────────────────
 
-  const crumbs = [
+  const crumbs: Array<{ to: string | null; label: string }> = [
     { to: '/library', label: 'Library' },
     ...(primarySeries ? [{ to: null, label: primarySeries.series_name }] : []),
     { to: null, label: book.title },
@@ -243,7 +293,7 @@ export default function BookDetail() {
                 <span className="text-primary">{percent}%</span>
               </div>
               <ProgressBar percent={percent} />
-              {summary?.total_time_seconds > 0 && (
+              {summary && summary.total_time_seconds > 0 && (
                 <p className="text-[10px] text-white/30 tracking-widest uppercase">
                   {fmtDuration(summary.total_time_seconds)} read · {summary.total_sessions} session{summary.total_sessions !== 1 ? 's' : ''}
                 </p>
@@ -257,7 +307,7 @@ export default function BookDetail() {
             {book.language && <span>{book.language}</span>}
             {book.publisher && <span className="normal-case">{book.publisher}</span>}
             {book.date_published && <span>{book.date_published}</span>}
-            <span>Added {fmtDate(book.date_added)}</span>
+            <span>Added {fmtDate(book.created_at)}</span>
           </div>
 
           {/* Actions */}

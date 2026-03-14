@@ -1,8 +1,15 @@
 import { NavLink } from 'react-router-dom'
-import { Settings } from 'lucide-react'
+import { Settings, type LucideIcon } from 'lucide-react'
 import { NAV_ITEMS } from './nav/navItems'
 
-function NavItem({ to, icon: Icon, label, end }) {
+interface NavItemProps {
+  to: string
+  icon: LucideIcon
+  label: string
+  end?: boolean
+}
+
+function NavItem({ to, icon: Icon, label, end }: NavItemProps) {
   return (
     <NavLink
       to={to}

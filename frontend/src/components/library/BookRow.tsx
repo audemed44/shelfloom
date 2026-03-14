@@ -1,6 +1,11 @@
 import { Link } from 'react-router-dom'
+import type { Book } from '../../types'
 
-export default function BookRow({ book }) {
+interface BookRowProps {
+  book: Book
+}
+
+export default function BookRow({ book }: BookRowProps) {
   const coverSrc = `/api/books/${book.id}/cover`
 
   return (
@@ -34,7 +39,7 @@ export default function BookRow({ book }) {
             {book.format.toUpperCase()}
           </span>
         )}
-        {book.page_count > 0 && (
+        {book.page_count != null && book.page_count > 0 && (
           <span className="text-[10px] font-bold tracking-wider">
             {book.page_count} Pages
           </span>

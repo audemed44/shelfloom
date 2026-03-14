@@ -3,7 +3,8 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { useApi } from '../hooks/useApi'
 
 describe('useApi', () => {
-  let fetchSpy
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fetchSpy: any
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, 'fetch')
@@ -42,7 +43,8 @@ describe('useApi', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.data).toBeNull()
     expect(result.current.error).toBeTruthy()
-    expect(result.current.error.status).toBe(500)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((result.current.error as any).status).toBe(500)
   })
 
   it('skips fetch when path is null', () => {
@@ -57,7 +59,7 @@ describe('useApi', () => {
       status: 200,
       json: async () => ({ id: 1 }),
     })
-    const { rerender } = renderHook(({ path }) => useApi(path), {
+    const { rerender } = renderHook(({ path }: { path: string }) => useApi(path), {
       initialProps: { path: '/api/books/1' },
     })
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))

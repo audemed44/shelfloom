@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react'
 import { AlertTriangle, X } from 'lucide-react'
 import { api } from '../../api/client'
+import type { BookDetail } from '../../types'
 
-export default function DeleteBookModal({ book, onClose, onDeleted }) {
+interface DeleteBookModalProps {
+  book: BookDetail
+  onClose: () => void
+  onDeleted: () => void
+}
+
+export default function DeleteBookModal({ book, onClose, onDeleted }: DeleteBookModalProps) {
   const [deleteFile, setDeleteFile] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
@@ -20,7 +27,8 @@ export default function DeleteBookModal({ book, onClose, onDeleted }) {
       await api.delete(`/api/books/${book.id}?delete_file=${deleteFile}`)
       onDeleted()
     } catch (err) {
-      setError(err.data?.detail ?? 'Failed to delete book.')
+      const apiErr = err as { data?: { detail?: string } }
+      setError(apiErr.data?.detail ?? 'Failed to delete book.')
       setDeleting(false)
     }
   }

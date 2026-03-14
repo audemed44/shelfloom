@@ -5,26 +5,33 @@ import { MemoryRouter } from 'react-router-dom'
 import Library from '../pages/Library'
 
 const MOCK_SHELVES = [
-  { id: 'shelf-1', name: 'Main Library', book_count: 3 },
+  { id: 1, name: 'Main Library', book_count: 3, path: '/books', is_default: true, is_sync_target: false },
 ]
 
 const MOCK_BOOKS = [
-  { id: 'b1', title: 'Dune', author: 'Frank Herbert', format: 'epub', page_count: 412 },
-  { id: 'b2', title: 'Foundation', author: 'Isaac Asimov', format: 'epub', page_count: 255 },
-  { id: 'b3', title: 'Neuromancer', author: 'William Gibson', format: 'pdf', page_count: 271 },
+  { id: 1, title: 'Dune', author: 'Frank Herbert', format: 'epub', page_count: 412, shelf_id: 1, shelf_name: 'Main Library', file_path: null, shelfloom_id: null, publisher: null, language: null, isbn: null, date_published: null, description: null, created_at: '', updated_at: '' },
+  { id: 2, title: 'Foundation', author: 'Isaac Asimov', format: 'epub', page_count: 255, shelf_id: 1, shelf_name: 'Main Library', file_path: null, shelfloom_id: null, publisher: null, language: null, isbn: null, date_published: null, description: null, created_at: '', updated_at: '' },
+  { id: 3, title: 'Neuromancer', author: 'William Gibson', format: 'pdf', page_count: 271, shelf_id: 1, shelf_name: 'Main Library', file_path: null, shelfloom_id: null, publisher: null, language: null, isbn: null, date_published: null, description: null, created_at: '', updated_at: '' },
 ]
 
-function mockFetch({ books = MOCK_BOOKS, total = MOCK_BOOKS.length, shelves = MOCK_SHELVES } = {}) {
+interface MockFetchOptions {
+  books?: typeof MOCK_BOOKS
+  total?: number
+  shelves?: typeof MOCK_SHELVES
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mockFetch({ books = MOCK_BOOKS, total = MOCK_BOOKS.length, shelves = MOCK_SHELVES }: MockFetchOptions = {}): any {
   return vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
     const u = url.toString()
     if (u.includes('/api/shelves')) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => shelves })
+      return Promise.resolve({ ok: true, status: 200, json: async () => shelves }) as Promise<Response>
     }
     return Promise.resolve({
       ok: true,
       status: 200,
       json: async () => ({ items: books, total, page: 1, per_page: 24 }),
-    })
+    }) as Promise<Response>
   })
 }
 
@@ -37,7 +44,8 @@ function renderLibrary() {
 }
 
 describe('Library', () => {
-  let fetchSpy
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fetchSpy: any
 
   beforeEach(() => { fetchSpy = mockFetch() })
   afterEach(() => fetchSpy.mockRestore())
@@ -116,7 +124,7 @@ describe('Library', () => {
 
     await waitFor(() => {
       const booksCall = fetchSpy.mock.calls.find(
-        ([url]) => url.includes('/api/books') && url.includes('shelf_id=shelf-1')
+        ([url]: [string]) => url.includes('/api/books') && url.includes('shelf_id=1')
       )
       expect(booksCall).toBeTruthy()
     })
@@ -131,7 +139,7 @@ describe('Library', () => {
 
     await waitFor(() => {
       const booksCall = fetchSpy.mock.calls.find(
-        ([url]) => url.includes('/api/books') && url.includes('sort=title')
+        ([url]: [string]) => url.includes('/api/books') && url.includes('sort=title')
       )
       expect(booksCall).toBeTruthy()
     })

@@ -5,6 +5,7 @@ import { useDebounce } from '../hooks/useDebounce'
 import BookCard from '../components/library/BookCard'
 import BookRow from '../components/library/BookRow'
 import { SkeletonCard, SkeletonRow } from '../components/library/SkeletonCard'
+import type { Book, Shelf, PaginatedResponse } from '../types'
 
 const PER_PAGE = 24
 
@@ -18,7 +19,13 @@ const SORT_OPTIONS = [
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function ShelfTabs({ shelves, selectedId, onSelect }) {
+interface ShelfTabsProps {
+  shelves: Shelf[]
+  selectedId: number | null
+  onSelect: (id: number | null) => void
+}
+
+function ShelfTabs({ shelves, selectedId, onSelect }: ShelfTabsProps) {
   return (
     <div className="flex gap-0 border-b border-white/10 mb-6 overflow-x-auto no-scrollbar">
       <TabButton active={!selectedId} onClick={() => onSelect(null)}>
@@ -33,7 +40,13 @@ function ShelfTabs({ shelves, selectedId, onSelect }) {
   )
 }
 
-function TabButton({ active, onClick, children }) {
+interface TabButtonProps {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}
+
+function TabButton({ active, onClick, children }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
@@ -48,7 +61,16 @@ function TabButton({ active, onClick, children }) {
   )
 }
 
-function Controls({ search, onSearch, sort, onSort, view, onView }) {
+interface ControlsProps {
+  search: string
+  onSearch: (v: string) => void
+  sort: string
+  onSort: (v: string) => void
+  view: string
+  onView: (v: string) => void
+}
+
+function Controls({ search, onSearch, sort, onSort, view, onView }: ControlsProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-3 mb-6">
       {/* Search — full width on mobile */}
@@ -108,7 +130,11 @@ function Controls({ search, onSearch, sort, onSort, view, onView }) {
   )
 }
 
-function EmptyState({ search }) {
+interface EmptyStateProps {
+  search: string
+}
+
+function EmptyState({ search }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center" data-testid="empty-state">
       <BookOpen size={48} className="text-white/10 mb-4" />
@@ -116,7 +142,7 @@ function EmptyState({ search }) {
         <>
           <p className="font-black tracking-widest text-white/30">No Results</p>
           <p className="text-xs text-white/20 mt-1 normal-case">
-            No books matching "{search}"
+            No books matching &ldquo;{search}&rdquo;
           </p>
         </>
       ) : (
@@ -131,7 +157,14 @@ function EmptyState({ search }) {
   )
 }
 
-function Pagination({ page, totalPages, total, onPage }) {
+interface PaginationProps {
+  page: number
+  totalPages: number
+  total: number
+  onPage: React.Dispatch<React.SetStateAction<number>>
+}
+
+function Pagination({ page, totalPages, total, onPage }: PaginationProps) {
   return (
     <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/10">
       <p className="text-xs text-white/30 font-bold tracking-widest">
@@ -169,7 +202,7 @@ function Pagination({ page, totalPages, total, onPage }) {
 export default function Library() {
   const [view, setView] = useState('grid')
   const [search, setSearch] = useState('')
-  const [selectedShelfId, setSelectedShelfId] = useState(null)
+  const [selectedShelfId, setSelectedShelfId] = useState<number | null>(null)
   const [sort, setSort] = useState('created_at')
   const [page, setPage] = useState(1)
 
@@ -178,7 +211,7 @@ export default function Library() {
   const resetPage = () => setPage(1)
 
   // Shelves for tab bar
-  const { data: shelves } = useApi('/api/shelves')
+  const { data: shelves } = useApi<Shelf[]>('/api/shelves')
 
   // Books — re-fetches whenever any filter/sort/page changes
   const booksPath = useMemo(() => {
@@ -188,11 +221,11 @@ export default function Library() {
       sort,
     })
     if (debouncedSearch) params.set('search', debouncedSearch)
-    if (selectedShelfId) params.set('shelf_id', selectedShelfId)
+    if (selectedShelfId) params.set('shelf_id', String(selectedShelfId))
     return `/api/books?${params}`
   }, [page, debouncedSearch, selectedShelfId, sort])
 
-  const { data: booksData, loading } = useApi(booksPath)
+  const { data: booksData, loading } = useApi<PaginatedResponse<Book>>(booksPath)
   const books = booksData?.items ?? []
   const total = booksData?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))

@@ -1,6 +1,11 @@
 import { Link } from 'react-router-dom'
+import type { Book } from '../../types'
 
-export default function BookCard({ book }) {
+interface BookCardProps {
+  book: Book
+}
+
+export default function BookCard({ book }: BookCardProps) {
   const coverSrc = `/api/books/${book.id}/cover`
 
   return (

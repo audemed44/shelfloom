@@ -1,15 +1,17 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Layout from './components/Layout'
-import Home from './pages/Home'
-import Library from './pages/Library'
-import BookDetail from './pages/BookDetail'
-import Stats from './pages/Stats'
-import Serials from './pages/Serials'
-import NotFound from './pages/NotFound'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Layout from "./components/Layout";
+import Home from "./pages/Home";
+import Library from "./pages/Library";
+import BookDetail from "./pages/BookDetail";
+import Stats from "./pages/Stats";
+import Serials from "./pages/Serials";
+import NotFound from "./pages/NotFound";
 
 export default function App() {
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
@@ -21,5 +23,5 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
-  )
+  );
 }
