@@ -17,11 +17,12 @@ describe('App', () => {
     expect(document.body).toBeTruthy()
   })
 
-  it('shows sidebar navigation items', () => {
+  it('shows navigation items (sidebar + bottom nav both render them)', () => {
     render(<App />)
-    expect(screen.getByText('Library')).toBeInTheDocument()
-    expect(screen.getByText('Stats')).toBeInTheDocument()
-    expect(screen.getByText('Serials')).toBeInTheDocument()
+    // Both Sidebar and BottomNav render the same labels — getAllByText asserts ≥1
+    expect(screen.getAllByText('Library').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Stats').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Serials').length).toBeGreaterThan(0)
   })
 
   it('shows dashboard page by default', () => {
@@ -32,21 +33,22 @@ describe('App', () => {
   it('navigates to library page', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await user.click(screen.getByText('Library'))
+    // Click the first matching nav link (sidebar or bottom nav)
+    await user.click(screen.getAllByText('Library')[0])
     expect(screen.getByRole('heading', { name: /library/i })).toBeInTheDocument()
   })
 
   it('navigates to stats page', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await user.click(screen.getByText('Stats'))
+    await user.click(screen.getAllByText('Stats')[0])
     expect(screen.getByRole('heading', { name: /stats/i })).toBeInTheDocument()
   })
 
   it('navigates to serials page', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await user.click(screen.getByText('Serials'))
+    await user.click(screen.getAllByText('Serials')[0])
     expect(screen.getByRole('heading', { name: /serials/i })).toBeInTheDocument()
   })
 })
