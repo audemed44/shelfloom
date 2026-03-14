@@ -11,6 +11,7 @@ from app.services.shelf_service import (
     create_shelf,
     delete_shelf,
     get_shelf,
+    get_shelf_templates,
     list_shelves,
     update_shelf,
 )
@@ -18,16 +19,27 @@ from app.services.shelf_service import (
 router = APIRouter(prefix="/shelves", tags=["shelves"])
 
 
-def _shelf_to_response(shelf, book_count: int) -> ShelfResponse:
-    data = ShelfResponse.model_validate(shelf)
-    data.book_count = book_count
-    return data
+def _shelf_to_response(shelf, book_count: int, tmpl=None) -> ShelfResponse:
+    return ShelfResponse(
+        id=shelf.id,
+        name=shelf.name,
+        path=shelf.path,
+        is_default=shelf.is_default,
+        is_sync_target=shelf.is_sync_target,
+        device_name=shelf.device_name,
+        auto_organize=shelf.auto_organize,
+        created_at=shelf.created_at,
+        book_count=book_count,
+        organize_template=tmpl.template if tmpl else None,
+        seq_pad=tmpl.seq_pad if tmpl else 2,
+    )
 
 
 @router.get("", response_model=list[ShelfResponse])
 async def list_shelves_endpoint(session: AsyncSession = Depends(get_session)):
     rows = await list_shelves(session)
-    return [_shelf_to_response(shelf, count) for shelf, count in rows]
+    tmpl_map = await get_shelf_templates(session, [shelf.id for shelf, _ in rows])
+    return [_shelf_to_response(shelf, count, tmpl_map.get(shelf.id)) for shelf, count in rows]
 
 
 @router.get("/{shelf_id}", response_model=ShelfResponse)
@@ -36,7 +48,8 @@ async def get_shelf_endpoint(shelf_id: int, session: AsyncSession = Depends(get_
         shelf, count = await get_shelf(session, shelf_id)
     except ShelfNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    return _shelf_to_response(shelf, count)
+    tmpl_map = await get_shelf_templates(session, [shelf_id])
+    return _shelf_to_response(shelf, count, tmpl_map.get(shelf_id))
 
 
 @router.post("", response_model=ShelfResponse, status_code=status.HTTP_201_CREATED)
@@ -49,7 +62,8 @@ async def create_shelf_endpoint(
         raise HTTPException(status_code=422, detail=str(e))
     except ShelfConflict as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-    return _shelf_to_response(shelf, 0)
+    tmpl_map = await get_shelf_templates(session, [shelf.id])
+    return _shelf_to_response(shelf, 0, tmpl_map.get(shelf.id))
 
 
 @router.patch("/{shelf_id}", response_model=ShelfResponse)
@@ -62,9 +76,10 @@ async def update_shelf_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ShelfConflict as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-    # Re-fetch book count
+    # Re-fetch book count and template
     _, count = await get_shelf(session, shelf_id)
-    return _shelf_to_response(shelf, count)
+    tmpl_map = await get_shelf_templates(session, [shelf_id])
+    return _shelf_to_response(shelf, count, tmpl_map.get(shelf_id))
 
 
 @router.delete("/{shelf_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -16,6 +16,8 @@ interface ShelfForm {
   is_sync_target: boolean
   device_name: string
   auto_organize: boolean
+  organize_template: string
+  seq_pad: number
 }
 
 export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps) {
@@ -27,6 +29,8 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
     is_sync_target: shelf?.is_sync_target ?? false,
     device_name: shelf?.device_name ?? '',
     auto_organize: shelf?.auto_organize ?? false,
+    organize_template: shelf?.organize_template ?? '{author}/{series_path}/{sequence} - {title}',
+    seq_pad: shelf?.seq_pad ?? 2,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +49,10 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
         is_sync_target: form.is_sync_target,
         device_name: form.is_sync_target && form.device_name.trim() ? form.device_name.trim() : null,
         auto_organize: form.auto_organize,
+        organize_template: form.auto_organize && form.organize_template.trim()
+          ? form.organize_template.trim()
+          : null,
+        seq_pad: form.seq_pad,
       }
       if (isEdit) {
         await api.patch(`/api/shelves/${shelf.id}`, payload)
@@ -154,6 +162,42 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
               checked={form.auto_organize}
               onChange={(v) => setForm((f) => ({ ...f, auto_organize: v }))}
             />
+            {form.auto_organize && (
+              <div className="ml-7 space-y-4 pt-1">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
+                    Path Template
+                  </label>
+                  <input
+                    type="text"
+                    value={form.organize_template}
+                    onChange={(e) => setForm((f) => ({ ...f, organize_template: e.target.value }))}
+                    placeholder="{author}/{series_path}/{sequence} - {title}"
+                    className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
+                  />
+                  <p className="text-[10px] text-white/30 normal-case">
+                    Tokens: <code className="text-primary/80">{'{author}'}</code>{' '}
+                    <code className="text-primary/80">{'{title}'}</code>{' '}
+                    <code className="text-primary/80">{'{series_path}'}</code>{' '}
+                    <code className="text-primary/80">{'{sequence}'}</code>{' '}
+                    <code className="text-primary/80">{'{format}'}</code>
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
+                    Sequence Padding
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={6}
+                    value={form.seq_pad}
+                    onChange={(e) => setForm((f) => ({ ...f, seq_pad: parseInt(e.target.value, 10) || 2 }))}
+                    className="w-20 bg-black border border-white/10 px-4 py-3 text-sm text-white text-center focus:outline-none focus:border-primary transition-colors"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer */}

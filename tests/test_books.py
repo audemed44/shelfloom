@@ -469,3 +469,41 @@ async def test_move_book_sync_shelf_applies_template(client, db_session, tmp_pat
     assert data["file_path"] == "Jane Doe/Great Book.epub"
     assert (dst_path / "Jane Doe" / "Great Book.epub").exists()
     assert not book_file.exists()
+
+
+async def test_move_book_auto_organize_shelf_applies_template(client, db_session, tmp_path):
+    """Moving to an auto_organize shelf (not sync-target) also applies the template."""
+    from app.models.shelf import ShelfTemplate
+
+    src_path = tmp_path / "src"
+    dst_path = tmp_path / "dst"
+    src_path.mkdir()
+    dst_path.mkdir()
+    shelf1 = await _create_shelf(db_session, src_path, "Src2")
+    shelf2 = Shelf(name="AutoOrg", path=str(dst_path), is_sync_target=False, auto_organize=True)
+    db_session.add(shelf2)
+    await db_session.commit()
+    await db_session.refresh(shelf2)
+
+    tmpl = ShelfTemplate(shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2)
+    db_session.add(tmpl)
+    await db_session.commit()
+
+    book_file = src_path / "orig.epub"
+    _make_epub(book_file)
+    book = Book(
+        id=str(uuid.uuid4()),
+        title="Auto Book",
+        author="Test Author",
+        format="epub",
+        file_path="orig.epub",
+        shelf_id=shelf1.id,
+    )
+    db_session.add(book)
+    await db_session.commit()
+
+    resp = await client.post(f"/api/books/{book.id}/move", json={"shelf_id": shelf2.id})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["file_path"] == "Test Author/Auto Book.epub"
+    assert (dst_path / "Test Author" / "Auto Book.epub").exists()

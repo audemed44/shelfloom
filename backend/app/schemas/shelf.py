@@ -10,6 +10,8 @@ class ShelfCreate(BaseModel):
     is_sync_target: bool = False
     device_name: str | None = None
     auto_organize: bool = False
+    organize_template: str | None = None
+    seq_pad: int = 2
 
     @field_validator("name")
     @classmethod
@@ -32,6 +34,8 @@ class ShelfUpdate(BaseModel):
     is_sync_target: bool | None = None
     device_name: str | None = None
     auto_organize: bool | None = None
+    organize_template: str | None = None
+    seq_pad: int | None = None
 
 
 class ShelfResponse(BaseModel):
@@ -46,3 +50,5 @@ class ShelfResponse(BaseModel):
     auto_organize: bool
     created_at: datetime
     book_count: int = 0
+    organize_template: str | None = None
+    seq_pad: int = 2

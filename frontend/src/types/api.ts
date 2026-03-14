@@ -10,6 +10,8 @@ export interface Shelf {
   auto_organize: boolean
   created_at: string
   book_count: number
+  organize_template: string | null
+  seq_pad: number
 }
 
 export interface OrganizerResult {

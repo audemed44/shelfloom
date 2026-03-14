@@ -3,9 +3,8 @@ import os
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.models.book import Book
-from app.models.shelf import Shelf
+from app.models.shelf import Shelf, ShelfTemplate
 from app.schemas.shelf import ShelfCreate, ShelfUpdate
 
 
@@ -52,6 +51,18 @@ async def get_shelf(session: AsyncSession, shelf_id: int) -> tuple[Shelf, int]:
     return row  # type: ignore[return-value]
 
 
+async def get_shelf_templates(
+    session: AsyncSession, shelf_ids: list[int]
+) -> dict[int, ShelfTemplate]:
+    """Return a mapping of shelf_id → ShelfTemplate for the given IDs."""
+    if not shelf_ids:
+        return {}
+    result = await session.execute(
+        select(ShelfTemplate).where(ShelfTemplate.shelf_id.in_(shelf_ids))
+    )
+    return {t.shelf_id: t for t in result.scalars()}
+
+
 async def create_shelf(
     session: AsyncSession, data: ShelfCreate, require_path_exists: bool = True
 ) -> Shelf:
@@ -76,6 +87,16 @@ async def create_shelf(
         await session.rollback()
         raise ShelfConflict(f"A shelf named '{data.name}' already exists")
     await session.refresh(shelf)
+
+    if data.organize_template is not None:
+        tmpl = ShelfTemplate(
+            shelf_id=shelf.id,
+            template=data.organize_template,
+            seq_pad=data.seq_pad,
+        )
+        session.add(tmpl)
+        await session.commit()
+
     return shelf
 
 
@@ -97,6 +118,19 @@ async def update_shelf(
         shelf.device_name = data.device_name
     if data.auto_organize is not None:
         shelf.auto_organize = data.auto_organize
+
+    if data.organize_template is not None:
+        existing_tmpl = await session.get(ShelfTemplate, shelf.id)
+        if existing_tmpl is not None:
+            existing_tmpl.template = data.organize_template
+            if data.seq_pad is not None:
+                existing_tmpl.seq_pad = data.seq_pad
+        else:
+            session.add(ShelfTemplate(
+                shelf_id=shelf.id,
+                template=data.organize_template,
+                seq_pad=data.seq_pad if data.seq_pad is not None else 2,
+            ))
 
     try:
         await session.commit()

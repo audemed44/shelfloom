@@ -178,6 +178,60 @@ async def test_shelf_book_count(client, db_session, tmp_path):
     assert resp.json()["book_count"] == 3
 
 
+# ── organize template ─────────────────────────────────────────────────────────
+
+async def test_create_shelf_with_organize_template(client, tmp_path):
+    resp = await client.post(
+        "/api/shelves",
+        json={
+            "name": "Organized",
+            "path": str(tmp_path),
+            "auto_organize": True,
+            "organize_template": "{author}/{series_path}/{sequence} - {title}",
+            "seq_pad": 3,
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["organize_template"] == "{author}/{series_path}/{sequence} - {title}"
+    assert data["seq_pad"] == 3
+
+
+async def test_create_shelf_without_template_returns_null(client, tmp_path):
+    resp = await client.post("/api/shelves", json={"name": "Plain", "path": str(tmp_path)})
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["organize_template"] is None
+    assert data["seq_pad"] == 2
+
+
+async def test_update_shelf_organize_template(client, tmp_path):
+    created = (await client.post("/api/shelves", json={"name": "UpdTmpl", "path": str(tmp_path)})).json()
+    resp = await client.patch(
+        f"/api/shelves/{created['id']}",
+        json={"organize_template": "{author}/{title}.{format}", "seq_pad": 4},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["organize_template"] == "{author}/{title}.{format}"
+    assert data["seq_pad"] == 4
+
+
+async def test_update_shelf_template_overwrites_existing(client, tmp_path):
+    created = (await client.post(
+        "/api/shelves",
+        json={"name": "Overwrite", "path": str(tmp_path), "organize_template": "{title}"},
+    )).json()
+    assert created["organize_template"] == "{title}"
+
+    resp = await client.patch(
+        f"/api/shelves/{created['id']}",
+        json={"organize_template": "{author}/{title}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["organize_template"] == "{author}/{title}"
+
+
 # ── schema validation ─────────────────────────────────────────────────────────
 
 async def test_create_shelf_missing_name(client):

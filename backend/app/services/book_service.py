@@ -174,8 +174,8 @@ async def move_book(
 
     src_path = Path(src_shelf.path) / book.file_path
 
-    # Resolve destination path: apply template only for sync-target shelves
-    if dst_shelf.is_sync_target:
+    # Resolve destination path: apply template for auto-organize or sync-target shelves
+    if dst_shelf.auto_organize or dst_shelf.is_sync_target:
         from app.services.organizer import _get_series_info, _get_shelf_template, resolve_template
         template, seq_pad = await _get_shelf_template(session, target_shelf_id)
         series_name, series_path, sequence = await _get_series_info(session, book.id)
@@ -201,8 +201,8 @@ async def move_book(
 
     src_path.unlink()
 
-    # Log rename if path changed (sync-target move with template applied)
-    if dst_shelf.is_sync_target and new_rel_path != book.file_path:
+    # Log rename if path changed (template was applied during move)
+    if (dst_shelf.auto_organize or dst_shelf.is_sync_target) and new_rel_path != book.file_path:
         from app.models.organize import RenameLog
         session.add(RenameLog(
             book_id=book.id,
