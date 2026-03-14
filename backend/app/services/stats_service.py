@@ -86,7 +86,7 @@ async def get_overview(session: AsyncSession) -> dict:
     books_read: int = (
         await session.execute(
             select(func.count(func.distinct(ReadingProgress.book_id))).where(
-                ReadingProgress.progress >= 1.0
+                ReadingProgress.progress >= 99.0
             )
         )
     ).scalar_one()
@@ -146,11 +146,11 @@ async def get_time_series(
 
 
 async def get_books_completed(session: AsyncSession) -> list[dict]:
-    """Books with progress >= 1.0, most-recently-completed first."""
+    """Books with progress >= 99.0, most-recently-completed first."""
     result = await session.execute(
         select(Book, ReadingProgress)
         .join(ReadingProgress, ReadingProgress.book_id == Book.id)
-        .where(ReadingProgress.progress >= 1.0)
+        .where(ReadingProgress.progress >= 99.0)
         .order_by(ReadingProgress.updated_at.desc())
     )
     rows = result.all()

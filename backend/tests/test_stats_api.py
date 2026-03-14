@@ -111,8 +111,8 @@ async def test_overview_with_data(client: AsyncClient, db_session: AsyncSession,
     # dismissed session should not count
     await _make_session(db_session, book1.id, now - timedelta(hours=3), duration=9999, dismissed=True)
 
-    await _make_progress(db_session, book1.id, 1.0)  # book1 complete
-    await _make_progress(db_session, book2.id, 0.5)  # book2 in progress
+    await _make_progress(db_session, book1.id, 100.0)  # book1 complete
+    await _make_progress(db_session, book2.id, 50.0)  # book2 in progress
 
     resp = await client.get("/api/stats/overview")
     assert resp.status_code == 200
@@ -241,8 +241,8 @@ async def test_books_completed_empty(client: AsyncClient) -> None:
 async def test_books_completed_with_data(client: AsyncClient, db_session: AsyncSession, shelf: Shelf) -> None:
     b1 = await _make_book(db_session, shelf.id, "Finished Book")
     b2 = await _make_book(db_session, shelf.id, "Unfinished Book")
-    await _make_progress(db_session, b1.id, 1.0)
-    await _make_progress(db_session, b2.id, 0.4)
+    await _make_progress(db_session, b1.id, 100.0)
+    await _make_progress(db_session, b2.id, 40.0)
 
     resp = await client.get("/api/stats/books-completed")
     data = resp.json()

@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Flame, Clock, BookOpen } from 'lucide-react'
+import { Clock, BookOpen, Flame } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
+import { ReadingHeatmap } from '../components/ReadingHeatmap'
 import type { PaginatedResponse } from '../types'
 import type { Book } from '../types'
 import type { LucideIcon } from 'lucide-react'
+import type { HeatmapEntry } from '../components/ReadingHeatmap'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,11 +18,6 @@ interface StatsOverview {
   total_reading_time_seconds: number
   total_pages_read: number
   current_streak_days: number
-}
-
-interface HeatmapEntry {
-  date: string
-  seconds: number
 }
 
 interface TimeSeriesEntry {
@@ -74,115 +71,6 @@ const WEEK_START = (() => {
   d.setUTCHours(0, 0, 0, 0)
   return d.toISOString()
 })()
-
-// ---------------------------------------------------------------------------
-// Heatmap grid builder
-// ---------------------------------------------------------------------------
-
-const EMPTY_HEATMAP: number[][] = Array.from({ length: 53 }, () =>
-  Array(7).fill(0)
-)
-
-function buildHeatmapGrid(data: HeatmapEntry[]): number[][] {
-  if (!data.length) return EMPTY_HEATMAP
-  const maxSec = Math.max(...data.map((d) => d.seconds))
-  if (!maxSec) return EMPTY_HEATMAP
-
-  const dayMap = new Map<string, number>()
-  for (const d of data) {
-    dayMap.set(d.date, d.seconds / maxSec)
-  }
-
-  const year = parseInt(data[0].date.slice(0, 4), 10)
-  const jan1 = new Date(year, 0, 1)
-  const startDay = new Date(jan1)
-  startDay.setDate(jan1.getDate() - jan1.getDay()) // back to Sunday
-
-  const weeks: number[][] = []
-  const cursor = new Date(startDay)
-
-  while (weeks.length < 53) {
-    const week: number[] = []
-    for (let d = 0; d < 7; d++) {
-      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
-      week.push(dayMap.get(key) ?? 0)
-      cursor.setDate(cursor.getDate() + 1)
-    }
-    weeks.push(week)
-  }
-  return weeks
-}
-
-function cellClass(level: number): string {
-  if (!level) return 'bg-white/5 border border-white/10'
-  if (level <= 0.25) return 'bg-primary/20'
-  if (level <= 0.5) return 'bg-primary/40'
-  if (level <= 0.75) return 'bg-primary/75'
-  return 'bg-primary'
-}
-
-// ---------------------------------------------------------------------------
-// Heatmap
-// ---------------------------------------------------------------------------
-
-interface ReadingHeatmapProps {
-  weeks: number[][]
-  streak: number
-}
-
-function ReadingHeatmap({ weeks, streak }: ReadingHeatmapProps) {
-  const isEmpty = weeks.every((w) => w.every((v) => !v))
-  return (
-    <div className="bg-white/5 border border-white/10 p-8 h-full">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h4 className="text-xl font-black tracking-widest text-white">
-            Reading Activity
-          </h4>
-          <p className="text-white/40 text-xs font-bold tracking-wider mt-1">
-            {CURRENT_YEAR} Activity Heatmap
-          </p>
-        </div>
-        <div className="bg-primary text-white text-[10px] font-black px-3 py-1 tracking-widest flex items-center gap-1.5">
-          <Flame size={11} />
-          {streak > 0 ? `${streak} Day Streak` : 'No Streak Yet'}
-        </div>
-      </div>
-
-      <div className="overflow-x-auto pb-4">
-        <div className="inline-grid grid-rows-7 grid-flow-col gap-1.5 min-w-max">
-          {weeks.flatMap((week, wi) =>
-            week.map((level, di) => (
-              <div
-                key={`${wi}-${di}`}
-                className={`h-3 w-3 ${cellClass(level)}`}
-              />
-            ))
-          )}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mt-6">
-        {isEmpty ? (
-          <p className="text-white/40 text-xs font-medium italic normal-case">
-            No reading data yet. Sync your KOReader to see activity.
-          </p>
-        ) : (
-          <div />
-        )}
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] text-white/40 font-black">Less</span>
-          <div className="flex gap-1">
-            {[0, 0.25, 0.5, 0.75, 1].map((v, i) => (
-              <div key={i} className={`w-3 h-3 ${cellClass(v)}`} />
-            ))}
-          </div>
-          <span className="text-[10px] text-white/40 font-black">More</span>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Stat card
@@ -324,7 +212,7 @@ function ActivityFeed({ sessions }: { sessions: RecentSession[] }) {
 export default function Home() {
   const { data: booksData } = useApi<
     PaginatedResponse<Book & { reading_progress?: number }>
-  >('/api/books?status=reading&sort=last_read&per_page=5')
+  >('/api/books?status=reading&sort=last_read&per_page=6')
 
   const { data: overview } = useApi<StatsOverview>('/api/stats/overview')
 
@@ -344,14 +232,25 @@ export default function Home() {
     '/api/stats/recent-sessions?limit=10'
   )
 
-  const currentlyReading = booksData?.items ?? []
-  const streak = overview?.current_streak_days ?? 0
-  const heatmapWeeks = useMemo(
-    () => buildHeatmapGrid(heatmapData ?? []),
-    [heatmapData]
+  const { data: completedBooks } = useApi<{ completed_at: string }[]>(
+    '/api/stats/books-completed'
   )
+
+  const currentlyReading = (booksData?.items ?? []).slice(0, 6)
+  const streak = overview?.current_streak_days ?? 0
   const thisWeekSeconds = weekTimeData?.reduce((a, b) => a + b.value, 0) ?? 0
   const thisWeekPages = weekPagesData?.reduce((a, b) => a + b.value, 0) ?? 0
+  const activitySessions = useMemo(
+    () => (recentSessions ?? []).slice(0, 5),
+    [recentSessions]
+  )
+  const booksCompletedThisYear = useMemo(
+    () =>
+      (completedBooks ?? []).filter((b) =>
+        b.completed_at?.startsWith(String(CURRENT_YEAR))
+      ).length,
+    [completedBooks]
+  )
 
   return (
     <div className="p-6 lg:p-12">
@@ -392,7 +291,11 @@ export default function Home() {
 
         {/* Heatmap */}
         <section className="col-span-12 lg:col-span-8">
-          <ReadingHeatmap weeks={heatmapWeeks} streak={streak} />
+          <ReadingHeatmap
+            data={heatmapData ?? []}
+            year={CURRENT_YEAR}
+            streak={streak}
+          />
         </section>
 
         {/* Stat cards */}
@@ -411,16 +314,20 @@ export default function Home() {
           />
           <StatCard
             icon={Flame}
-            label="Current Streak"
-            value={streak > 0 ? `${streak} days` : null}
-            sub={streak > 0 ? 'keep it up!' : 'start reading today'}
+            label="This Year"
+            value={
+              completedBooks !== undefined
+                ? String(booksCompletedThisYear)
+                : null
+            }
+            sub="books completed"
           />
         </section>
 
         {/* Recent activity */}
-        {recentSessions && recentSessions.length > 0 && (
+        {activitySessions.length > 0 && (
           <section className="col-span-12">
-            <ActivityFeed sessions={recentSessions} />
+            <ActivityFeed sessions={activitySessions} />
           </section>
         )}
 

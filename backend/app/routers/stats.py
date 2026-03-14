@@ -43,7 +43,7 @@ async def pages_over_time(
 
 @router.get("/books-completed")
 async def books_completed(session: AsyncSession = Depends(get_session)) -> list[dict]:
-    """Completed books (progress ≥ 1.0), most recent first."""
+    """Completed books (progress ≥ 99), most recent first."""
     return await stats_service.get_books_completed(session)
 
 
