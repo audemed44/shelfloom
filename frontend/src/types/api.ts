@@ -6,7 +6,36 @@ export interface Shelf {
   path: string
   is_default: boolean
   is_sync_target: boolean
+  device_name: string | null
+  auto_organize: boolean
+  created_at: string
   book_count: number
+}
+
+export interface OrganizerResult {
+  book_id: string
+  book_title: string
+  old_path: string
+  new_path: string
+  moved: boolean
+  already_correct: boolean
+  error: string | null
+}
+
+export interface ScanProgress {
+  total: number
+  processed: number
+  created: number
+  updated: number
+  skipped: number
+  errors: number
+}
+
+export interface ScanStatus {
+  is_running: boolean
+  last_scan_at: string | null
+  progress: ScanProgress | null
+  error: string | null
 }
 
 export interface Series {

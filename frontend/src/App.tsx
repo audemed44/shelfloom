@@ -7,6 +7,7 @@ import Stats from "./pages/Stats";
 import Serials from "./pages/Serials";
 import SeriesList from "./pages/SeriesList";
 import SeriesDetail from "./pages/SeriesDetail";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="serials" element={<Serials />} />
           <Route path="series" element={<SeriesList />} />
           <Route path="series/:id" element={<SeriesDetail />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
