@@ -78,6 +78,7 @@ async def create_shelf(
         is_default=data.is_default,
         is_sync_target=data.is_sync_target,
         device_name=data.device_name,
+        koreader_stats_db_path=data.koreader_stats_db_path,
         auto_organize=data.auto_organize,
     )
     session.add(shelf)
@@ -116,6 +117,8 @@ async def update_shelf(
         shelf.is_sync_target = data.is_sync_target
     if data.device_name is not None:
         shelf.device_name = data.device_name
+    if data.koreader_stats_db_path is not None:
+        shelf.koreader_stats_db_path = data.koreader_stats_db_path or None
     if data.auto_organize is not None:
         shelf.auto_organize = data.auto_organize
 

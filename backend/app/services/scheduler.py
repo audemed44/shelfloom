@@ -73,8 +73,17 @@ class Scheduler:
 
                 combined = ImportProgress()
                 for shelf in shelves:
+                    from pathlib import Path as _Path
+                    stats_db = shelf.koreader_stats_db_path
+                    stats_db_path = (
+                        _Path(stats_db)
+                        if stats_db and _Path(stats_db).is_file()
+                        else None
+                    )
                     p = await import_shelf(
-                        session, shelf, covers_dir, mtime_cache=self.mtime_cache
+                        session, shelf, covers_dir,
+                        mtime_cache=self.mtime_cache,
+                        stats_db_path=stats_db_path,
                     )
                     combined.total += p.total
                     combined.processed += p.processed

@@ -24,6 +24,7 @@ class StatsBook:
     total_read_time: int | None
     total_read_pages: int | None
     last_open: int | None
+    ko_total_pages: int | None = None  # KOReader's page count (mode across sessions)
 
 
 @dataclass
@@ -143,16 +144,30 @@ def read_stats_db(db_path: str | Path) -> tuple[list[StatsBook], dict[int, list[
             )
             # Group rows by book
             raw_by_book: dict[int, list[tuple[int, int, int]]] = {}
+            total_pages_by_book: dict[int, list[int]] = {}
             for row in cursor.fetchall():
                 bid = row["id_book"]
                 if bid not in raw_by_book:
                     raw_by_book[bid] = []
+                    total_pages_by_book[bid] = []
                 raw_by_book[bid].append((row["page"], row["start_time"], row["duration"]))
+                if row["total_pages"]:
+                    total_pages_by_book[bid].append(row["total_pages"])
+
+            # Compute mode of total_pages per book (most common value = most typical layout)
+            ko_pages_map: dict[int, int] = {}
+            for bid, tp_list in total_pages_by_book.items():
+                if tp_list:
+                    ko_pages_map[bid] = max(set(tp_list), key=tp_list.count)
 
             # Aggregate sessions per book
             book_md5_map = {b.id: b.md5 for b in books}
             for bid, rows in raw_by_book.items():
                 sessions_by_book[bid] = _aggregate_page_stats(rows, book_md5_map.get(bid), bid)
+
+            # Attach ko_total_pages to each StatsBook
+            for book in books:
+                book.ko_total_pages = ko_pages_map.get(book.id)
 
     finally:
         conn.close()

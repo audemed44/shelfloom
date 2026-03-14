@@ -36,6 +36,8 @@ async def list_books(
     format: str | None = None,
     tag: str | None = None,
     series_id: int | None = None,
+    status: str | None = None,
+    sort: str = "created_at",
 ) -> tuple[list[Book], int]:
     """Return (books, total_count)."""
     query = select(Book)
@@ -61,14 +63,45 @@ async def list_books(
             .join(Tag, BookTag.tag_id == Tag.id)
             .where(Tag.name == tag)
         )
+    if status is not None:
+        from app.models.reading import ReadingProgress as RP
+
+        progress_subq = (
+            select(func.max(RP.progress))
+            .where(RP.book_id == Book.id)
+            .correlate(Book)
+            .scalar_subquery()
+        )
+        if status == "completed":
+            query = query.where(progress_subq >= 100)
+        elif status == "reading":
+            query = query.where(progress_subq > 0, progress_subq < 100)
+        elif status == "unread":
+            query = query.where(progress_subq.is_(None) | (progress_subq == 0))
 
     # Count
     count_result = await session.execute(select(func.count()).select_from(query.subquery()))
     total = count_result.scalar_one()
 
-    # Paginate
+    # Sort
     offset = (page - 1) * per_page
-    query = query.order_by(Book.date_added.desc()).offset(offset).limit(per_page)
+    if sort == "title":
+        query = query.order_by(Book.title)
+    elif sort == "author":
+        query = query.order_by(Book.author.nulls_last(), Book.title)
+    elif sort == "last_read":
+        from app.models.reading import ReadingSession as RS
+        last_session_subq = (
+            select(func.max(RS.start_time))
+            .where(RS.book_id == Book.id, RS.dismissed == False)  # noqa: E712
+            .correlate(Book)
+            .scalar_subquery()
+        )
+        query = query.order_by(last_session_subq.desc().nulls_last(), Book.date_added.desc())
+    else:  # created_at (default)
+        query = query.order_by(Book.date_added.desc())
+
+    query = query.offset(offset).limit(per_page)
     result = await session.execute(query)
     return result.scalars().all(), total  # type: ignore[return-value]
 

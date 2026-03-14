@@ -27,6 +27,7 @@ interface EditForm {
   language: string
   isbn: string
   date_published: string
+  genre: string
   description: string
 }
 
@@ -253,6 +254,7 @@ export default function EditBookModal({
     language: book.language ?? '',
     isbn: book.isbn ?? '',
     date_published: book.date_published ?? '',
+    genre: book.genre ?? '',
     description: book.description ?? '',
   })
   const [saving, setSaving] = useState(false)
@@ -503,6 +505,15 @@ export default function EditBookModal({
                     value={form.date_published}
                     onChange={handleChange}
                     placeholder="e.g. 2010"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Field
+                    label="Genre"
+                    name="genre"
+                    value={form.genre}
+                    onChange={handleChange}
+                    placeholder="e.g. Science Fiction"
                   />
                 </div>
                 <div>

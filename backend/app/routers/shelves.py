@@ -27,6 +27,7 @@ def _shelf_to_response(shelf, book_count: int, tmpl=None) -> ShelfResponse:
         is_default=shelf.is_default,
         is_sync_target=shelf.is_sync_target,
         device_name=shelf.device_name,
+        koreader_stats_db_path=shelf.koreader_stats_db_path,
         auto_organize=shelf.auto_organize,
         created_at=shelf.created_at,
         book_count=book_count,

@@ -98,6 +98,8 @@ async def import_shelf(
     # Import stats DB sessions if path provided
     if stats_db_path is not None:
         await _ingest_stats_db(session, stats_db_path, progress)
+        # Deduplicate after stats_db is fully imported so it can win over SDR
+        await _deduplicate_all(session, shelf)
 
     return progress
 
@@ -320,6 +322,15 @@ def _extract_metadata(
         from app.services.metadata.filename import parse_filename
         fn = parse_filename(book_path)
         return fn.title, fn.author, None, None, None, None, None, {}
+
+
+async def _deduplicate_all(session: AsyncSession, shelf: "Shelf") -> None:  # type: ignore[name-defined]  # noqa: F821
+    """Run cross-source deduplication for every book in the shelf."""
+    from app.koreader.dedup import deduplicate_sessions
+    result = await session.execute(select(Book).where(Book.shelf_id == shelf.id))
+    books = result.scalars().all()
+    for book in books:
+        await deduplicate_sessions(session, book.id)
 
 
 def _extract_cover(

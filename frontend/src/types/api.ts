@@ -7,6 +7,7 @@ export interface Shelf {
   is_default: boolean
   is_sync_target: boolean
   device_name: string | null
+  koreader_stats_db_path: string | null
   auto_organize: boolean
   created_at: string
   book_count: number
@@ -88,6 +89,7 @@ export interface Book {
   language: string | null
   isbn: string | null
   date_published: string | null
+  genre: string | null
   description: string | null
   page_count: number | null
   shelf_id: number
@@ -96,6 +98,7 @@ export interface Book {
   shelfloom_id: string | null
   created_at: string
   updated_at: string
+  reading_progress: number | null  // 0–100, null = unread
 }
 
 export interface BookDetail extends Book {

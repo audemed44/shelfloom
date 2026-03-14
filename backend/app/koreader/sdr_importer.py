@@ -113,7 +113,7 @@ async def import_sdr(
         session.add(progress_record)
 
     if sdr_data.percent_finished is not None:
-        progress_record.progress = sdr_data.percent_finished
+        progress_record.progress = round(sdr_data.percent_finished * 100, 2)
         counts["progress"] = 1
     if sdr_data.last_xpointer:
         progress_record.position = sdr_data.last_xpointer

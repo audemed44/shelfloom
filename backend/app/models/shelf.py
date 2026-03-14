@@ -15,6 +15,7 @@ class Shelf(Base):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_sync_target: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     device_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    koreader_stats_db_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     auto_organize: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False

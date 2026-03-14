@@ -224,7 +224,7 @@ async def test_import_sdr_creates_progress(db_session, book_factory, shelf_facto
     )
     progress = result.scalar_one_or_none()
     assert progress is not None
-    assert abs(progress.progress - 0.5) < 0.001
+    assert abs(progress.progress - 50.0) < 0.001
 
 
 async def test_import_sdr_creates_highlights(db_session, book_factory, shelf_factory):

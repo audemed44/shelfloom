@@ -22,6 +22,8 @@ class BookResponse(BaseModel):
     page_count: int | None
     date_added: datetime
     date_published: str | None
+    genre: str | None
+    reading_progress: float | None = None  # 0–100, max across all devices
 
 
 class BookUpdate(BaseModel):
@@ -32,6 +34,7 @@ class BookUpdate(BaseModel):
     language: str | None = None
     description: str | None = None
     date_published: str | None = None
+    genre: str | None = None
 
 
 class BookListResponse(BaseModel):

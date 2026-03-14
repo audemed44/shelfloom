@@ -16,6 +16,7 @@ interface ShelfForm {
   is_default: boolean
   is_sync_target: boolean
   device_name: string
+  koreader_stats_db_path: string
   auto_organize: boolean
   organize_template: string
   seq_pad: number
@@ -33,6 +34,7 @@ export default function ShelfModal({
     is_default: shelf?.is_default ?? false,
     is_sync_target: shelf?.is_sync_target ?? false,
     device_name: shelf?.device_name ?? '',
+    koreader_stats_db_path: shelf?.koreader_stats_db_path ?? '',
     auto_organize: shelf?.auto_organize ?? false,
     organize_template:
       shelf?.organize_template ??
@@ -65,6 +67,7 @@ export default function ShelfModal({
           form.is_sync_target && form.device_name.trim()
             ? form.device_name.trim()
             : null,
+        koreader_stats_db_path: form.koreader_stats_db_path.trim() || null,
         auto_organize: form.auto_organize,
         organize_template:
           form.auto_organize && form.organize_template.trim()
@@ -193,6 +196,25 @@ export default function ShelfModal({
                 />
               </div>
             )}
+            {/* KOReader stats DB path */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
+                KOReader Statistics DB
+              </label>
+              <input
+                type="text"
+                value={form.koreader_stats_db_path}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, koreader_stats_db_path: e.target.value }))
+                }
+                placeholder="e.g., /koreader/statistics.sqlite3"
+                className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
+              />
+              <p className="text-[10px] text-white/30 normal-case">
+                Path to the KOReader statistics.sqlite3 for this shelf's device. Scanned automatically to import reading sessions.
+              </p>
+            </div>
+
             <Toggle
               label="Auto-organize on scan"
               hint="Files are reorganized automatically after each scan."

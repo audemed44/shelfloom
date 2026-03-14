@@ -31,6 +31,7 @@ class Book(Base):
         DateTime, server_default=func.now(), nullable=False
     )
     date_published: Mapped[str | None] = mapped_column(Text, nullable=True)
+    genre: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_raw: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
 
     shelf: Mapped["Shelf"] = relationship("Shelf", back_populates="books")  # type: ignore[name-defined]  # noqa: F821

@@ -13,7 +13,7 @@ class ReadingProgress(Base):
     book_id: Mapped[str] = mapped_column(
         Text, ForeignKey("books.id", ondelete="CASCADE"), nullable=False
     )
-    progress: Mapped[float | None] = mapped_column(nullable=True)  # 0.0–1.0
+    progress: Mapped[float | None] = mapped_column(nullable=True)  # 0–100
     device: Mapped[str | None] = mapped_column(Text, nullable=True)
     chapter: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[str | None] = mapped_column(Text, nullable=True)

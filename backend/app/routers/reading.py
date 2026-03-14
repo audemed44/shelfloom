@@ -21,6 +21,56 @@ from app.services.book_service import BookNotFound, get_book
 router = APIRouter(prefix="/books", tags=["reading"])
 
 
+@router.post("/{book_id}/mark-read", status_code=200)
+async def mark_read(
+    book_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Mark a book as fully read (upserts a manual progress record at 100%)."""
+    try:
+        await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    result = await session.execute(
+        select(ReadingProgress).where(
+            ReadingProgress.book_id == book_id,
+            ReadingProgress.device == "manual",
+        )
+    )
+    record = result.scalar_one_or_none()
+    if record is None:
+        record = ReadingProgress(book_id=book_id, device="manual", progress=100.0)
+        session.add(record)
+    else:
+        record.progress = 100.0
+    await session.commit()
+    return {"status": "ok"}
+
+
+@router.delete("/{book_id}/mark-read", status_code=204)
+async def unmark_read(
+    book_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Remove the manual 'read' mark (leaves KOReader progress intact)."""
+    try:
+        await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    result = await session.execute(
+        select(ReadingProgress).where(
+            ReadingProgress.book_id == book_id,
+            ReadingProgress.device == "manual",
+        )
+    )
+    record = result.scalar_one_or_none()
+    if record:
+        await session.delete(record)
+        await session.commit()
+
+
 @router.get("/{book_id}/highlights")
 async def get_highlights(
     book_id: str,

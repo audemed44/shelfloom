@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
+from sqlalchemy import func, inspect as sa_inspect, select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
@@ -30,6 +31,16 @@ from app.services.book_service import (
 router = APIRouter(prefix="/books", tags=["books"])
 
 
+def _book_response(book: "Book", reading_progress: float | None = None) -> BookResponse:  # type: ignore[name-defined]  # noqa: F821
+    """Build BookResponse from ORM object without triggering lazy relationship loads."""
+    col_data = {
+        attr.key: getattr(book, attr.key)
+        for attr in sa_inspect(type(book)).mapper.column_attrs
+    }
+    col_data["reading_progress"] = reading_progress
+    return BookResponse.model_validate(col_data)
+
+
 @router.get("", response_model=BookListResponse)
 async def list_books_endpoint(
     page: int = Query(1, ge=1),
@@ -39,6 +50,8 @@ async def list_books_endpoint(
     format: str | None = Query(None),
     tag: str | None = Query(None),
     series_id: int | None = Query(None),
+    status: str | None = Query(None),
+    sort: str = Query("created_at"),
     session: AsyncSession = Depends(get_session),
 ):
     books, total = await list_books(
@@ -50,9 +63,25 @@ async def list_books_endpoint(
         format=format,
         tag=tag,
         series_id=series_id,
+        status=status,
+        sort=sort,
     )
+
+    # Batch-fetch max reading progress per book (single query)
+    progress_map: dict[str, float] = {}
+    if books:
+        from app.models.reading import ReadingProgress
+        prog_rows = await session.execute(
+            sa_select(ReadingProgress.book_id, func.max(ReadingProgress.progress))
+            .where(ReadingProgress.book_id.in_([b.id for b in books]))
+            .group_by(ReadingProgress.book_id)
+        )
+        progress_map = {row[0]: row[1] for row in prog_rows.all()}
+
+    items = [_book_response(b, progress_map.get(b.id)) for b in books]
+
     return BookListResponse(
-        items=[BookResponse.model_validate(b) for b in books],
+        items=items,
         total=total,
         page=page,
         per_page=per_page,
@@ -75,7 +104,7 @@ async def get_book_endpoint(book_id: str, session: AsyncSession = Depends(get_se
         book = await get_book(session, book_id)
     except BookNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return BookResponse.model_validate(book)
+    return _book_response(book)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=BookResponse)
@@ -125,7 +154,7 @@ async def upload_book_endpoint(
     book = result2.scalar_one_or_none()
     if book is None:
         raise HTTPException(status_code=500, detail="Book was imported but could not be found")
-    return BookResponse.model_validate(book)
+    return _book_response(book)
 
 
 @router.patch("/{book_id}", response_model=BookResponse)
@@ -138,7 +167,7 @@ async def update_book_endpoint(
         book = await update_book(session, book_id, data)
     except BookNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return BookResponse.model_validate(book)
+    return _book_response(book)
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -201,7 +230,7 @@ async def refresh_cover_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
     except (ShelfNotFound, FileOperationError) as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return BookResponse.model_validate(book)
+    return _book_response(book)
 
 
 @router.post("/{book_id}/move", response_model=BookResponse)
@@ -218,4 +247,4 @@ async def move_book_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
     except FileOperationError as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return BookResponse.model_validate(book)
+    return _book_response(book)

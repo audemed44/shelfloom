@@ -66,7 +66,7 @@ def _inject_identifier(opf_content: str, book_uuid: str) -> str:
     )
     # Insert before closing </metadata>
     new_content, count = re.subn(
-        r'(</metadata>)', tag + r'\n    \1', opf_content, count=1, flags=re.IGNORECASE
+        r'(</(?:opf:)?metadata>)', tag + r'\n    \1', opf_content, count=1, flags=re.IGNORECASE
     )
     if count == 0:
         raise EmbedError("Could not find </metadata> tag in OPF")

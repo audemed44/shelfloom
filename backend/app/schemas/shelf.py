@@ -9,6 +9,7 @@ class ShelfCreate(BaseModel):
     is_default: bool = False
     is_sync_target: bool = False
     device_name: str | None = None
+    koreader_stats_db_path: str | None = None
     auto_organize: bool = False
     organize_template: str | None = None
     seq_pad: int = 2
@@ -33,6 +34,7 @@ class ShelfUpdate(BaseModel):
     is_default: bool | None = None
     is_sync_target: bool | None = None
     device_name: str | None = None
+    koreader_stats_db_path: str | None = None
     auto_organize: bool | None = None
     organize_template: str | None = None
     seq_pad: int | None = None
@@ -47,6 +49,7 @@ class ShelfResponse(BaseModel):
     is_default: bool
     is_sync_target: bool
     device_name: str | None
+    koreader_stats_db_path: str | None = None
     auto_organize: bool
     created_at: datetime
     book_count: int = 0

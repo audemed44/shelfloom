@@ -121,10 +121,12 @@ export default function BookDetailPage() {
   const [movingTo, setMovingTo] = useState<number | null>(null)
   const [coverRefreshing, setCoverRefreshing] = useState(false)
   const [coverKey, setCoverKey] = useState(0)
+  const [markingRead, setMarkingRead] = useState(false)
+  const [summaryKey, setSummaryKey] = useState(0)
 
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
   const { data: summary } = useApi<ReadingSummary>(
-    id ? `/api/books/${id}/reading-summary` : null
+    id ? `/api/books/${id}/reading-summary?_k=${summaryKey}` : null
   )
   const { data: sessionsData } = useApi<{ items: SessionDisplay[] }>(
     id ? `/api/books/${id}/sessions?per_page=10` : null
@@ -195,6 +197,23 @@ export default function BookDetailPage() {
       // silently ignore
     } finally {
       setCoverRefreshing(false)
+    }
+  }
+
+  const handleMarkRead = async (markRead: boolean) => {
+    if (!id) return
+    setMarkingRead(true)
+    try {
+      if (markRead) {
+        await api.post(`/api/books/${id}/mark-read`, {})
+      } else {
+        await api.delete(`/api/books/${id}/mark-read`)
+      }
+      setSummaryKey((k) => k + 1)
+    } catch {
+      // silently ignore
+    } finally {
+      setMarkingRead(false)
     }
   }
 
@@ -699,6 +718,20 @@ export default function BookDetailPage() {
             </div>
 
             <button
+              onClick={() => handleMarkRead(percent == null || percent < 100)}
+              disabled={markingRead}
+              data-testid="mark-read-btn"
+              className={`flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border rounded-lg transition-all disabled:opacity-40 ${
+                percent != null && percent >= 100
+                  ? 'border-primary/40 text-primary/70 hover:text-primary hover:border-primary'
+                  : 'border-white/10 text-white/40 hover:text-white hover:border-white/30'
+              }`}
+            >
+              <CheckCircle2 size={13} />
+              {percent != null && percent >= 100 ? 'Unmark' : 'Mark Read'}
+            </button>
+
+            <button
               onClick={() => setShowEdit(true)}
               data-testid="edit-btn"
               className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 rounded-lg transition-all"
@@ -732,14 +765,6 @@ export default function BookDetailPage() {
               </p>
               <p className="text-base font-medium">
                 {book.page_count ? book.page_count.toLocaleString() : '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
-                Shelf
-              </p>
-              <p className="text-base font-medium normal-case">
-                {currentShelf?.name ?? '—'}
               </p>
             </div>
           </div>
@@ -812,6 +837,7 @@ export default function BookDetailPage() {
         book.publisher ||
         book.language ||
         book.isbn ||
+        book.genre ||
         book.format) && (
         <footer className="mt-20 pt-8 border-t border-white/10 opacity-70">
           <div className="flex flex-wrap gap-x-12 gap-y-4 text-[10px] font-black uppercase tracking-widest">
@@ -837,6 +863,12 @@ export default function BookDetailPage() {
               <div className="flex flex-col gap-1">
                 <span className="text-white/30">ISBN</span>
                 <span>{book.isbn}</span>
+              </div>
+            )}
+            {book.genre && (
+              <div className="flex flex-col gap-1">
+                <span className="text-white/30">Genre</span>
+                <span className="normal-case">{book.genre}</span>
               </div>
             )}
             {book.format && (

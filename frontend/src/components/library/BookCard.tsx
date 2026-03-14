@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Book } from '../../types'
 
@@ -7,6 +8,9 @@ interface BookCardProps {
 
 export default function BookCard({ book }: BookCardProps) {
   const coverSrc = `/api/books/${book.id}/cover`
+  const progress = book.reading_progress
+  const isComplete = progress != null && progress >= 100
+  const isInProgress = progress != null && progress > 0 && progress < 100
 
   return (
     <Link
@@ -30,6 +34,23 @@ export default function BookCard({ book }: BookCardProps) {
             {book.format?.toUpperCase()}
           </span>
         </div>
+
+        {/* Complete checkmark */}
+        {isComplete && (
+          <div className="absolute top-2 left-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
+            <Check size={12} strokeWidth={3} className="text-white" />
+          </div>
+        )}
+
+        {/* Reading progress bar */}
+        {isInProgress && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/60">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Meta */}

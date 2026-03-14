@@ -47,7 +47,7 @@ export default function SeriesDetail() {
   )
   const { data: allSeries } = useApi<SeriesWithCount[]>('/api/series/tree')
   const { data: readingOrders } = useApi<ReadingOrder[]>(
-    seriesId ? `/api/series/${seriesId}/reading-orders` : null
+    seriesId ? `/api/series/${seriesId}/reading-orders?_rev=${refreshKey}` : null
   )
 
   const [showEdit, setShowEdit] = useState(false)
@@ -65,7 +65,7 @@ export default function SeriesDetail() {
   const [localEntries, setLocalEntries] = useState<ReadingOrderEntry[]>([])
   const [entriesDirty, setEntriesDirty] = useState(false)
   const [entryDragOver, setEntryDragOver] = useState<number | null>(null)
-  const [, setRefreshKey] = useState(0)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // sync localBooks when books load
   useEffect(() => {

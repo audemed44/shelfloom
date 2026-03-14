@@ -18,9 +18,17 @@ import type { Book, Shelf, PaginatedResponse } from '../types'
 const PER_PAGE = 24
 
 const SORT_OPTIONS = [
+  { value: 'last_read', label: 'Last Read' },
   { value: 'created_at', label: 'Newest' },
   { value: 'title', label: 'Title A–Z' },
   { value: 'author', label: 'Author A–Z' },
+]
+
+const STATUS_OPTIONS = [
+  { value: null, label: 'All' },
+  { value: 'reading', label: 'Reading' },
+  { value: 'unread', label: 'Unread' },
+  { value: 'completed', label: 'Completed' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -231,7 +239,8 @@ export default function Library() {
   const [view, setView] = useState('grid')
   const [search, setSearch] = useState('')
   const [selectedShelfId, setSelectedShelfId] = useState<number | null>(null)
-  const [sort, setSort] = useState('created_at')
+  const [sort, setSort] = useState('last_read')
+  const [status, setStatus] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [rev, setRev] = useState(0)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
@@ -271,9 +280,10 @@ export default function Library() {
     })
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (selectedShelfId) params.set('shelf_id', String(selectedShelfId))
+    if (status) params.set('status', status)
     if (rev > 0) params.set('_rev', String(rev))
     return `/api/books?${params}`
-  }, [page, debouncedSearch, selectedShelfId, sort, rev])
+  }, [page, debouncedSearch, selectedShelfId, sort, status, rev])
 
   const { data: booksData, loading } =
     useApi<PaginatedResponse<Book>>(booksPath)
@@ -320,6 +330,23 @@ export default function Library() {
           }}
         />
       )}
+
+      {/* Status filter pills */}
+      <div className="flex gap-2 mb-5">
+        {STATUS_OPTIONS.map((opt) => (
+          <button
+            key={String(opt.value)}
+            onClick={() => { setStatus(opt.value); resetPage() }}
+            className={`px-3 py-1.5 text-[10px] font-black tracking-widest uppercase rounded transition-colors ${
+              status === opt.value
+                ? 'bg-primary text-white'
+                : 'bg-white/5 border border-white/10 text-white/40 hover:text-white hover:border-white/20'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
 
       {/* Controls */}
       <Controls

@@ -93,11 +93,17 @@ async def import_stats_db(
                 skipped += 1
                 continue
 
+            pages_read = sess.pages_read
+            if shelfloom_book.page_count and stats_book.ko_total_pages:
+                pages_read = round(
+                    sess.pages_read * shelfloom_book.page_count / stats_book.ko_total_pages
+                )
+
             reading_session = ReadingSession(
                 book_id=shelfloom_book.id,
                 start_time=sess.start_time,
                 duration=sess.duration,
-                pages_read=sess.pages_read,
+                pages_read=pages_read,
                 source="stats_db",
                 source_key=sess.source_key,
                 dismissed=False,
