@@ -68,8 +68,9 @@ async def update_series(session: AsyncSession, series_id: int, data: SeriesUpdat
     series = await get_series(session, series_id)
     if data.name is not None:
         series.name = data.name
-    if data.parent_id is not None:
-        await get_series(session, data.parent_id)
+    if "parent_id" in data.model_fields_set:
+        if data.parent_id is not None:
+            await get_series(session, data.parent_id)
         series.parent_id = data.parent_id
     if data.description is not None:
         series.description = data.description

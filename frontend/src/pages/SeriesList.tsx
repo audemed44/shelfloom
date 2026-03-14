@@ -259,7 +259,7 @@ export default function SeriesList() {
     <div className="p-4 sm:p-6 lg:p-12">
       {/* Header */}
       <header className="mb-6 sm:mb-8">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
               Series
@@ -270,18 +270,18 @@ export default function SeriesList() {
                 : 'Organize books into series'}
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0 mt-2">
+          <div className="flex items-center gap-2 sm:gap-3 sm:shrink-0 sm:mt-2">
             <button
               onClick={handlePurge}
               data-testid="purge-btn"
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold border border-white/20 text-white/60 hover:text-white hover:border-white/40 rounded-lg transition-colors normal-case"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-semibold border border-white/20 text-white/60 hover:text-white hover:border-white/40 rounded-lg transition-colors normal-case"
             >
               Purge Empty
             </button>
             <button
               onClick={() => setShowCreate(true)}
               data-testid="new-series-btn"
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white hover:bg-primary/80 rounded-lg transition-colors normal-case"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 text-sm font-semibold bg-primary text-white hover:bg-primary/80 rounded-lg transition-colors normal-case"
             >
               <PlusCircle size={16} />
               New Series
