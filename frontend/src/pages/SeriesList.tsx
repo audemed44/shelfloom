@@ -137,7 +137,10 @@ function GroupCard({
       {/* Parent header */}
       <div className="flex items-center gap-4 px-4 py-3 bg-white/[0.03] border-b border-white/10">
         <Link to={`/series/${parent.id}`} className="shrink-0">
-          <CoverThumb bookId={parent.first_book_id} />
+          {/* TODO: decide proper parent cover logic (dedicated upload, or inherit from parent's own books) */}
+          <CoverThumb
+            bookId={children[0]?.first_book_id ?? parent.first_book_id}
+          />
         </Link>
         <div className="flex-1 min-w-0">
           <Link
