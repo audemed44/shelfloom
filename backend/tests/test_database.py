@@ -5,14 +5,19 @@ from app.database import make_engine
 
 
 @pytest.mark.asyncio
-async def test_foreign_keys_pragma_enabled():
-    """make_engine must enable PRAGMA foreign_keys = ON for every connection."""
-    engine = make_engine(":memory:")
+async def test_sqlite_pragmas_set(tmp_path):
+    """make_engine must set all required SQLite pragmas on every connection."""
+    engine = make_engine(str(tmp_path / "test.db"))
     async with engine.connect() as conn:
-        result = await conn.execute(text("PRAGMA foreign_keys"))
-        value = result.scalar()
+        fk = (await conn.execute(text("PRAGMA foreign_keys"))).scalar()
+        journal = (await conn.execute(text("PRAGMA journal_mode"))).scalar()
+        sync = (await conn.execute(text("PRAGMA synchronous"))).scalar()
+        busy = (await conn.execute(text("PRAGMA busy_timeout"))).scalar()
     await engine.dispose()
-    assert value == 1
+    assert fk == 1
+    assert journal == "wal"
+    assert sync == 1  # NORMAL = 1
+    assert busy == 5000
 
 
 @pytest.mark.asyncio

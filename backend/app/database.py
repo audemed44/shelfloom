@@ -22,6 +22,9 @@ def make_engine(db_path: str | None = None):  # pragma: no cover
         if engine.dialect.name == "sqlite":
             cursor = dbapi_conn.cursor()
             cursor.execute("PRAGMA foreign_keys = ON")
+            cursor.execute("PRAGMA journal_mode = WAL")
+            cursor.execute("PRAGMA synchronous = NORMAL")
+            cursor.execute("PRAGMA busy_timeout = 5000")
             cursor.close()
 
     return engine
