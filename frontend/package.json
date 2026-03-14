@@ -12,6 +12,7 @@
     "lint": "eslint src --ext js,jsx --max-warnings 0"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
     "lucide-react": "^0.400.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

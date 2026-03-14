@@ -1,9 +1,17 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '../App'
 
 describe('App', () => {
+  // Silence fetch errors from useApi calls in jsdom (no network available)
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No network in tests'))
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('renders without crashing', () => {
     render(<App />)
     expect(document.body).toBeTruthy()

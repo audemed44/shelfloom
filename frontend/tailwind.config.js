@@ -6,7 +6,24 @@ export default {
     './src/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        primary: '#258cf4',
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+      },
+      // Sharp, editorial border-radius — matches design system
+      borderRadius: {
+        DEFAULT: '0.125rem',
+        sm: '0.125rem',
+        md: '0.25rem',
+        lg: '0.25rem',
+        xl: '0.5rem',
+        '2xl': '0.5rem',
+        full: '9999px',
+      },
+    },
   },
   plugins: [],
 }
