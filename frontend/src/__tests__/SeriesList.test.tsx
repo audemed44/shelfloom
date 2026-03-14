@@ -5,44 +5,81 @@ import { MemoryRouter } from 'react-router-dom'
 import SeriesList from '../pages/SeriesList'
 
 const SERIES_TREE = [
-  { id: 1, name: 'Cosmere', parent_id: null, book_count: 0, description: null, sort_order: 0, cover_path: null },
-  { id: 2, name: 'Stormlight Archive', parent_id: 1, book_count: 7, description: null, sort_order: 0, cover_path: null },
+  {
+    id: 1,
+    name: 'Cosmere',
+    parent_id: null,
+    book_count: 0,
+    description: null,
+    sort_order: 0,
+    cover_path: null,
+  },
+  {
+    id: 2,
+    name: 'Stormlight Archive',
+    parent_id: 1,
+    book_count: 7,
+    description: null,
+    sort_order: 0,
+    cover_path: null,
+  },
 ]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mockFetch(overrides: Record<string, any> = {}): any {
   return vi.spyOn(globalThis, 'fetch').mockImplementation((url, opts) => {
     const u = url.toString()
-    const method = (opts as RequestInit | undefined)?.method?.toUpperCase() ?? 'GET'
+    const method =
+      (opts as RequestInit | undefined)?.method?.toUpperCase() ?? 'GET'
 
     if (u.includes('/api/series/tree')) {
       return Promise.resolve({
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => overrides.tree ?? SERIES_TREE,
       }) as Promise<Response>
     }
     if (u.includes('/api/series/empty') && method === 'DELETE') {
       return Promise.resolve({
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         json: async () => overrides.purge ?? { deleted: [], count: 0 },
       }) as Promise<Response>
     }
     if (u.match(/\/api\/series\/\d+$/) && method === 'DELETE') {
-      return Promise.resolve({ ok: true, status: 204, json: async () => ({}) }) as Promise<Response>
+      return Promise.resolve({
+        ok: true,
+        status: 204,
+        json: async () => ({}),
+      }) as Promise<Response>
     }
     if (u.includes('/api/series') && method === 'POST') {
       return Promise.resolve({
-        ok: true, status: 201,
-        json: async () => ({ id: 99, name: 'New', parent_id: null, description: null, sort_order: 0, cover_path: null }),
+        ok: true,
+        status: 201,
+        json: async () => ({
+          id: 99,
+          name: 'New',
+          parent_id: null,
+          description: null,
+          sort_order: 0,
+          cover_path: null,
+        }),
       }) as Promise<Response>
     }
-    return Promise.resolve({ ok: true, status: 200, json: async () => ({}) }) as Promise<Response>
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    }) as Promise<Response>
   })
 }
 
 function renderList() {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <SeriesList />
     </MemoryRouter>
   )
@@ -52,7 +89,9 @@ describe('SeriesList', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fetchSpy: any
 
-  beforeEach(() => { fetchSpy = mockFetch() })
+  beforeEach(() => {
+    fetchSpy = mockFetch()
+  })
   afterEach(() => fetchSpy.mockRestore())
 
   it('renders series tree', async () => {
@@ -74,7 +113,9 @@ describe('SeriesList', () => {
     renderList()
     await waitFor(() => screen.getByTestId('purge-btn'))
     await userEvent.click(screen.getByTestId('purge-btn'))
-    await waitFor(() => expect(screen.getByTestId('purge-result')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('purge-result')).toBeInTheDocument()
+    )
     expect(screen.getByTestId('purge-result')).toHaveTextContent('Old Series')
   })
 
@@ -83,12 +124,19 @@ describe('SeriesList', () => {
     await waitFor(() => screen.getByTestId('series-row-1'))
     // stub confirm
     vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const deleteBtn = screen.getByTestId('series-row-1').querySelector('[aria-label^="Delete"]')
+    const deleteBtn = screen
+      .getByTestId('series-row-1')
+      .querySelector('[aria-label^="Delete"]')
     expect(deleteBtn).not.toBeNull()
     await userEvent.click(deleteBtn!)
-    const calls = (fetchSpy as ReturnType<typeof vi.spyOn>).mock.calls
-    const deleteCall = calls.find(([url, opts]: [string, RequestInit]) =>
-      url.toString().includes('/api/series/1') && (opts?.method ?? 'GET').toUpperCase() === 'DELETE'
+    const calls = (fetchSpy as ReturnType<typeof vi.spyOn>).mock.calls as [
+      string,
+      RequestInit,
+    ][]
+    const deleteCall = calls.find(
+      ([url, opts]: [string, RequestInit]) =>
+        url.toString().includes('/api/series/1') &&
+        (opts?.method ?? 'GET').toUpperCase() === 'DELETE'
     )
     expect(deleteCall).toBeDefined()
   })
@@ -99,7 +147,11 @@ describe('SeriesList', () => {
     renderList()
     await waitFor(() => screen.getByTestId('purge-btn'))
     await userEvent.click(screen.getByTestId('purge-btn'))
-    await waitFor(() => expect(screen.getByTestId('purge-result')).toBeInTheDocument())
-    expect(screen.getByTestId('purge-result')).toHaveTextContent('No empty series found')
+    await waitFor(() =>
+      expect(screen.getByTestId('purge-result')).toBeInTheDocument()
+    )
+    expect(screen.getByTestId('purge-result')).toHaveTextContent(
+      'No empty series found'
+    )
   })
 })

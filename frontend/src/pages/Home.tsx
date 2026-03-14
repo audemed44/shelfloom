@@ -8,7 +8,9 @@ import type { LucideIcon } from 'lucide-react'
 // ---------------------------------------------------------------------------
 
 // Empty 53×7 grid — filled with real data when Phase 4 stats API is ready
-const EMPTY_HEATMAP: number[][] = Array.from({ length: 53 }, () => Array(7).fill(0))
+const EMPTY_HEATMAP: number[][] = Array.from({ length: 53 }, () =>
+  Array(7).fill(0)
+)
 
 function cellClass(level: number): string {
   if (!level) return 'bg-white/5 border border-white/10'
@@ -23,7 +25,10 @@ interface ReadingHeatmapProps {
   streak?: number
 }
 
-function ReadingHeatmap({ weeks = EMPTY_HEATMAP, streak = 0 }: ReadingHeatmapProps) {
+function ReadingHeatmap({
+  weeks = EMPTY_HEATMAP,
+  streak = 0,
+}: ReadingHeatmapProps) {
   const isEmpty = weeks.every((w) => w.every((v) => !v))
   return (
     <div className="bg-white/5 border border-white/10 p-8 h-full">
@@ -45,7 +50,10 @@ function ReadingHeatmap({ weeks = EMPTY_HEATMAP, streak = 0 }: ReadingHeatmapPro
         <div className="inline-grid grid-rows-7 grid-flow-col gap-1.5 min-w-max">
           {weeks.flatMap((week, wi) =>
             week.map((level, di) => (
-              <div key={`${wi}-${di}`} className={`h-3 w-3 ${cellClass(level)}`} />
+              <div
+                key={`${wi}-${di}`}
+                className={`h-3 w-3 ${cellClass(level)}`}
+              />
             ))
           )}
         </div>
@@ -54,7 +62,8 @@ function ReadingHeatmap({ weeks = EMPTY_HEATMAP, streak = 0 }: ReadingHeatmapPro
       <div className="flex items-center justify-between mt-6">
         {isEmpty ? (
           <p className="text-white/40 text-xs font-medium italic normal-case">
-            No reading data yet. Sync your KOReader or start reading to see activity.
+            No reading data yet. Sync your KOReader or start reading to see
+            activity.
           </p>
         ) : (
           <div /> /* spacer */
@@ -91,8 +100,12 @@ function StatCard({ icon: Icon, label, value }: StatCardProps) {
         <Icon size={20} />
       </div>
       <div>
-        <p className="text-white/40 text-[10px] font-black tracking-widest">{label}</p>
-        <h5 className={`text-3xl font-black leading-tight ${empty ? 'text-white/20' : 'text-white'}`}>
+        <p className="text-white/40 text-[10px] font-black tracking-widest">
+          {label}
+        </p>
+        <h5
+          className={`text-3xl font-black leading-tight ${empty ? 'text-white/20' : 'text-white'}`}
+        >
           {value ?? '—'}
         </h5>
       </div>
@@ -191,7 +204,10 @@ function CurrentlyReadingCard({ book }: CurrentlyReadingCardProps) {
             </span>
           </div>
           <div className="h-4 bg-white/10 w-full overflow-hidden">
-            <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
+            <div
+              className="h-full bg-primary"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </div>
 
@@ -215,7 +231,11 @@ function CurrentlyReadingCard({ book }: CurrentlyReadingCardProps) {
 
 export default function Home() {
   // Books list — used to find an in-progress book
-  const { data: booksData } = useApi<PaginatedResponse<Book & { reading_progress?: number; current_page?: number }>>('/api/books?per_page=50')
+  const { data: booksData } = useApi<
+    PaginatedResponse<
+      Book & { reading_progress?: number; current_page?: number }
+    >
+  >('/api/books?per_page=50')
 
   // Find the most recently active in-progress book
   const currentlyReading =
@@ -224,7 +244,11 @@ export default function Home() {
     ) ?? null
 
   // Stats require Phase 4 (/api/stats/overview) — show empty until then
-  const stats: { timeRead: string | null; pages: string | null; completion: string | null } = {
+  const stats: {
+    timeRead: string | null
+    pages: string | null
+    completion: string | null
+  } = {
     timeRead: null,
     pages: null,
     completion: null,

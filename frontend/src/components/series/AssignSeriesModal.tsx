@@ -37,7 +37,9 @@ export default function AssignSeriesModal({
 
   // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
@@ -65,7 +67,9 @@ export default function AssignSeriesModal({
     setSaving(true)
     setError(null)
     try {
-      const seq = sequence.trim() ? `?sequence=${encodeURIComponent(sequence.trim())}` : ''
+      const seq = sequence.trim()
+        ? `?sequence=${encodeURIComponent(sequence.trim())}`
+        : ''
       await api.post(`/api/series/${selectedId}/books/${bookId}${seq}`, {})
       onSaved()
     } catch (err) {
@@ -79,13 +83,20 @@ export default function AssignSeriesModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
       data-testid="assign-series-modal"
     >
       <div className="w-full max-w-md bg-black border border-white/10 rounded-lg shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <h2 className="text-xs font-black tracking-widest uppercase text-white">Assign to Series</h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+          <h2 className="text-xs font-black tracking-widest uppercase text-white">
+            Assign to Series
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-white/40 hover:text-white transition-colors"
+          >
             <X size={16} />
           </button>
         </div>
@@ -96,12 +107,19 @@ export default function AssignSeriesModal({
           {/* Current memberships */}
           {currentSeries.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[10px] font-black tracking-widest uppercase text-white/40">Current Series</p>
+              <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
+                Current Series
+              </p>
               {currentSeries.map((s) => (
-                <div key={s.series_id} className="flex items-center justify-between py-1.5 border-b border-white/5">
+                <div
+                  key={s.series_id}
+                  className="flex items-center justify-between py-1.5 border-b border-white/5"
+                >
                   <span className="text-sm text-white/80 normal-case">
                     {s.series_name}
-                    {s.sequence != null && <span className="text-white/40 ml-1">#{s.sequence}</span>}
+                    {s.sequence != null && (
+                      <span className="text-white/40 ml-1">#{s.sequence}</span>
+                    )}
                   </span>
                   <button
                     onClick={() => handleRemove(s.series_id)}
@@ -117,7 +135,9 @@ export default function AssignSeriesModal({
 
           {/* Search and select */}
           <div className="space-y-2">
-            <p className="text-[10px] font-black tracking-widest uppercase text-white/40">Add to Series</p>
+            <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
+              Add to Series
+            </p>
             <input
               type="text"
               value={search}
@@ -129,7 +149,9 @@ export default function AssignSeriesModal({
               {filtered.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => setSelectedId(s.id === selectedId ? null : s.id)}
+                  onClick={() =>
+                    setSelectedId(s.id === selectedId ? null : s.id)
+                  }
                   className={`w-full text-left px-3 py-2 text-sm normal-case rounded transition-colors ${
                     selectedId === s.id
                       ? 'bg-primary/20 text-white border border-primary/40'
@@ -137,11 +159,15 @@ export default function AssignSeriesModal({
                   }`}
                 >
                   {s.name}
-                  <span className="ml-2 text-[10px] text-white/30">{s.book_count} books</span>
+                  <span className="ml-2 text-[10px] text-white/30">
+                    {s.book_count} books
+                  </span>
                 </button>
               ))}
               {filtered.length === 0 && (
-                <p className="text-xs text-white/30 normal-case py-2 px-3">No series found.</p>
+                <p className="text-xs text-white/30 normal-case py-2 px-3">
+                  No series found.
+                </p>
               )}
             </div>
           </div>

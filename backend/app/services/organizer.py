@@ -17,7 +17,7 @@ from app.services.hash_service import compute_hashes
 
 _ILLEGAL = re.compile(r'[\\/:*?"<>|]')
 _MAX_COMPONENT = 200
-_DEFAULT_TEMPLATE = "{author}/{title}.{format}"
+_DEFAULT_TEMPLATE = "{author}/{title}"
 
 
 class FileOperationError(Exception):
@@ -75,12 +75,19 @@ def resolve_template(
     seq_str = format_sequence(sequence, seq_pad) if sequence is not None else ""
 
     raw = template
+    # Strip {format} (and any preceding dot) — extension is always auto-appended
+    raw = re.sub(r'\.?\{format\}', '', raw)
+    # Conditional sequence token: {sequence|suffix} → "seq_strsuffix" if present, else ""
+    raw = re.sub(
+        r'\{sequence\|([^}]*)\}',
+        lambda m: f"{seq_str}{m.group(1)}" if sequence is not None else "",
+        raw,
+    )
     raw = raw.replace("{author}", author)
     raw = raw.replace("{title}", title)
     raw = raw.replace("{series}", series_name_clean)
     raw = raw.replace("{series_path}", series_path_clean)
     raw = raw.replace("{sequence}", seq_str)
-    raw = raw.replace("{format}", book.format)
     raw = raw.replace("{isbn}", sanitize_component(book.isbn or ""))
     raw = raw.replace("{publisher}", sanitize_component(book.publisher or ""))
     raw = raw.replace("{language}", sanitize_component(book.language or ""))
@@ -88,6 +95,7 @@ def resolve_template(
     parts = [p.strip() for p in raw.split("/") if p.strip()]
     if not parts:
         return sanitize_component(book.title) + "." + book.format
+    parts[-1] = parts[-1] + "." + book.format
     return "/".join(parts)
 
 

@@ -1,14 +1,14 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Layout from "./components/Layout";
-import Home from "./pages/Home";
-import Library from "./pages/Library";
-import BookDetail from "./pages/BookDetail";
-import Stats from "./pages/Stats";
-import Serials from "./pages/Serials";
-import SeriesList from "./pages/SeriesList";
-import SeriesDetail from "./pages/SeriesDetail";
-import Settings from "./pages/Settings";
-import NotFound from "./pages/NotFound";
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Layout from './components/Layout'
+import Home from './pages/Home'
+import Library from './pages/Library'
+import BookDetail from './pages/BookDetail'
+import Stats from './pages/Stats'
+import Serials from './pages/Serials'
+import SeriesList from './pages/SeriesList'
+import SeriesDetail from './pages/SeriesDetail'
+import Settings from './pages/Settings'
+import NotFound from './pages/NotFound'
 
 export default function App() {
   return (
@@ -29,5 +29,5 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
-  );
+  )
 }

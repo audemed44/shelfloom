@@ -59,9 +59,12 @@ describe('useApi', () => {
       status: 200,
       json: async () => ({ id: 1 }),
     })
-    const { rerender } = renderHook(({ path }: { path: string }) => useApi(path), {
-      initialProps: { path: '/api/books/1' },
-    })
+    const { rerender } = renderHook(
+      ({ path }: { path: string }) => useApi(path),
+      {
+        initialProps: { path: '/api/books/1' },
+      }
+    )
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1))
     rerender({ path: '/api/books/2' })
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2))

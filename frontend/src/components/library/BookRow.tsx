@@ -20,7 +20,9 @@ export default function BookRow({ book }: BookRowProps) {
           src={coverSrc}
           alt=""
           className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300"
-          onError={(e) => { e.currentTarget.style.display = 'none' }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+          }}
         />
       </div>
 
@@ -28,7 +30,9 @@ export default function BookRow({ book }: BookRowProps) {
       <div className="flex-1 min-w-0">
         <p className="font-black tracking-tighter truncate">{book.title}</p>
         {book.author && (
-          <p className="text-xs text-white/40 mt-0.5 normal-case truncate">{book.author}</p>
+          <p className="text-xs text-white/40 mt-0.5 normal-case truncate">
+            {book.author}
+          </p>
         )}
       </div>
 

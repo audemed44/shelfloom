@@ -1,7 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  HardDrive, FolderCog, RefreshCw, Plus, Edit2, Trash2,
-  Play, CheckCircle2, AlertCircle, Clock, ChevronRight, Loader2,
+  HardDrive,
+  FolderCog,
+  RefreshCw,
+  Plus,
+  Edit2,
+  Trash2,
+  Play,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  ChevronRight,
+  Loader2,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
@@ -10,13 +20,29 @@ import type { Shelf, OrganizerResult, ScanStatus } from '../types/api'
 
 // ── Section header ─────────────────────────────────────────────────────────────
 
-function SectionHeader({ num, title, description }: { num: string; title: string; description?: string }) {
+function SectionHeader({
+  num,
+  title,
+  description,
+}: {
+  num: string
+  title: string
+  description?: string
+}) {
   return (
     <div className="flex items-start gap-4 pb-3 border-b border-white/10 mb-6">
-      <span className="text-xs font-black tracking-[0.2em] text-white/20 mt-0.5">{num}</span>
+      <span className="text-xs font-black tracking-[0.2em] text-white/20 mt-0.5">
+        {num}
+      </span>
       <div>
-        <h2 className="text-base font-bold uppercase tracking-tight text-white">{title}</h2>
-        {description && <p className="text-xs text-white/40 normal-case mt-0.5">{description}</p>}
+        <h2 className="text-base font-bold uppercase tracking-tight text-white">
+          {title}
+        </h2>
+        {description && (
+          <p className="text-xs text-white/40 normal-case mt-0.5">
+            {description}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -29,9 +55,10 @@ const TOKENS = [
   { label: '{title}', example: 'The Way of Kings' },
   { label: '{series_path}', example: 'Cosmere/Stormlight Archive' },
   { label: '{sequence}', example: '01' },
+  { label: '{sequence| - }', example: '01 - ' },
 ]
 
-const DEFAULT_TEMPLATE = '{author}/{series_path}/{sequence} - {title}'
+const DEFAULT_TEMPLATE = '{author}/{series_path}/{sequence| - }{title}'
 
 function computeExamplePath(template: string): string {
   const examples: Record<string, string> = {
@@ -40,7 +67,17 @@ function computeExamplePath(template: string): string {
     series_path: 'Cosmere/Stormlight Archive',
     sequence: '01',
   }
-  const result = template.replace(/\{(\w+)(?::[^}]*)?\}/g, (_, token) => examples[token] ?? `{${token}}`)
+  let result = template
+  // Handle conditional {sequence|suffix} first
+  result = result.replace(
+    /\{sequence\|([^}]*)\}/g,
+    (_, suffix) => `01${suffix}`
+  )
+  // Then regular tokens
+  result = result.replace(
+    /\{(\w+)(?::[^}]*)?\}/g,
+    (_, token) => examples[token] ?? `{${token}}`
+  )
   return result + '.epub'
 }
 
@@ -63,7 +100,9 @@ function ShelfCard({ shelf, onEdit, onDelete }: ShelfCardProps) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
-          <p className="text-sm font-medium text-white truncate">{shelf.name}</p>
+          <p className="text-sm font-medium text-white truncate">
+            {shelf.name}
+          </p>
           {shelf.is_default && (
             <span className="shrink-0 text-[9px] font-black tracking-widest uppercase text-primary bg-primary/10 px-1.5 py-0.5">
               Default
@@ -75,9 +114,13 @@ function ShelfCard({ shelf, onEdit, onDelete }: ShelfCardProps) {
             </span>
           )}
         </div>
-        <p className="text-[11px] text-white/30 font-mono normal-case truncate">{shelf.path}</p>
+        <p className="text-[11px] text-white/30 font-mono normal-case truncate">
+          {shelf.path}
+        </p>
         {shelf.device_name && (
-          <p className="text-[10px] text-white/20 normal-case mt-0.5">{shelf.device_name}</p>
+          <p className="text-[10px] text-white/20 normal-case mt-0.5">
+            {shelf.device_name}
+          </p>
         )}
       </div>
       <div className="flex items-center gap-1 shrink-0">
@@ -131,12 +174,21 @@ function OrganizerResultTable({ results }: { results: OrganizerResult[] }) {
       {moves.length > 0 && (
         <div className="border border-white/10 max-h-64 overflow-y-auto">
           {moves.map((r) => (
-            <div key={r.book_id} className="px-4 py-2.5 border-b border-white/5 last:border-0">
-              <p className="text-xs text-white/70 normal-case truncate">{r.book_title}</p>
+            <div
+              key={r.book_id}
+              className="px-4 py-2.5 border-b border-white/5 last:border-0"
+            >
+              <p className="text-xs text-white/70 normal-case truncate">
+                {r.book_title}
+              </p>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] text-white/30 font-mono normal-case truncate flex-1">{r.old_path}</span>
+                <span className="text-[10px] text-white/30 font-mono normal-case truncate flex-1">
+                  {r.old_path}
+                </span>
                 <ChevronRight size={10} className="shrink-0 text-white/20" />
-                <span className="text-[10px] text-primary font-mono normal-case truncate flex-1">{r.new_path}</span>
+                <span className="text-[10px] text-primary font-mono normal-case truncate flex-1">
+                  {r.new_path}
+                </span>
               </div>
             </div>
           ))}
@@ -146,8 +198,13 @@ function OrganizerResultTable({ results }: { results: OrganizerResult[] }) {
       {errors.length > 0 && (
         <div className="border border-red-400/20 bg-red-400/5">
           {errors.map((r) => (
-            <div key={r.book_id} className="px-4 py-2 border-b border-red-400/10 last:border-0">
-              <p className="text-xs text-red-400 normal-case">{r.book_title}: {r.error}</p>
+            <div
+              key={r.book_id}
+              className="px-4 py-2 border-b border-red-400/10 last:border-0"
+            >
+              <p className="text-xs text-red-400 normal-case">
+                {r.book_title}: {r.error}
+              </p>
             </div>
           ))}
         </div>
@@ -169,7 +226,9 @@ export default function Settings() {
   const [organizeShelfId, setOrganizeShelfId] = useState<string>('')
   const [template, setTemplate] = useState(DEFAULT_TEMPLATE)
   const [seqPad, setSeqPad] = useState(2)
-  const [previewResults, setPreviewResults] = useState<OrganizerResult[] | null>(null)
+  const [previewResults, setPreviewResults] = useState<
+    OrganizerResult[] | null
+  >(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [applyLoading, setApplyLoading] = useState(false)
   const [applyDone, setApplyDone] = useState<{ moved: number } | null>(null)
@@ -214,14 +273,22 @@ export default function Settings() {
   useEffect(() => {
     if (scanStatus?.is_running) startPolling()
     return () => {
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
     }
   }, [scanStatus?.is_running, startPolling])
 
   // ── Handlers ──
 
   const handleDeleteShelf = async (shelf: Shelf) => {
-    if (!window.confirm(`Delete shelf "${shelf.name}"? This fails if the shelf has books.`)) return
+    if (
+      !window.confirm(
+        `Delete shelf "${shelf.name}"? This fails if the shelf has books.`
+      )
+    )
+      return
     setDeleteError(null)
     try {
       await api.delete(`/api/shelves/${shelf.id}`)
@@ -255,7 +322,10 @@ export default function Settings() {
   }
 
   const handlePreview = async () => {
-    if (!organizeShelfId) { setOrganizeError('Select a shelf first.'); return }
+    if (!organizeShelfId) {
+      setOrganizeError('Select a shelf first.')
+      return
+    }
     setPreviewLoading(true)
     setPreviewResults(null)
     setApplyDone(null)
@@ -266,7 +336,9 @@ export default function Settings() {
         seq_pad: String(seqPad),
         ...(template.trim() ? { template: template.trim() } : {}),
       })
-      const results = await api.get<OrganizerResult[]>(`/api/organize/preview?${qs}`)
+      const results = await api.get<OrganizerResult[]>(
+        `/api/organize/preview?${qs}`
+      )
       setPreviewResults(results ?? [])
     } catch (err) {
       const apiErr = err as { data?: { detail?: string } }
@@ -278,8 +350,12 @@ export default function Settings() {
 
   const handleApply = async () => {
     if (!organizeShelfId) return
-    const movesCount = previewResults?.filter((r) => !r.already_correct && !r.error).length ?? 0
-    if (!window.confirm(`Apply organization? ${movesCount} files will be moved.`)) return
+    const movesCount =
+      previewResults?.filter((r) => !r.already_correct && !r.error).length ?? 0
+    if (
+      !window.confirm(`Apply organization? ${movesCount} files will be moved.`)
+    )
+      return
     setApplyLoading(true)
     setOrganizeError(null)
     try {
@@ -320,7 +396,9 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-12">
-      <h1 className="text-xs font-black tracking-widest uppercase text-white">Settings</h1>
+      <h1 className="text-xs font-black tracking-widest uppercase text-white">
+        Settings
+      </h1>
 
       {/* ── 01 Shelves ── */}
       <section>
@@ -379,13 +457,19 @@ export default function Settings() {
             </label>
             <select
               value={organizeShelfId}
-              onChange={(e) => { setOrganizeShelfId(e.target.value); setPreviewResults(null); setApplyDone(null) }}
+              onChange={(e) => {
+                setOrganizeShelfId(e.target.value)
+                setPreviewResults(null)
+                setApplyDone(null)
+              }}
               data-testid="organize-shelf-select"
               className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white normal-case focus:outline-none focus:border-primary transition-colors appearance-none"
             >
               <option value="">— Select a shelf —</option>
               {shelfList.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
               ))}
             </select>
           </div>
@@ -399,7 +483,11 @@ export default function Settings() {
               ref={templateRef}
               type="text"
               value={template}
-              onChange={(e) => { setTemplate(e.target.value); setPreviewResults(null); setApplyDone(null) }}
+              onChange={(e) => {
+                setTemplate(e.target.value)
+                setPreviewResults(null)
+                setApplyDone(null)
+              }}
               data-testid="template-input"
               className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
             />
@@ -438,8 +526,13 @@ export default function Settings() {
 
           {/* Live example path */}
           <div className="p-4 border border-white/5 bg-white/[0.02]">
-            <p className="text-[10px] font-black tracking-widest uppercase text-white/30 mb-2">Example path</p>
-            <p className="text-xs text-primary font-mono normal-case break-all" data-testid="example-path">
+            <p className="text-[10px] font-black tracking-widest uppercase text-white/30 mb-2">
+              Example path
+            </p>
+            <p
+              className="text-xs text-primary font-mono normal-case break-all"
+              data-testid="example-path"
+            >
               {examplePath}
             </p>
           </div>
@@ -471,21 +564,30 @@ export default function Settings() {
               data-testid="preview-btn"
               className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 disabled:opacity-40 transition-colors"
             >
-              {previewLoading ? <Loader2 size={13} className="animate-spin" /> : <FolderCog size={13} />}
+              {previewLoading ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <FolderCog size={13} />
+              )}
               Dry Run Preview
             </button>
 
-            {previewResults && previewResults.some((r) => !r.already_correct && !r.error) && (
-              <button
-                onClick={handleApply}
-                disabled={applyLoading}
-                data-testid="apply-btn"
-                className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-50 transition-colors"
-              >
-                {applyLoading ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-                Apply
-              </button>
-            )}
+            {previewResults &&
+              previewResults.some((r) => !r.already_correct && !r.error) && (
+                <button
+                  onClick={handleApply}
+                  disabled={applyLoading}
+                  data-testid="apply-btn"
+                  className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-50 transition-colors"
+                >
+                  {applyLoading ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Play size={13} />
+                  )}
+                  Apply
+                </button>
+              )}
           </div>
         </div>
       </section>
@@ -501,7 +603,10 @@ export default function Settings() {
         <div className="space-y-5">
           {/* Status card */}
           {scanStatus && (
-            <div className="p-4 border border-white/10 bg-white/[0.02] space-y-3" data-testid="scan-status">
+            <div
+              className="p-4 border border-white/10 bg-white/[0.02] space-y-3"
+              data-testid="scan-status"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {scanStatus.is_running ? (
@@ -512,14 +617,19 @@ export default function Settings() {
                     <CheckCircle2 size={14} className="text-white/30" />
                   )}
                   <span className="text-[10px] font-black tracking-widest uppercase text-white/60">
-                    {scanStatus.is_running ? 'Scanning…' : scanStatus.error ? 'Scan error' : 'Idle'}
+                    {scanStatus.is_running
+                      ? 'Scanning…'
+                      : scanStatus.error
+                        ? 'Scan error'
+                        : 'Idle'}
                   </span>
                 </div>
                 {scanStatus.last_scan_at && (
                   <div className="flex items-center gap-1.5 text-[10px] text-white/30">
                     <Clock size={11} />
                     <span className="normal-case">
-                      Last scan {new Date(scanStatus.last_scan_at).toLocaleString()}
+                      Last scan{' '}
+                      {new Date(scanStatus.last_scan_at).toLocaleString()}
                     </span>
                   </div>
                 )}
@@ -532,25 +642,35 @@ export default function Settings() {
                     <div
                       className="h-full bg-primary transition-all duration-500"
                       style={{
-                        width: scanStatus.progress.total > 0
-                          ? `${Math.round((scanStatus.progress.processed / scanStatus.progress.total) * 100)}%`
-                          : '0%',
+                        width:
+                          scanStatus.progress.total > 0
+                            ? `${Math.round((scanStatus.progress.processed / scanStatus.progress.total) * 100)}%`
+                            : '0%',
                       }}
                     />
                   </div>
                   <div className="flex items-center gap-4 text-[10px] text-white/40 normal-case">
-                    <span>{scanStatus.progress.processed} / {scanStatus.progress.total} files</span>
-                    <span className="text-primary">+{scanStatus.progress.created} new</span>
+                    <span>
+                      {scanStatus.progress.processed} /{' '}
+                      {scanStatus.progress.total} files
+                    </span>
+                    <span className="text-primary">
+                      +{scanStatus.progress.created} new
+                    </span>
                     <span>{scanStatus.progress.updated} updated</span>
                     {scanStatus.progress.errors > 0 && (
-                      <span className="text-red-400">{scanStatus.progress.errors} errors</span>
+                      <span className="text-red-400">
+                        {scanStatus.progress.errors} errors
+                      </span>
                     )}
                   </div>
                 </div>
               )}
 
               {scanStatus.error && (
-                <p className="text-xs text-red-400 normal-case">{scanStatus.error}</p>
+                <p className="text-xs text-red-400 normal-case">
+                  {scanStatus.error}
+                </p>
               )}
             </div>
           )}
@@ -567,7 +687,11 @@ export default function Settings() {
             data-testid="scan-btn"
             className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-50 transition-colors"
           >
-            {scanLoading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+            {scanLoading ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <RefreshCw size={13} />
+            )}
             {scanStatus?.is_running ? 'Scanning…' : 'Trigger Scan'}
           </button>
         </div>

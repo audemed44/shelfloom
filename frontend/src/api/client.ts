@@ -13,14 +13,15 @@ class ApiRequestError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit & { body?: BodyInit | null } = {}): Promise<T | null> {
+async function request<T>(
+  path: string,
+  options: RequestInit & { body?: BodyInit | null } = {}
+): Promise<T | null> {
   const { body, ...fetchOptions } = options
 
   // Don't set Content-Type for FormData — browser sets it with boundary
   const headers: HeadersInit =
-    body instanceof FormData
-      ? {}
-      : { 'Content-Type': 'application/json' }
+    body instanceof FormData ? {} : { 'Content-Type': 'application/json' }
 
   const response = await fetch(`${BASE_URL}${path}`, {
     headers,
@@ -31,7 +32,7 @@ async function request<T>(path: string, options: RequestInit & { body?: BodyInit
   if (!response.ok) {
     let data: { detail?: string } | null = null
     try {
-      data = await response.json() as { detail?: string }
+      data = (await response.json()) as { detail?: string }
     } catch {
       data = null
     }
@@ -50,7 +51,7 @@ export const api = {
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
-  delete: (path: string) => request<null>(path, { method: 'DELETE' }),
+  delete: <T = null>(path: string) => request<T>(path, { method: 'DELETE' }),
   upload: <T>(path: string, formData: FormData) =>
     request<T>(path, { method: 'POST', body: formData }),
 }

@@ -10,16 +10,25 @@ interface SeriesModalProps {
   onSaved: () => void
 }
 
-export default function SeriesModal({ series, allSeries, onClose, onSaved }: SeriesModalProps) {
+export default function SeriesModal({
+  series,
+  allSeries,
+  onClose,
+  onSaved,
+}: SeriesModalProps) {
   const [name, setName] = useState(series?.name ?? '')
   const [description, setDescription] = useState(series?.description ?? '')
-  const [parentId, setParentId] = useState<string>(series?.parent_id?.toString() ?? '')
+  const [parentId, setParentId] = useState<string>(
+    series?.parent_id?.toString() ?? ''
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Close on Escape
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
@@ -57,7 +66,9 @@ export default function SeriesModal({ series, allSeries, onClose, onSaved }: Ser
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
       data-testid="series-modal"
     >
       <div className="w-full max-w-md bg-black border border-white/10 rounded-lg shadow-xl">
@@ -65,15 +76,16 @@ export default function SeriesModal({ series, allSeries, onClose, onSaved }: Ser
           <h2 className="text-xs font-black tracking-widest uppercase text-white">
             {series ? 'Edit Series' : 'New Series'}
           </h2>
-          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+          <button
+            onClick={onClose}
+            className="text-white/40 hover:text-white transition-colors"
+          >
             <X size={16} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          {error && (
-            <p className="text-xs text-red-400 normal-case">{error}</p>
-          )}
+          {error && <p className="text-xs text-red-400 normal-case">{error}</p>}
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-black tracking-widest uppercase text-white/40">
@@ -114,7 +126,9 @@ export default function SeriesModal({ series, allSeries, onClose, onSaved }: Ser
             >
               <option value="">— None —</option>
               {parentOptions.map((s) => (
-                <option key={s.id} value={s.id.toString()}>{s.name}</option>
+                <option key={s.id} value={s.id.toString()}>
+                  {s.name}
+                </option>
               ))}
             </select>
           </div>

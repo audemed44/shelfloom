@@ -1,5 +1,12 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
-import { Search, LayoutGrid, LayoutList, ChevronLeft, ChevronRight, BookOpen } from 'lucide-react'
+import {
+  Search,
+  LayoutGrid,
+  LayoutList,
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
+} from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
 import BookCard from '../components/library/BookCard'
@@ -33,7 +40,11 @@ function ShelfTabs({ shelves, selectedId, onSelect }: ShelfTabsProps) {
         All
       </TabButton>
       {shelves.map((s) => (
-        <TabButton key={s.id} active={selectedId === s.id} onClick={() => onSelect(s.id)}>
+        <TabButton
+          key={s.id}
+          active={selectedId === s.id}
+          onClick={() => onSelect(s.id)}
+        >
           {s.name}
         </TabButton>
       ))}
@@ -71,7 +82,14 @@ interface ControlsProps {
   onView: (v: string) => void
 }
 
-function Controls({ search, onSearch, sort, onSort, view, onView }: ControlsProps) {
+function Controls({
+  search,
+  onSearch,
+  sort,
+  onSort,
+  view,
+  onView,
+}: ControlsProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-3 mb-6">
       {/* Search — full width on mobile */}
@@ -110,7 +128,9 @@ function Controls({ search, onSearch, sort, onSort, view, onView }: ControlsProp
           <button
             onClick={() => onView('grid')}
             className={`p-2.5 transition-colors ${
-              view === 'grid' ? 'bg-primary text-white' : 'text-white/40 hover:text-white hover:bg-white/5'
+              view === 'grid'
+                ? 'bg-primary text-white'
+                : 'text-white/40 hover:text-white hover:bg-white/5'
             }`}
             aria-label="Grid view"
           >
@@ -119,7 +139,9 @@ function Controls({ search, onSearch, sort, onSort, view, onView }: ControlsProp
           <button
             onClick={() => onView('list')}
             className={`p-2.5 transition-colors ${
-              view === 'list' ? 'bg-primary text-white' : 'text-white/40 hover:text-white hover:bg-white/5'
+              view === 'list'
+                ? 'bg-primary text-white'
+                : 'text-white/40 hover:text-white hover:bg-white/5'
             }`}
             aria-label="List view"
           >
@@ -137,7 +159,10 @@ interface EmptyStateProps {
 
 function EmptyState({ search }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center" data-testid="empty-state">
+    <div
+      className="flex flex-col items-center justify-center py-24 text-center"
+      data-testid="empty-state"
+    >
       <BookOpen size={48} className="text-white/10 mb-4" />
       {search ? (
         <>
@@ -148,7 +173,9 @@ function EmptyState({ search }: EmptyStateProps) {
         </>
       ) : (
         <>
-          <p className="font-black tracking-widest text-white/30">No Books Yet</p>
+          <p className="font-black tracking-widest text-white/30">
+            No Books Yet
+          </p>
           <p className="text-xs text-white/20 mt-1 normal-case">
             Upload books or run a shelf scan to get started
           </p>
@@ -248,7 +275,8 @@ export default function Library() {
     return `/api/books?${params}`
   }, [page, debouncedSearch, selectedShelfId, sort, rev])
 
-  const { data: booksData, loading } = useApi<PaginatedResponse<Book>>(booksPath)
+  const { data: booksData, loading } =
+    useApi<PaginatedResponse<Book>>(booksPath)
   const books = booksData?.items ?? []
   const total = booksData?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
@@ -268,29 +296,43 @@ export default function Library() {
         </h2>
         {!loading && (
           <p className="text-white/40 text-base sm:text-lg font-medium mt-2 normal-case">
-            {total > 0 ? `${total} books in your collection` : 'Your book collection'}
+            {total > 0
+              ? `${total} books in your collection`
+              : 'Your book collection'}
           </p>
         )}
       </header>
 
       {/* Upload zone */}
-      <UploadZone onSuccess={handleUploadSuccess} highlighted={isDraggingOver} />
+      <UploadZone
+        onSuccess={handleUploadSuccess}
+        highlighted={isDraggingOver}
+      />
 
       {/* Shelf tabs */}
       {shelves && shelves.length > 0 && (
         <ShelfTabs
           shelves={shelves}
           selectedId={selectedShelfId}
-          onSelect={(id) => { setSelectedShelfId(id); resetPage() }}
+          onSelect={(id) => {
+            setSelectedShelfId(id)
+            resetPage()
+          }}
         />
       )}
 
       {/* Controls */}
       <Controls
         search={search}
-        onSearch={(v) => { setSearch(v); resetPage() }}
+        onSearch={(v) => {
+          setSearch(v)
+          resetPage()
+        }}
         sort={sort}
-        onSort={(v) => { setSort(v); resetPage() }}
+        onSort={(v) => {
+          setSort(v)
+          resetPage()
+        }}
         view={view}
         onView={setView}
       />

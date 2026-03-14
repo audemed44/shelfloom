@@ -30,7 +30,11 @@ function fmtDuration(seconds: number | null | undefined): string {
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 // ── extended session display type ───────────────────────────────────────────────
@@ -53,12 +57,16 @@ function SessionRow({ session }: { session: SessionDisplay }) {
           {fmtDate(session.start_time ?? session.started_at)}
         </span>
         {session.device && (
-          <span className="text-[10px] text-white/30 normal-case">{session.device}</span>
+          <span className="text-[10px] text-white/30 normal-case">
+            {session.device}
+          </span>
         )}
       </div>
       <div className="flex items-center gap-4 text-xs">
         {session.pages_read != null && (
-          <span className="text-white/50 normal-case">{session.pages_read} pages</span>
+          <span className="text-white/50 normal-case">
+            {session.pages_read} pages
+          </span>
         )}
         <span className="text-white font-black">
           {fmtDuration(session.duration ?? session.duration_seconds)}
@@ -111,7 +119,9 @@ export default function BookDetailPage() {
   const [movingTo, setMovingTo] = useState<number | null>(null)
 
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
-  const { data: summary } = useApi<ReadingSummary>(id ? `/api/books/${id}/reading-summary` : null)
+  const { data: summary } = useApi<ReadingSummary>(
+    id ? `/api/books/${id}/reading-summary` : null
+  )
   const { data: sessionsData } = useApi<{ items: SessionDisplay[] }>(
     id ? `/api/books/${id}/sessions?per_page=10` : null
   )
@@ -141,7 +151,8 @@ export default function BookDetailPage() {
       if (visited.has(current.id)) break // cycle guard
       visited.add(current.id)
       chain.unshift(current)
-      current = current.parent_id != null ? byId.get(current.parent_id) : undefined
+      current =
+        current.parent_id != null ? byId.get(current.parent_id) : undefined
     }
     return chain
   }, [primarySeries, allSeriesList])
@@ -160,13 +171,17 @@ export default function BookDetailPage() {
     }
   }, [id])
 
-  useEffect(() => { fetchBook() }, [fetchBook])
+  useEffect(() => {
+    fetchBook()
+  }, [fetchBook])
 
   const handleMove = async (shelfId: number) => {
     setMoveOpen(false)
     setMovingTo(shelfId)
     try {
-      const updated = await api.post<BookDetail>(`/api/books/${id}/move`, { shelf_id: shelfId })
+      const updated = await api.post<BookDetail>(`/api/books/${id}/move`, {
+        shelf_id: shelfId,
+      })
       if (updated) setBook(updated)
     } catch {
       // silently ignore — UI keeps old state
@@ -184,10 +199,12 @@ export default function BookDetailPage() {
       const dateStr = s.start_time ?? s.started_at
       if (!dateStr) return
       const d = new Date(dateStr)
-      const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+      const diffDays = Math.floor(
+        (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)
+      )
       if (diffDays >= 7) return
       let idx = d.getDay() - 1 // Mon = 0
-      if (idx < 0) idx = 6   // Sun = 6
+      if (idx < 0) idx = 6 // Sun = 6
       totals[idx] += s.duration ?? s.duration_seconds ?? 0
     })
     const max = Math.max(...totals, 1)
@@ -225,17 +242,27 @@ export default function BookDetailPage() {
 
   if (notFound || !book) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4" data-testid="not-found">
+      <div
+        className="flex flex-col items-center justify-center py-24 gap-4"
+        data-testid="not-found"
+      >
         <AlertTriangle size={32} className="text-white/20" />
-        <p className="text-sm text-white/40 tracking-widest uppercase">Book not found</p>
-        <Link to="/library" className="text-xs text-primary hover:underline">Back to library</Link>
+        <p className="text-sm text-white/40 tracking-widest uppercase">
+          Book not found
+        </p>
+        <Link to="/library" className="text-xs text-primary hover:underline">
+          Back to library
+        </Link>
       </div>
     )
   }
 
   const currentShelf = shelves?.find((s) => s.id === book.shelf_id)
   const otherShelves = shelves?.filter((s) => s.id !== book.shelf_id) ?? []
-  const percent = summary?.percent_finished != null ? Math.round(summary.percent_finished) : null
+  const percent =
+    summary?.percent_finished != null
+      ? Math.round(summary.percent_finished)
+      : null
   const sessions = sessionsData?.items ?? []
   const highlights = highlightsData?.items ?? []
 
@@ -254,7 +281,6 @@ export default function BookDetailPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-
       {/* Breadcrumb */}
       <nav
         className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-white/40 mb-10"
@@ -264,31 +290,38 @@ export default function BookDetailPage() {
           <span key={i} className="flex items-center gap-1.5">
             {i > 0 && <ChevronRight size={10} className="text-white/20" />}
             {c.to ? (
-              <Link to={c.to} className="hover:text-primary transition-colors">{c.label}</Link>
+              <Link to={c.to} className="hover:text-primary transition-colors">
+                {c.label}
+              </Link>
             ) : (
-              <span className={i === crumbs.length - 1 ? 'text-white/70' : ''}>{c.label}</span>
+              <span className={i === crumbs.length - 1 ? 'text-white/70' : ''}>
+                {c.label}
+              </span>
             )}
           </span>
         ))}
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
-
         {/* ── Left Column ── */}
         <div className="lg:col-span-5 space-y-6">
-
           {/* Cover */}
           <div className="aspect-[2/3] w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 shadow-2xl shadow-primary/5">
             <img
               src={`/api/books/${book.id}/cover`}
               alt={book.title}
               className="w-full h-full object-cover"
-              onError={(e) => { e.currentTarget.style.display = 'none' }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
             />
           </div>
 
           {/* Progress card */}
-          <div className="bg-slate-900/60 border border-white/10 rounded-xl p-6 space-y-6" data-testid={percent != null ? 'reading-progress' : undefined}>
+          <div
+            className="bg-slate-900/60 border border-white/10 rounded-xl p-6 space-y-6"
+            data-testid={percent != null ? 'reading-progress' : undefined}
+          >
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">
@@ -297,14 +330,20 @@ export default function BookDetailPage() {
                 {percent != null ? (
                   <p className="text-3xl font-black tracking-tight">
                     {percent}%{' '}
-                    <span className="text-sm font-normal text-white/40">Complete</span>
+                    <span className="text-sm font-normal text-white/40">
+                      Complete
+                    </span>
                   </p>
                 ) : (
-                  <p className="text-lg font-black tracking-tight text-white/30">Not started</p>
+                  <p className="text-lg font-black tracking-tight text-white/30">
+                    Not started
+                  </p>
                 )}
                 {summary && summary.total_time_seconds > 0 && (
                   <p className="text-[10px] text-white/30 tracking-widest uppercase mt-1">
-                    {fmtDuration(summary.total_time_seconds)} · {summary.total_sessions} session{summary.total_sessions !== 1 ? 's' : ''}
+                    {fmtDuration(summary.total_time_seconds)} ·{' '}
+                    {summary.total_sessions} session
+                    {summary.total_sessions !== 1 ? 's' : ''}
                   </p>
                 )}
               </div>
@@ -345,8 +384,10 @@ export default function BookDetailPage() {
 
           {/* Series navigation tree */}
           {primarySeries && (
-            <div className="bg-slate-900/60 border border-white/10 rounded-xl p-6 space-y-6" data-testid="series-nav">
-
+            <div
+              className="bg-slate-900/60 border border-white/10 rounded-xl p-6 space-y-6"
+              data-testid="series-nav"
+            >
               {/* Prev / Next navigation */}
               {(primarySeries.prev_book || primarySeries.next_book) && (
                 <div className="flex gap-2">
@@ -356,13 +397,22 @@ export default function BookDetailPage() {
                       data-testid="prev-book-link"
                       className="flex-1 flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
                     >
-                      <ChevronRight size={13} className="text-white/40 shrink-0 rotate-180" />
+                      <ChevronRight
+                        size={13}
+                        className="text-white/40 shrink-0 rotate-180"
+                      />
                       <div className="min-w-0">
-                        <p className="text-[9px] tracking-widest uppercase text-white/30">Previous</p>
-                        <p className="text-xs text-white/80 normal-case truncate">{primarySeries.prev_book.title}</p>
+                        <p className="text-[9px] tracking-widest uppercase text-white/30">
+                          Previous
+                        </p>
+                        <p className="text-xs text-white/80 normal-case truncate">
+                          {primarySeries.prev_book.title}
+                        </p>
                       </div>
                     </Link>
-                  ) : <div className="flex-1" />}
+                  ) : (
+                    <div className="flex-1" />
+                  )}
                   {primarySeries.next_book ? (
                     <Link
                       to={`/books/${primarySeries.next_book.id}`}
@@ -370,12 +420,21 @@ export default function BookDetailPage() {
                       className="flex-1 flex items-center justify-end gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
                     >
                       <div className="min-w-0 text-right">
-                        <p className="text-[9px] tracking-widest uppercase text-white/30">Next</p>
-                        <p className="text-xs text-white/80 normal-case truncate">{primarySeries.next_book.title}</p>
+                        <p className="text-[9px] tracking-widest uppercase text-white/30">
+                          Next
+                        </p>
+                        <p className="text-xs text-white/80 normal-case truncate">
+                          {primarySeries.next_book.title}
+                        </p>
                       </div>
-                      <ChevronRight size={13} className="text-white/40 shrink-0" />
+                      <ChevronRight
+                        size={13}
+                        className="text-white/40 shrink-0"
+                      />
                     </Link>
-                  ) : <div className="flex-1" />}
+                  ) : (
+                    <div className="flex-1" />
+                  )}
                 </div>
               )}
 
@@ -394,12 +453,20 @@ export default function BookDetailPage() {
                         className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
                         style={{ paddingLeft: `${i * 1}rem` }}
                       >
-                        {i > 0 && <span className="text-white/10 border-l border-white/10 self-stretch mr-1" />}
-                        <span className="text-white/30">{i === 0 ? 'Collection' : 'Series'}</span>
+                        {i > 0 && (
+                          <span className="text-white/10 border-l border-white/10 self-stretch mr-1" />
+                        )}
+                        <span className="text-white/30">
+                          {i === 0 ? 'Collection' : 'Series'}
+                        </span>
                         <ChevronRight size={10} className="text-white/20" />
                         <Link
                           to={`/series/${s.id}`}
-                          className={isLast ? 'text-primary hover:underline' : 'text-white/60 hover:text-primary hover:underline transition-colors'}
+                          className={
+                            isLast
+                              ? 'text-primary hover:underline'
+                              : 'text-white/60 hover:text-primary hover:underline transition-colors'
+                          }
                         >
                           {s.name}
                         </Link>
@@ -410,11 +477,15 @@ export default function BookDetailPage() {
                   {primarySeries.sequence != null && (
                     <div
                       className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
-                      style={{ paddingLeft: `${seriesAncestors.length * 1}rem` }}
+                      style={{
+                        paddingLeft: `${seriesAncestors.length * 1}rem`,
+                      }}
                     >
                       <span className="text-white/30">Current</span>
                       <ChevronRight size={10} className="text-white/20" />
-                      <span className="text-white/80">Book {primarySeries.sequence}</span>
+                      <span className="text-white/80">
+                        Book {primarySeries.sequence}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -454,17 +525,29 @@ export default function BookDetailPage() {
                           to={`/books/${sb.book_id}`}
                           className={`flex items-center gap-3 ${isCurrent ? '' : 'opacity-50 hover:opacity-100 transition-opacity'}`}
                         >
-                          <div className={`size-7 rounded text-[9px] font-black flex items-center justify-center shrink-0 ${isCurrent ? 'bg-primary text-white' : 'bg-white/10 text-white/50'}`}>
-                            {sb.sequence != null ? String(sb.sequence).padStart(2, '0') : '—'}
+                          <div
+                            className={`size-7 rounded text-[9px] font-black flex items-center justify-center shrink-0 ${isCurrent ? 'bg-primary text-white' : 'bg-white/10 text-white/50'}`}
+                          >
+                            {sb.sequence != null
+                              ? String(sb.sequence).padStart(2, '0')
+                              : '—'}
                           </div>
                           <div className="flex-1 min-w-0 border-b border-white/5 pb-2 flex items-center justify-between">
-                            <span className={`text-xs truncate normal-case ${isCurrent ? 'font-bold text-white' : 'font-medium text-white/70'}`}>
+                            <span
+                              className={`text-xs truncate normal-case ${isCurrent ? 'font-bold text-white' : 'font-medium text-white/70'}`}
+                            >
                               {sb.title}
                             </span>
                             {isCurrent ? (
-                              <CheckCircle2 size={13} className="text-primary shrink-0 ml-2" />
+                              <CheckCircle2
+                                size={13}
+                                className="text-primary shrink-0 ml-2"
+                              />
                             ) : (
-                              <ArrowRight size={13} className="text-white/20 shrink-0 ml-2" />
+                              <ArrowRight
+                                size={13}
+                                className="text-white/20 shrink-0 ml-2"
+                              />
                             )}
                           </div>
                         </Link>
@@ -487,12 +570,13 @@ export default function BookDetailPage() {
 
         {/* ── Right Column ── */}
         <div className="lg:col-span-7 flex flex-col">
-
           {/* Series label */}
           {primarySeries && (
             <div className="flex items-center gap-3 mb-4">
               <span className="bg-primary/20 text-primary px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest">
-                {primarySeries.sequence != null ? `Book ${primarySeries.sequence}` : 'Series'}
+                {primarySeries.sequence != null
+                  ? `Book ${primarySeries.sequence}`
+                  : 'Series'}
               </span>
               <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
                 of {primarySeries.series_name}
@@ -506,7 +590,9 @@ export default function BookDetailPage() {
               {book.title}
             </h1>
             {book.author && (
-              <p className="text-xl font-light text-white/50 tracking-tight normal-case">{book.author}</p>
+              <p className="text-xl font-light text-white/50 tracking-tight normal-case">
+                {book.author}
+              </p>
             )}
           </div>
 
@@ -524,7 +610,10 @@ export default function BookDetailPage() {
             )}
             {primarySeries && (
               <span className="px-2.5 py-0.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/40 rounded normal-case">
-                {primarySeries.series_name}{primarySeries.sequence != null ? ` #${primarySeries.sequence}` : ''}
+                {primarySeries.series_name}
+                {primarySeries.sequence != null
+                  ? ` #${primarySeries.sequence}`
+                  : ''}
               </span>
             )}
           </div>
@@ -549,7 +638,10 @@ export default function BookDetailPage() {
                 className="flex items-center gap-2 px-6 py-3 text-[10px] font-black tracking-widest uppercase bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-white/30 disabled:opacity-40 rounded-lg transition-all"
               >
                 Move Shelf
-                <ChevronRight size={12} className={`transition-transform ${moveOpen ? 'rotate-90' : ''}`} />
+                <ChevronRight
+                  size={12}
+                  className={`transition-transform ${moveOpen ? 'rotate-90' : ''}`}
+                />
               </button>
               {moveOpen && (
                 <div
@@ -590,30 +682,49 @@ export default function BookDetailPage() {
           {/* Metadata grid */}
           <div className="grid grid-cols-3 gap-6 py-8 border-y border-white/10 mb-10">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">Series</p>
-              <p className="text-base font-medium normal-case">{primarySeries?.series_name ?? '—'}</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
+                Series
+              </p>
+              <p className="text-base font-medium normal-case">
+                {primarySeries?.series_name ?? '—'}
+              </p>
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">Pages</p>
-              <p className="text-base font-medium">{book.page_count ? book.page_count.toLocaleString() : '—'}</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
+                Pages
+              </p>
+              <p className="text-base font-medium">
+                {book.page_count ? book.page_count.toLocaleString() : '—'}
+              </p>
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">Shelf</p>
-              <p className="text-base font-medium normal-case">{currentShelf?.name ?? '—'}</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
+                Shelf
+              </p>
+              <p className="text-base font-medium normal-case">
+                {currentShelf?.name ?? '—'}
+              </p>
             </div>
           </div>
 
           {/* Description */}
           {book.description && (
             <div className="mb-8">
-              <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40 mb-3">Description</h2>
-              <p className="text-sm text-white/70 normal-case leading-relaxed">{book.description}</p>
+              <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40 mb-3">
+                Description
+              </h2>
+              <p className="text-sm text-white/70 normal-case leading-relaxed">
+                {book.description}
+              </p>
             </div>
           )}
 
           {/* Highlights */}
           {highlights.length > 0 && (
-            <section className="space-y-4 mb-8" data-testid="highlights-section">
+            <section
+              className="space-y-4 mb-8"
+              data-testid="highlights-section"
+            >
               <h2 className="text-sm font-black uppercase tracking-widest text-white/80">
                 Recent Highlights
               </h2>
@@ -627,7 +738,9 @@ export default function BookDetailPage() {
                       &ldquo;{h.text}&rdquo;
                     </p>
                     {h.note && (
-                      <p className="text-sm text-primary/70 normal-case mt-1">{h.note}</p>
+                      <p className="text-sm text-primary/70 normal-case mt-1">
+                        {h.note}
+                      </p>
                     )}
                     {h.chapter && (
                       <div className="mt-1.5 flex gap-3 text-[10px] font-bold uppercase tracking-widest text-white/30">
@@ -648,7 +761,9 @@ export default function BookDetailPage() {
                 Reading Sessions
               </h2>
               <div className="bg-white/5 border border-white/10 rounded-xl px-4">
-                {sessions.slice(0, 5).map((s) => <SessionRow key={s.id} session={s} />)}
+                {sessions.slice(0, 5).map((s) => (
+                  <SessionRow key={s.id} session={s} />
+                ))}
               </div>
             </section>
           )}
@@ -656,7 +771,11 @@ export default function BookDetailPage() {
       </div>
 
       {/* Footer: publication details */}
-      {(book.date_published || book.publisher || book.language || book.isbn || book.format) && (
+      {(book.date_published ||
+        book.publisher ||
+        book.language ||
+        book.isbn ||
+        book.format) && (
         <footer className="mt-20 pt-8 border-t border-white/10 opacity-70">
           <div className="flex flex-wrap gap-x-12 gap-y-4 text-[10px] font-black uppercase tracking-widest">
             {book.date_published && (
@@ -703,7 +822,10 @@ export default function BookDetailPage() {
           book={book}
           currentSeries={seriesMemberships ?? []}
           onClose={() => setShowEdit(false)}
-          onSaved={(updated) => { setBook(updated); setShowEdit(false) }}
+          onSaved={(updated) => {
+            setBook(updated)
+            setShowEdit(false)
+          }}
           onSeriesChange={() => setSeriesRefreshKey((k) => k + 1)}
         />
       )}

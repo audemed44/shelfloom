@@ -1,39 +1,119 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, createEvent, fireEvent } from '@testing-library/react'
+import {
+  render,
+  screen,
+  waitFor,
+  createEvent,
+  fireEvent,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import Library from '../pages/Library'
 
 const MOCK_SHELVES = [
-  { id: 1, name: 'Main Library', book_count: 3, path: '/books', is_default: true, is_sync_target: false },
+  {
+    id: 1,
+    name: 'Main Library',
+    book_count: 3,
+    path: '/books',
+    is_default: true,
+    is_sync_target: false,
+  },
 ]
 
 const MOCK_BOOKS = [
-  { id: 1, title: 'Dune', author: 'Frank Herbert', format: 'epub', page_count: 412, shelf_id: 1, shelf_name: 'Main Library', file_path: null, shelfloom_id: null, publisher: null, language: null, isbn: null, date_published: null, description: null, created_at: '', updated_at: '' },
-  { id: 2, title: 'Foundation', author: 'Isaac Asimov', format: 'epub', page_count: 255, shelf_id: 1, shelf_name: 'Main Library', file_path: null, shelfloom_id: null, publisher: null, language: null, isbn: null, date_published: null, description: null, created_at: '', updated_at: '' },
-  { id: 3, title: 'Neuromancer', author: 'William Gibson', format: 'pdf', page_count: 271, shelf_id: 1, shelf_name: 'Main Library', file_path: null, shelfloom_id: null, publisher: null, language: null, isbn: null, date_published: null, description: null, created_at: '', updated_at: '' },
+  {
+    id: 1,
+    title: 'Dune',
+    author: 'Frank Herbert',
+    format: 'epub',
+    page_count: 412,
+    shelf_id: 1,
+    shelf_name: 'Main Library',
+    file_path: null,
+    shelfloom_id: null,
+    publisher: null,
+    language: null,
+    isbn: null,
+    date_published: null,
+    description: null,
+    created_at: '',
+    updated_at: '',
+  },
+  {
+    id: 2,
+    title: 'Foundation',
+    author: 'Isaac Asimov',
+    format: 'epub',
+    page_count: 255,
+    shelf_id: 1,
+    shelf_name: 'Main Library',
+    file_path: null,
+    shelfloom_id: null,
+    publisher: null,
+    language: null,
+    isbn: null,
+    date_published: null,
+    description: null,
+    created_at: '',
+    updated_at: '',
+  },
+  {
+    id: 3,
+    title: 'Neuromancer',
+    author: 'William Gibson',
+    format: 'pdf',
+    page_count: 271,
+    shelf_id: 1,
+    shelf_name: 'Main Library',
+    file_path: null,
+    shelfloom_id: null,
+    publisher: null,
+    language: null,
+    isbn: null,
+    date_published: null,
+    description: null,
+    created_at: '',
+    updated_at: '',
+  },
 ]
 
 interface MockFetchOptions {
   books?: typeof MOCK_BOOKS
   total?: number
   shelves?: typeof MOCK_SHELVES
-  uploadResponse?: typeof MOCK_BOOKS[0] | null
+  uploadResponse?: (typeof MOCK_BOOKS)[0] | null
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mockFetch({ books = MOCK_BOOKS, total = MOCK_BOOKS.length, shelves = MOCK_SHELVES, uploadResponse = null }: MockFetchOptions = {}): any {
+function mockFetch({
+  books = MOCK_BOOKS,
+  total = MOCK_BOOKS.length,
+  shelves = MOCK_SHELVES,
+  uploadResponse = null,
+}: MockFetchOptions = {}) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => {
     const u = url.toString()
     const method = ((options as RequestInit)?.method ?? 'GET').toUpperCase()
     if (u.includes('/api/shelves')) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => shelves }) as Promise<Response>
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => shelves,
+      }) as Promise<Response>
     }
     if (u.includes('/api/books') && method === 'POST') {
       if (uploadResponse) {
-        return Promise.resolve({ ok: true, status: 201, json: async () => uploadResponse }) as Promise<Response>
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => uploadResponse,
+        }) as Promise<Response>
       }
-      return Promise.resolve({ ok: false, status: 422, json: async () => ({ detail: 'Upload failed' }) }) as Promise<Response>
+      return Promise.resolve({
+        ok: false,
+        status: 422,
+        json: async () => ({ detail: 'Upload failed' }),
+      }) as Promise<Response>
     }
     return Promise.resolve({
       ok: true,
@@ -45,7 +125,9 @@ function mockFetch({ books = MOCK_BOOKS, total = MOCK_BOOKS.length, shelves = MO
 
 function renderLibrary() {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <Library />
     </MemoryRouter>
   )
@@ -55,12 +137,16 @@ describe('Library', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fetchSpy: any
 
-  beforeEach(() => { fetchSpy = mockFetch() })
+  beforeEach(() => {
+    fetchSpy = mockFetch()
+  })
   afterEach(() => fetchSpy.mockRestore())
 
   it('renders the library heading', () => {
     renderLibrary()
-    expect(screen.getByRole('heading', { name: /library/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /library/i })
+    ).toBeInTheDocument()
   })
 
   it('shows loading skeletons while fetching', () => {
@@ -72,7 +158,9 @@ describe('Library', () => {
 
   it('renders the correct number of book cards', async () => {
     renderLibrary()
-    await waitFor(() => expect(screen.getAllByTestId('book-card')).toHaveLength(3))
+    await waitFor(() =>
+      expect(screen.getAllByTestId('book-card')).toHaveLength(3)
+    )
   })
 
   it('renders book titles', async () => {
@@ -88,23 +176,31 @@ describe('Library', () => {
     fetchSpy.mockRestore()
     mockFetch({ books: [], total: 0 })
     renderLibrary()
-    await waitFor(() => expect(screen.getByTestId('empty-state')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('empty-state')).toBeInTheDocument()
+    )
   })
 
   it('shows empty state when search has no results', async () => {
     fetchSpy.mockRestore()
     mockFetch({ books: [], total: 0 })
     renderLibrary()
-    await waitFor(() => expect(screen.getByTestId('empty-state')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('empty-state')).toBeInTheDocument()
+    )
   })
 
   it('switches to list view when list toggle is clicked', async () => {
     const user = userEvent.setup()
     renderLibrary()
-    await waitFor(() => expect(screen.getAllByTestId('book-card')).toHaveLength(3))
+    await waitFor(() =>
+      expect(screen.getAllByTestId('book-card')).toHaveLength(3)
+    )
 
     await user.click(screen.getByLabelText('List view'))
-    await waitFor(() => expect(screen.getAllByTestId('book-row')).toHaveLength(3))
+    await waitFor(() =>
+      expect(screen.getAllByTestId('book-row')).toHaveLength(3)
+    )
     expect(screen.queryByTestId('book-card')).not.toBeInTheDocument()
   })
 
@@ -115,12 +211,16 @@ describe('Library', () => {
 
     await user.click(screen.getByLabelText('List view'))
     await user.click(screen.getByLabelText('Grid view'))
-    await waitFor(() => expect(screen.getAllByTestId('book-card')).toHaveLength(3))
+    await waitFor(() =>
+      expect(screen.getAllByTestId('book-card')).toHaveLength(3)
+    )
   })
 
   it('renders shelf tabs when shelves exist', async () => {
     renderLibrary()
-    await waitFor(() => expect(screen.getByText('Main Library')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByText('Main Library')).toBeInTheDocument()
+    )
     expect(screen.getByText('All')).toBeInTheDocument()
   })
 
@@ -132,7 +232,8 @@ describe('Library', () => {
 
     await waitFor(() => {
       const booksCall = fetchSpy.mock.calls.find(
-        ([url]: [string]) => url.includes('/api/books') && url.includes('shelf_id=1')
+        ([url]: [string]) =>
+          url.includes('/api/books') && url.includes('shelf_id=1')
       )
       expect(booksCall).toBeTruthy()
     })
@@ -147,7 +248,8 @@ describe('Library', () => {
 
     await waitFor(() => {
       const booksCall = fetchSpy.mock.calls.find(
-        ([url]: [string]) => url.includes('/api/books') && url.includes('sort=title')
+        ([url]: [string]) =>
+          url.includes('/api/books') && url.includes('sort=title')
       )
       expect(booksCall).toBeTruthy()
     })
@@ -163,7 +265,9 @@ describe('Library', () => {
     fetchSpy.mockRestore()
     mockFetch({ total: 50 })
     renderLibrary()
-    await waitFor(() => expect(screen.getByLabelText('Next page')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByLabelText('Next page')).toBeInTheDocument()
+    )
   })
 })
 
@@ -171,22 +275,28 @@ describe('Upload', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fetchSpy: any
 
-  beforeEach(() => { fetchSpy = mockFetch({ uploadResponse: MOCK_BOOKS[0] }) })
+  beforeEach(() => {
+    fetchSpy = mockFetch({ uploadResponse: MOCK_BOOKS[0] })
+  })
   afterEach(() => fetchSpy.mockRestore())
 
   it('file drop triggers upload', async () => {
     renderLibrary()
     await waitFor(() => screen.getByTestId('upload-zone'))
 
-    const file = new File(['content'], 'dune.epub', { type: 'application/epub+zip' })
+    const file = new File(['content'], 'dune.epub', {
+      type: 'application/epub+zip',
+    })
     const dropEvent = createEvent.drop(screen.getByTestId('upload-zone'))
-    Object.defineProperty(dropEvent, 'dataTransfer', { value: { files: [file] } })
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: { files: [file] },
+    })
     fireEvent(screen.getByTestId('upload-zone'), dropEvent)
 
     await waitFor(() =>
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining('/api/books'),
-        expect.objectContaining({ method: 'POST' }),
+        expect.objectContaining({ method: 'POST' })
       )
     )
   })
@@ -198,19 +308,39 @@ describe('Upload', () => {
       const u = url.toString()
       const method = ((options as RequestInit)?.method ?? 'GET').toUpperCase()
       if (u.includes('/api/shelves')) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_SHELVES }) as Promise<Response>
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_SHELVES,
+        }) as Promise<Response>
       }
       if (u.includes('/api/books') && method === 'POST') {
-        return new Promise((r) => { resolveUpload = r })
+        return new Promise((r) => {
+          resolveUpload = r
+        })
       }
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({ items: MOCK_BOOKS, total: MOCK_BOOKS.length, page: 1, per_page: 24 }) }) as Promise<Response>
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: MOCK_BOOKS,
+          total: MOCK_BOOKS.length,
+          page: 1,
+          per_page: 24,
+        }),
+      }) as Promise<Response>
     })
 
     renderLibrary()
     const input = screen.getByTestId('file-input')
-    await user.upload(input, new File(['content'], 'dune.epub', { type: 'application/epub+zip' }))
+    await user.upload(
+      input,
+      new File(['content'], 'dune.epub', { type: 'application/epub+zip' })
+    )
 
-    await waitFor(() => expect(screen.getByTestId('upload-spinner')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('upload-spinner')).toBeInTheDocument()
+    )
 
     // Resolve so upload doesn't leak into other tests
     resolveUpload({ ok: true, status: 201, json: async () => MOCK_BOOKS[0] })
@@ -221,9 +351,14 @@ describe('Upload', () => {
     const user = userEvent.setup({ applyAccept: false })
     renderLibrary()
     const input = screen.getByTestId('file-input')
-    await user.upload(input, new File(['content'], 'notes.txt', { type: 'text/plain' }))
+    await user.upload(
+      input,
+      new File(['content'], 'notes.txt', { type: 'text/plain' })
+    )
 
-    await waitFor(() => expect(screen.getByTestId('upload-error')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('upload-error')).toBeInTheDocument()
+    )
     expect(screen.getByTestId('upload-error')).toHaveTextContent(/epub.*pdf/i)
   })
 
@@ -234,23 +369,49 @@ describe('Upload', () => {
       const u = url.toString()
       const method = ((options as RequestInit)?.method ?? 'GET').toUpperCase()
       if (u.includes('/api/shelves')) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => MOCK_SHELVES }) as Promise<Response>
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_SHELVES,
+        }) as Promise<Response>
       }
       if (u.includes('/api/books') && method === 'POST') {
         bookCount = 1
-        return Promise.resolve({ ok: true, status: 201, json: async () => MOCK_BOOKS[0] }) as Promise<Response>
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => MOCK_BOOKS[0],
+        }) as Promise<Response>
       }
       const books = bookCount > 0 ? [MOCK_BOOKS[0]] : []
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({ items: books, total: books.length, page: 1, per_page: 24 }) }) as Promise<Response>
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: books,
+          total: books.length,
+          page: 1,
+          per_page: 24,
+        }),
+      }) as Promise<Response>
     })
 
     renderLibrary()
-    await waitFor(() => expect(screen.getByTestId('empty-state')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('empty-state')).toBeInTheDocument()
+    )
 
     const input = screen.getByTestId('file-input')
-    await user.upload(input, new File(['content'], 'dune.epub', { type: 'application/epub+zip' }))
+    await user.upload(
+      input,
+      new File(['content'], 'dune.epub', { type: 'application/epub+zip' })
+    )
 
-    await waitFor(() => expect(screen.queryByTestId('upload-spinner')).not.toBeInTheDocument())
-    await waitFor(() => expect(screen.getAllByTestId('book-card')).toHaveLength(1))
+    await waitFor(() =>
+      expect(screen.queryByTestId('upload-spinner')).not.toBeInTheDocument()
+    )
+    await waitFor(() =>
+      expect(screen.getAllByTestId('book-card')).toHaveLength(1)
+    )
   })
 })

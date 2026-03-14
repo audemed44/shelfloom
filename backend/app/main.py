@@ -46,7 +46,19 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    from app.routers import health, shelves, books, series, organizer, tags, import_, kosync, reading
+    from app.routers import (
+        health,
+        shelves,
+        books,
+        series,
+        organizer,
+        tags,
+        import_,
+        kosync,
+        reading,
+        fs,
+    )
+
     application.include_router(health.router, prefix="/api")
     application.include_router(shelves.router, prefix="/api")
     application.include_router(books.router, prefix="/api")
@@ -56,6 +68,7 @@ def create_app() -> FastAPI:
     application.include_router(import_.router, prefix="/api")
     application.include_router(kosync.router, prefix="/api")
     application.include_router(reading.router, prefix="/api")
+    application.include_router(fs.router, prefix="/api")
 
     # Serve built frontend — only when dist exists (skipped in dev / CI)
     if _FRONTEND_DIST.exists():  # pragma: no cover

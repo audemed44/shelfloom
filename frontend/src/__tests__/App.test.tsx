@@ -6,7 +6,9 @@ import App from '../App'
 describe('App', () => {
   // Silence fetch errors from useApi calls in jsdom (no network available)
   beforeEach(() => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No network in tests'))
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(
+      new Error('No network in tests')
+    )
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -27,7 +29,9 @@ describe('App', () => {
 
   it('shows dashboard page by default', () => {
     render(<App />)
-    expect(screen.getByRole('heading', { name: /dashboard/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /dashboard/i })
+    ).toBeInTheDocument()
   })
 
   it('navigates to library page', async () => {
@@ -35,7 +39,9 @@ describe('App', () => {
     render(<App />)
     // Click the first matching nav link (sidebar or bottom nav)
     await user.click(screen.getAllByText('Library')[0])
-    expect(screen.getByRole('heading', { name: /library/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /library/i })
+    ).toBeInTheDocument()
   })
 
   it('navigates to stats page', async () => {

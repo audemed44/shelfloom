@@ -12,27 +12,36 @@ describe('useDebounce', () => {
   })
 
   it('does not update before the delay has passed', () => {
-    const { result, rerender } = renderHook(({ val }: { val: string }) => useDebounce(val, 300), {
-      initialProps: { val: 'a' },
-    })
+    const { result, rerender } = renderHook(
+      ({ val }: { val: string }) => useDebounce(val, 300),
+      {
+        initialProps: { val: 'a' },
+      }
+    )
     rerender({ val: 'ab' })
     act(() => vi.advanceTimersByTime(100))
     expect(result.current).toBe('a')
   })
 
   it('updates after the delay has passed', () => {
-    const { result, rerender } = renderHook(({ val }: { val: string }) => useDebounce(val, 300), {
-      initialProps: { val: 'a' },
-    })
+    const { result, rerender } = renderHook(
+      ({ val }: { val: string }) => useDebounce(val, 300),
+      {
+        initialProps: { val: 'a' },
+      }
+    )
     rerender({ val: 'ab' })
     act(() => vi.advanceTimersByTime(300))
     expect(result.current).toBe('ab')
   })
 
   it('resets the timer on rapid changes', () => {
-    const { result, rerender } = renderHook(({ val }: { val: string }) => useDebounce(val, 300), {
-      initialProps: { val: 'a' },
-    })
+    const { result, rerender } = renderHook(
+      ({ val }: { val: string }) => useDebounce(val, 300),
+      {
+        initialProps: { val: 'a' },
+      }
+    )
     rerender({ val: 'ab' })
     act(() => vi.advanceTimersByTime(200))
     rerender({ val: 'abc' })
@@ -43,9 +52,12 @@ describe('useDebounce', () => {
   })
 
   it('uses 300ms default delay', () => {
-    const { result, rerender } = renderHook(({ val }: { val: string }) => useDebounce(val), {
-      initialProps: { val: 'x' },
-    })
+    const { result, rerender } = renderHook(
+      ({ val }: { val: string }) => useDebounce(val),
+      {
+        initialProps: { val: 'x' },
+      }
+    )
     rerender({ val: 'y' })
     act(() => vi.advanceTimersByTime(299))
     expect(result.current).toBe('x')

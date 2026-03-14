@@ -15,28 +15,40 @@ type State =
   | { status: 'uploading'; filename: string }
   | { status: 'error'; message: string }
 
-export default function UploadZone({ onSuccess, highlighted = false }: UploadZoneProps) {
+export default function UploadZone({
+  onSuccess,
+  highlighted = false,
+}: UploadZoneProps) {
   const [state, setState] = useState<State>({ status: 'idle' })
   const [isDragOver, setIsDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const upload = useCallback(async (file: File) => {
-    const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
-    if (!ACCEPTED.has(ext)) {
-      setState({ status: 'error', message: 'Only .epub and .pdf files are supported' })
-      return
-    }
-    setState({ status: 'uploading', filename: file.name })
-    try {
-      const form = new FormData()
-      form.append('file', file)
-      const book = await api.upload<Book>('/api/books', form)
-      setState({ status: 'idle' })
-      if (book) onSuccess(book)
-    } catch (err) {
-      setState({ status: 'error', message: err instanceof Error ? err.message : 'Upload failed' })
-    }
-  }, [onSuccess])
+  const upload = useCallback(
+    async (file: File) => {
+      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+      if (!ACCEPTED.has(ext)) {
+        setState({
+          status: 'error',
+          message: 'Only .epub and .pdf files are supported',
+        })
+        return
+      }
+      setState({ status: 'uploading', filename: file.name })
+      try {
+        const form = new FormData()
+        form.append('file', file)
+        const book = await api.upload<Book>('/api/books', form)
+        setState({ status: 'idle' })
+        if (book) onSuccess(book)
+      } catch (err) {
+        setState({
+          status: 'error',
+          message: err instanceof Error ? err.message : 'Upload failed',
+        })
+      }
+    },
+    [onSuccess]
+  )
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -52,10 +64,15 @@ export default function UploadZone({ onSuccess, highlighted = false }: UploadZon
     <div
       data-testid="upload-zone"
       onDrop={onDrop}
-      onDragOver={(e) => { e.preventDefault(); setIsDragOver(true) }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        setIsDragOver(true)
+      }}
       onDragLeave={() => setIsDragOver(false)}
       className={`border-2 border-dashed transition-colors mb-6 ${
-        active ? 'border-primary bg-primary/5' : 'border-white/10 hover:border-white/20'
+        active
+          ? 'border-primary bg-primary/5'
+          : 'border-white/10 hover:border-white/20'
       }`}
     >
       <input
@@ -79,13 +96,19 @@ export default function UploadZone({ onSuccess, highlighted = false }: UploadZon
               className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin flex-shrink-0"
             />
             <span className="text-xs text-white/40 normal-case">
-              Uploading {(state as { status: 'uploading'; filename: string }).filename}…
+              Uploading{' '}
+              {(state as { status: 'uploading'; filename: string }).filename}…
             </span>
           </>
         ) : (
           <>
-            <Upload size={14} className={active ? 'text-primary' : 'text-white/20'} />
-            <span className={`text-xs normal-case ${active ? 'text-primary/80' : 'text-white/20'}`}>
+            <Upload
+              size={14}
+              className={active ? 'text-primary' : 'text-white/20'}
+            />
+            <span
+              className={`text-xs normal-case ${active ? 'text-primary/80' : 'text-white/20'}`}
+            >
               Drop an EPUB or PDF here, or
             </span>
             <button

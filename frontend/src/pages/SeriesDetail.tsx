@@ -26,8 +26,12 @@ export default function SeriesDetail() {
   const navigate = useNavigate()
   const seriesId = id ? parseInt(id, 10) : null
 
-  const { data: series } = useApi<SeriesDetail>(seriesId ? `/api/series/${seriesId}` : null)
-  const { data: books } = useApi<SeriesBook[]>(seriesId ? `/api/series/${seriesId}/books` : null)
+  const { data: series } = useApi<SeriesDetail>(
+    seriesId ? `/api/series/${seriesId}` : null
+  )
+  const { data: books } = useApi<SeriesBook[]>(
+    seriesId ? `/api/series/${seriesId}/books` : null
+  )
   const { data: allSeries } = useApi<SeriesWithCount[]>('/api/series/tree')
   const { data: readingOrders } = useApi<ReadingOrder[]>(
     seriesId ? `/api/series/${seriesId}/reading-orders` : null
@@ -37,10 +41,13 @@ export default function SeriesDetail() {
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null)
   const [newOrderName, setNewOrderName] = useState('')
   const [showNewOrderForm, setShowNewOrderForm] = useState(false)
-  const [readCounts, setReadCounts] = useState<{ read: number; total: number } | null>(null)
+  const [readCounts, setReadCounts] = useState<{
+    read: number
+    total: number
+  } | null>(null)
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [localBooks, setLocalBooks] = useState<SeriesBook[] | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [, setRefreshKey] = useState(0)
 
   // sync localBooks when books load
   useEffect(() => {
@@ -52,10 +59,14 @@ export default function SeriesDetail() {
     if (!books || books.length === 0) return
     Promise.all(
       books.map((b) =>
-        api.get<ReadingSummary>(`/api/books/${b.book_id}/reading-summary`).catch(() => null)
+        api
+          .get<ReadingSummary>(`/api/books/${b.book_id}/reading-summary`)
+          .catch(() => null)
       )
     ).then((summaries) => {
-      const read = summaries.filter((s) => s != null && (s.percent_finished ?? 0) >= 99).length
+      const read = summaries.filter(
+        (s) => s != null && (s.percent_finished ?? 0) >= 99
+      ).length
       setReadCounts({ read, total: books.length })
     })
   }, [books])
@@ -104,7 +115,10 @@ export default function SeriesDetail() {
   const handleCreateOrder = async () => {
     if (!newOrderName.trim() || !seriesId) return
     try {
-      await api.post('/api/reading-orders', { name: newOrderName.trim(), series_id: seriesId })
+      await api.post('/api/reading-orders', {
+        name: newOrderName.trim(),
+        series_id: seriesId,
+      })
       setNewOrderName('')
       setShowNewOrderForm(false)
       setRefreshKey((k) => k + 1)
@@ -140,7 +154,10 @@ export default function SeriesDetail() {
     const origMap = new Map(localBooks.map((b) => [b.book_id, b.sequence]))
     for (const b of updated) {
       if (origMap.get(b.book_id) !== b.sequence) {
-        await api.post(`/api/series/${seriesId}/books/${b.book_id}?sequence=${b.sequence}`, {})
+        await api.post(
+          `/api/series/${seriesId}/books/${b.book_id}?sequence=${b.sequence}`,
+          {}
+        )
       }
     }
   }
@@ -149,17 +166,25 @@ export default function SeriesDetail() {
   const activeOrder = (readingOrders ?? []).find((o) => o.id === activeOrderId)
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-8" data-testid="series-detail">
+    <div
+      className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-8"
+      data-testid="series-detail"
+    >
       {/* Breadcrumb */}
       <nav
         className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-white/40"
         aria-label="breadcrumb"
       >
-        <Link to="/library" className="hover:text-primary transition-colors">Library</Link>
+        <Link to="/library" className="hover:text-primary transition-colors">
+          Library
+        </Link>
         {parentSeries && (
           <>
             <ChevronRight size={10} className="text-white/20" />
-            <Link to={`/series/${parentSeries.id}`} className="hover:text-primary transition-colors">
+            <Link
+              to={`/series/${parentSeries.id}`}
+              className="hover:text-primary transition-colors"
+            >
               {parentSeries.name}
             </Link>
           </>
@@ -171,11 +196,16 @@ export default function SeriesDetail() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="text-2xl font-black tracking-tight text-white" data-testid="series-title">
+          <h1
+            className="text-2xl font-black tracking-tight text-white"
+            data-testid="series-title"
+          >
             {series.name}
           </h1>
           {series.description && (
-            <p className="text-sm text-white/60 normal-case leading-relaxed">{series.description}</p>
+            <p className="text-sm text-white/60 normal-case leading-relaxed">
+              {series.description}
+            </p>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -198,9 +228,13 @@ export default function SeriesDetail() {
 
       {/* Books section */}
       <section className="space-y-3" data-testid="books-section">
-        <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40">Books</h2>
+        <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40">
+          Books
+        </h2>
         {displayBooks.length === 0 ? (
-          <p className="text-xs text-white/30 normal-case">No books in this series.</p>
+          <p className="text-xs text-white/30 normal-case">
+            No books in this series.
+          </p>
         ) : (
           <div className="border border-white/10 rounded bg-black">
             {displayBooks.map((b) => (
@@ -208,7 +242,10 @@ export default function SeriesDetail() {
                 key={b.book_id}
                 draggable
                 onDragStart={(e) => handleDragStart(e, b.book_id)}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(b.book_id) }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setDragOver(b.book_id)
+                }}
                 onDragLeave={() => setDragOver(null)}
                 onDrop={(e) => handleDrop(e, b.book_id)}
                 className={`flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0 cursor-grab transition-colors ${
@@ -228,7 +265,9 @@ export default function SeriesDetail() {
                     {b.title}
                   </Link>
                   {b.author && (
-                    <p className="text-[10px] text-white/30 normal-case">{b.author}</p>
+                    <p className="text-[10px] text-white/30 normal-case">
+                      {b.author}
+                    </p>
                   )}
                 </div>
                 {b.format && (
@@ -255,7 +294,9 @@ export default function SeriesDetail() {
       {/* Sub-series */}
       {subSeries.length > 0 && (
         <section className="space-y-3">
-          <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40">Sub-series</h2>
+          <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40">
+            Sub-series
+          </h2>
           <div className="space-y-1">
             {subSeries.map((s) => (
               <Link
@@ -263,7 +304,9 @@ export default function SeriesDetail() {
                 to={`/series/${s.id}`}
                 className="flex items-center justify-between px-4 py-2.5 border border-white/10 rounded hover:border-white/20 transition-colors"
               >
-                <span className="text-sm text-white/80 normal-case hover:text-white">{s.name}</span>
+                <span className="text-sm text-white/80 normal-case hover:text-white">
+                  {s.name}
+                </span>
                 <span className="text-[10px] text-white/30 tracking-widest uppercase">
                   {s.book_count} books
                 </span>
@@ -296,7 +339,9 @@ export default function SeriesDetail() {
               onChange={(e) => setNewOrderName(e.target.value)}
               placeholder="Reading order name"
               className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white normal-case placeholder:text-white/20 focus:outline-none focus:border-white/30"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleCreateOrder() }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateOrder()
+              }}
             />
             <button
               onClick={handleCreateOrder}
@@ -308,7 +353,9 @@ export default function SeriesDetail() {
         )}
 
         {(readingOrders ?? []).length === 0 && !showNewOrderForm && (
-          <p className="text-xs text-white/30 normal-case">No reading orders yet.</p>
+          <p className="text-xs text-white/30 normal-case">
+            No reading orders yet.
+          </p>
         )}
 
         {(readingOrders ?? []).length > 0 && (
@@ -343,12 +390,16 @@ export default function SeriesDetail() {
             {activeOrder && (
               <div className="border border-white/10 rounded bg-black">
                 {activeOrder.entries.length === 0 ? (
-                  <p className="text-xs text-white/30 normal-case px-4 py-4">No entries yet.</p>
+                  <p className="text-xs text-white/30 normal-case px-4 py-4">
+                    No entries yet.
+                  </p>
                 ) : (
                   [...activeOrder.entries]
                     .sort((a, b) => a.position - b.position)
                     .map((entry) => {
-                      const book = displayBooks.find((b) => b.book_id === entry.book_id)
+                      const book = displayBooks.find(
+                        (b) => b.book_id === entry.book_id
+                      )
                       return (
                         <div
                           key={entry.id}

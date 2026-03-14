@@ -9,13 +9,19 @@ interface DeleteBookModalProps {
   onDeleted: () => void
 }
 
-export default function DeleteBookModal({ book, onClose, onDeleted }: DeleteBookModalProps) {
+export default function DeleteBookModal({
+  book,
+  onClose,
+  onDeleted,
+}: DeleteBookModalProps) {
   const [deleteFile, setDeleteFile] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
@@ -36,7 +42,9 @@ export default function DeleteBookModal({ book, onClose, onDeleted }: DeleteBook
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
       <div className="w-full max-w-md bg-black border border-white/10 rounded-lg shadow-xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
@@ -61,8 +69,9 @@ export default function DeleteBookModal({ book, onClose, onDeleted }: DeleteBook
           )}
 
           <p className="text-sm text-white/70 normal-case">
-            Remove <span className="text-white font-semibold">{book.title}</span> from your library?
-            This cannot be undone.
+            Remove{' '}
+            <span className="text-white font-semibold">{book.title}</span> from
+            your library? This cannot be undone.
           </p>
 
           <label className="flex items-center gap-3 cursor-pointer select-none">

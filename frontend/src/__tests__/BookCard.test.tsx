@@ -25,7 +25,9 @@ const BOOK: Book = {
 
 function renderCard(book: Book = BOOK) {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <MemoryRouter
+      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+    >
       <BookCard book={book} />
     </MemoryRouter>
   )

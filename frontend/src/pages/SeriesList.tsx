@@ -35,7 +35,13 @@ interface SeriesRowProps {
   onDelete: (s: SeriesWithCount) => void
 }
 
-function SeriesRow({ node, depth, allSeries, onEdit, onDelete }: SeriesRowProps) {
+function SeriesRow({
+  node,
+  depth,
+  allSeries,
+  onEdit,
+  onDelete,
+}: SeriesRowProps) {
   return (
     <>
       <div
@@ -87,11 +93,15 @@ function SeriesRow({ node, depth, allSeries, onEdit, onDelete }: SeriesRowProps)
 
 export default function SeriesList() {
   const [refreshKey, setRefreshKey] = useState(0)
-  const [editingSeries, setEditingSeries] = useState<SeriesWithCount | null | undefined>(undefined)
+  const [editingSeries, setEditingSeries] = useState<
+    SeriesWithCount | null | undefined
+  >(undefined)
   const [showCreate, setShowCreate] = useState(false)
   const [purgeResult, setPurgeResult] = useState<string | null>(null)
 
-  const { data: flatList } = useApi<SeriesWithCount[]>(`/api/series/tree?_k=${refreshKey}`)
+  const { data: flatList } = useApi<SeriesWithCount[]>(
+    `/api/series/tree?_k=${refreshKey}`
+  )
   const allSeries: SeriesWithCount[] = flatList ?? []
   const tree = buildTree(allSeries)
 
@@ -107,7 +117,9 @@ export default function SeriesList() {
 
   const handlePurge = async () => {
     try {
-      const result = await api.delete<{ deleted: string[]; count: number }>('/api/series/empty')
+      const result = await api.delete<{ deleted: string[]; count: number }>(
+        '/api/series/empty'
+      )
       if (result && result.count > 0) {
         setPurgeResult(`Deleted: ${result.deleted.join(', ')}`)
       } else {
@@ -129,7 +141,9 @@ export default function SeriesList() {
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xs font-black tracking-widest uppercase text-white">Series</h1>
+        <h1 className="text-xs font-black tracking-widest uppercase text-white">
+          Series
+        </h1>
         <div className="flex items-center gap-2">
           <button
             onClick={handlePurge}
@@ -160,9 +174,14 @@ export default function SeriesList() {
       )}
 
       {/* Series tree */}
-      <div className="border border-white/10 rounded bg-black" data-testid="series-list">
+      <div
+        className="border border-white/10 rounded bg-black"
+        data-testid="series-list"
+      >
         {tree.length === 0 ? (
-          <p className="text-xs text-white/30 tracking-widest uppercase text-center py-8">No series yet</p>
+          <p className="text-xs text-white/30 tracking-widest uppercase text-center py-8">
+            No series yet
+          </p>
         ) : (
           tree.map((node) => (
             <SeriesRow

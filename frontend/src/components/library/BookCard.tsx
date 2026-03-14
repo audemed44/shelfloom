@@ -9,14 +9,20 @@ export default function BookCard({ book }: BookCardProps) {
   const coverSrc = `/api/books/${book.id}/cover`
 
   return (
-    <Link to={`/books/${book.id}`} className="group block" data-testid="book-card">
+    <Link
+      to={`/books/${book.id}`}
+      className="group block"
+      data-testid="book-card"
+    >
       {/* Cover */}
       <div className="aspect-[2/3] bg-white/5 border border-white/10 overflow-hidden relative">
         <img
           src={coverSrc}
           alt={book.title}
           className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300"
-          onError={(e) => { e.currentTarget.style.display = 'none' }}
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+          }}
         />
         {/* Format badge */}
         <div className="absolute top-2 right-2">

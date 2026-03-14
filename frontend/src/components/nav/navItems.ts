@@ -1,4 +1,10 @@
-import { Home, BookOpen, BarChart3, BookMarked, type LucideIcon } from 'lucide-react'
+import {
+  Home,
+  BookOpen,
+  BarChart3,
+  BookMarked,
+  type LucideIcon,
+} from 'lucide-react'
 
 export interface NavItem {
   to: string

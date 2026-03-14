@@ -89,7 +89,11 @@ describe('api client', () => {
     })
 
     const formData = new FormData()
-    formData.append('file', new Blob(['data'], { type: 'application/epub+zip' }), 'book.epub')
+    formData.append(
+      'file',
+      new Blob(['data'], { type: 'application/epub+zip' }),
+      'book.epub'
+    )
 
     await api.upload('/api/books', formData)
 

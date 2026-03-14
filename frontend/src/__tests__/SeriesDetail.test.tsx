@@ -14,8 +14,20 @@ const SERIES = {
 }
 
 const SERIES_BOOKS = [
-  { book_id: 'uuid1', sequence: 1, title: 'The Way of Kings', author: 'Brandon Sanderson', format: 'epub' },
-  { book_id: 'uuid2', sequence: 2, title: 'Words of Radiance', author: 'Brandon Sanderson', format: 'epub' },
+  {
+    book_id: 'uuid1',
+    sequence: 1,
+    title: 'The Way of Kings',
+    author: 'Brandon Sanderson',
+    format: 'epub',
+  },
+  {
+    book_id: 'uuid2',
+    sequence: 2,
+    title: 'Words of Radiance',
+    author: 'Brandon Sanderson',
+    format: 'epub',
+  },
 ]
 
 const READING_ORDERS = [
@@ -23,7 +35,15 @@ const READING_ORDERS = [
 ]
 
 const SERIES_TREE = [
-  { id: 1, name: 'Stormlight Archive', parent_id: null, book_count: 2, description: null, sort_order: 0, cover_path: null },
+  {
+    id: 1,
+    name: 'Stormlight Archive',
+    parent_id: null,
+    book_count: 2,
+    description: null,
+    sort_order: 0,
+    cover_path: null,
+  },
 ]
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,22 +52,50 @@ function mockFetch(overrides: Record<string, any> = {}): any {
     const u = url.toString()
 
     if (u.includes('/api/series/tree')) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => overrides.tree ?? SERIES_TREE }) as Promise<Response>
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => overrides.tree ?? SERIES_TREE,
+      }) as Promise<Response>
     }
     if (u.match(/\/api\/series\/\d+\/reading-orders/)) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => overrides.readingOrders ?? READING_ORDERS }) as Promise<Response>
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => overrides.readingOrders ?? READING_ORDERS,
+      }) as Promise<Response>
     }
     if (u.match(/\/api\/series\/\d+\/books$/)) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => overrides.books ?? SERIES_BOOKS }) as Promise<Response>
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => overrides.books ?? SERIES_BOOKS,
+      }) as Promise<Response>
     }
     if (u.match(/\/api\/series\/\d+$/)) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => overrides.series ?? SERIES }) as Promise<Response>
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => overrides.series ?? SERIES,
+      }) as Promise<Response>
     }
     if (u.includes('/reading-summary')) {
-      const summary = overrides.summary ?? { percent_finished: null, total_time_seconds: 0, total_sessions: 0 }
-      return Promise.resolve({ ok: true, status: 200, json: async () => summary }) as Promise<Response>
+      const summary = overrides.summary ?? {
+        percent_finished: null,
+        total_time_seconds: 0,
+        total_sessions: 0,
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => summary,
+      }) as Promise<Response>
     }
-    return Promise.resolve({ ok: true, status: 200, json: async () => ({}) }) as Promise<Response>
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    }) as Promise<Response>
   })
 }
 
@@ -59,7 +107,10 @@ function renderDetail(seriesId: number = 1) {
     >
       <Routes>
         <Route path="/series/:id" element={<SeriesDetail />} />
-        <Route path="/series" element={<div data-testid="series-list-page">Series List</div>} />
+        <Route
+          path="/series"
+          element={<div data-testid="series-list-page">Series List</div>}
+        />
       </Routes>
     </MemoryRouter>
   )
@@ -69,20 +120,30 @@ describe('SeriesDetail', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fetchSpy: any
 
-  beforeEach(() => { fetchSpy = mockFetch() })
+  beforeEach(() => {
+    fetchSpy = mockFetch()
+  })
   afterEach(() => fetchSpy.mockRestore())
 
   it('renders series title and books', async () => {
     renderDetail()
-    await waitFor(() => expect(screen.getByTestId('series-title')).toHaveTextContent('Stormlight Archive'))
+    await waitFor(() =>
+      expect(screen.getByTestId('series-title')).toHaveTextContent(
+        'Stormlight Archive'
+      )
+    )
     expect(screen.getByText('The Way of Kings')).toBeInTheDocument()
     expect(screen.getByText('Words of Radiance')).toBeInTheDocument()
   })
 
   it('shows reading order tabs', async () => {
     renderDetail()
-    await waitFor(() => expect(screen.getByTestId('reading-order-tab-10')).toBeInTheDocument())
-    expect(screen.getByTestId('reading-order-tab-10')).toHaveTextContent('Publication Order')
+    await waitFor(() =>
+      expect(screen.getByTestId('reading-order-tab-10')).toBeInTheDocument()
+    )
+    expect(screen.getByTestId('reading-order-tab-10')).toHaveTextContent(
+      'Publication Order'
+    )
   })
 
   it('progress indicator shows when summaries loaded', async () => {
@@ -91,28 +152,60 @@ describe('SeriesDetail', () => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
       const u = url.toString()
       if (u.includes('/api/series/tree')) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => SERIES_TREE }) as Promise<Response>
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => SERIES_TREE,
+        }) as Promise<Response>
       }
       if (u.match(/\/api\/series\/\d+\/reading-orders/)) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => READING_ORDERS }) as Promise<Response>
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => READING_ORDERS,
+        }) as Promise<Response>
       }
       if (u.match(/\/api\/series\/\d+\/books$/)) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => SERIES_BOOKS }) as Promise<Response>
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => SERIES_BOOKS,
+        }) as Promise<Response>
       }
       if (u.match(/\/api\/series\/\d+$/)) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => SERIES }) as Promise<Response>
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => SERIES,
+        }) as Promise<Response>
       }
       if (u.includes('/reading-summary')) {
         callCount++
         // first book: read, second: not read
         const pct = callCount === 1 ? 100 : 10
-        return Promise.resolve({ ok: true, status: 200, json: async () => ({ percent_finished: pct, total_time_seconds: 0, total_sessions: 0 }) }) as Promise<Response>
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            percent_finished: pct,
+            total_time_seconds: 0,
+            total_sessions: 0,
+          }),
+        }) as Promise<Response>
       }
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({}) }) as Promise<Response>
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+      }) as Promise<Response>
     })
 
     renderDetail()
-    await waitFor(() => expect(screen.getByTestId('progress-indicator')).toBeInTheDocument(), { timeout: 3000 })
+    await waitFor(
+      () =>
+        expect(screen.getByTestId('progress-indicator')).toBeInTheDocument(),
+      { timeout: 3000 }
+    )
     expect(screen.getByTestId('progress-indicator')).toHaveTextContent('1 of 2')
   })
 
@@ -127,18 +220,48 @@ describe('SeriesDetail', () => {
   it('reading order tab switching shows different content', async () => {
     fetchSpy.mockRestore()
     const twoOrders = [
-      { id: 10, name: 'Publication Order', series_id: 1, entries: [{ id: 1, reading_order_id: 10, book_id: 'uuid1', position: 1, note: null }] },
-      { id: 11, name: 'Chronological Order', series_id: 1, entries: [{ id: 2, reading_order_id: 11, book_id: 'uuid2', position: 1, note: null }] },
+      {
+        id: 10,
+        name: 'Publication Order',
+        series_id: 1,
+        entries: [
+          {
+            id: 1,
+            reading_order_id: 10,
+            book_id: 'uuid1',
+            position: 1,
+            note: null,
+          },
+        ],
+      },
+      {
+        id: 11,
+        name: 'Chronological Order',
+        series_id: 1,
+        entries: [
+          {
+            id: 2,
+            reading_order_id: 11,
+            book_id: 'uuid2',
+            position: 1,
+            note: null,
+          },
+        ],
+      },
     ]
     fetchSpy = mockFetch({ readingOrders: twoOrders })
 
     renderDetail()
-    await waitFor(() => expect(screen.getByTestId('reading-order-tab-10')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('reading-order-tab-10')).toBeInTheDocument()
+    )
     expect(screen.getByTestId('reading-order-tab-11')).toBeInTheDocument()
 
     // Tab 10 is active by default (first tab), click tab 11
     await userEvent.click(screen.getByTestId('reading-order-tab-11'))
     // After switching, the active order tab-11 should be active
-    expect(screen.getByTestId('reading-order-tab-11').className).toContain('border-primary')
+    expect(screen.getByTestId('reading-order-tab-11').className).toContain(
+      'border-primary'
+    )
   })
 })

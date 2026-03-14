@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { X, HardDrive, Plus, Save } from 'lucide-react'
+import { X, HardDrive, Plus, Save, FolderOpen } from 'lucide-react'
 import { api } from '../../api/client'
 import type { Shelf } from '../../types/api'
+import DirPicker from './DirPicker'
 
 interface ShelfModalProps {
   shelf?: Shelf
@@ -20,7 +21,11 @@ interface ShelfForm {
   seq_pad: number
 }
 
-export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps) {
+export default function ShelfModal({
+  shelf,
+  onClose,
+  onSaved,
+}: ShelfModalProps) {
   const isEdit = shelf != null
   const [form, setForm] = useState<ShelfForm>({
     name: shelf?.name ?? '',
@@ -29,16 +34,25 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
     is_sync_target: shelf?.is_sync_target ?? false,
     device_name: shelf?.device_name ?? '',
     auto_organize: shelf?.auto_organize ?? false,
-    organize_template: shelf?.organize_template ?? '{author}/{series_path}/{sequence} - {title}',
+    organize_template:
+      shelf?.organize_template ??
+      '{author}/{series_path}/{sequence| - }{title}',
     seq_pad: shelf?.seq_pad ?? 2,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showPicker, setShowPicker] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.name.trim()) { setError('Name is required.'); return }
-    if (!form.path.trim()) { setError('Path is required.'); return }
+    if (!form.name.trim()) {
+      setError('Name is required.')
+      return
+    }
+    if (!form.path.trim()) {
+      setError('Path is required.')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -47,11 +61,15 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
         path: form.path.trim(),
         is_default: form.is_default,
         is_sync_target: form.is_sync_target,
-        device_name: form.is_sync_target && form.device_name.trim() ? form.device_name.trim() : null,
+        device_name:
+          form.is_sync_target && form.device_name.trim()
+            ? form.device_name.trim()
+            : null,
         auto_organize: form.auto_organize,
-        organize_template: form.auto_organize && form.organize_template.trim()
-          ? form.organize_template.trim()
-          : null,
+        organize_template:
+          form.auto_organize && form.organize_template.trim()
+            ? form.organize_template.trim()
+            : null,
         seq_pad: form.seq_pad,
       }
       if (isEdit) {
@@ -71,10 +89,12 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
       data-testid="shelf-modal"
     >
-      <div className="w-full max-w-lg bg-black border border-white/10 shadow-2xl">
+      <div className="w-full max-w-lg bg-black border border-white/10 shadow-2xl flex flex-col max-h-[calc(100vh-2rem)]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
@@ -85,12 +105,15 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
               {isEdit ? 'Edit Shelf' : 'Add Shelf'}
             </h3>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors">
+          <button
+            onClick={onClose}
+            className="text-white/40 hover:text-white transition-colors"
+          >
             <X size={16} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
           {error && (
             <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 normal-case">
               {error}
@@ -116,13 +139,25 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
             <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
               Path <span className="text-red-400">*</span>
             </label>
-            <input
-              type="text"
-              value={form.path}
-              onChange={(e) => setForm((f) => ({ ...f, path: e.target.value }))}
-              placeholder="e.g., /shelves/library"
-              className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={form.path}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, path: e.target.value }))
+                }
+                placeholder="e.g., /shelves/library"
+                className="flex-1 bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPicker(true)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-2 border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors"
+                title="Browse"
+              >
+                <FolderOpen size={14} />
+              </button>
+            </div>
             <p className="text-[10px] text-white/30 normal-case">
               Absolute path to the directory containing book files.
             </p>
@@ -150,7 +185,9 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
                 <input
                   type="text"
                   value={form.device_name}
-                  onChange={(e) => setForm((f) => ({ ...f, device_name: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, device_name: e.target.value }))
+                  }
                   placeholder="e.g., Kobo Clara 2E"
                   className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
                 />
@@ -171,16 +208,26 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
                   <input
                     type="text"
                     value={form.organize_template}
-                    onChange={(e) => setForm((f) => ({ ...f, organize_template: e.target.value }))}
-                    placeholder="{author}/{series_path}/{sequence} - {title}"
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        organize_template: e.target.value,
+                      }))
+                    }
+                    placeholder="{author}/{series_path}/{sequence| - }{title}"
                     className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
                   />
                   <p className="text-[10px] text-white/30 normal-case">
-                    Tokens: <code className="text-primary/80">{'{author}'}</code>{' '}
+                    Tokens:{' '}
+                    <code className="text-primary/80">{'{author}'}</code>{' '}
                     <code className="text-primary/80">{'{title}'}</code>{' '}
                     <code className="text-primary/80">{'{series_path}'}</code>{' '}
-                    <code className="text-primary/80">{'{sequence}'}</code>{' '}
-                    <code className="text-primary/80">{'{format}'}</code>
+                    <code className="text-primary/80">{'{sequence}'}</code>
+                    {' — or '}
+                    <code className="text-primary/80">{'{sequence| - }'}</code>
+                    {
+                      ' to include the separator only when a sequence exists. Format (epub/pdf) is always appended automatically.'
+                    }
                   </p>
                 </div>
                 <div className="space-y-1.5">
@@ -192,7 +239,12 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
                     min={1}
                     max={6}
                     value={form.seq_pad}
-                    onChange={(e) => setForm((f) => ({ ...f, seq_pad: parseInt(e.target.value, 10) || 2 }))}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        seq_pad: parseInt(e.target.value, 10) || 2,
+                      }))
+                    }
                     className="w-20 bg-black border border-white/10 px-4 py-3 text-sm text-white text-center focus:outline-none focus:border-primary transition-colors"
                   />
                 </div>
@@ -220,6 +272,16 @@ export default function ShelfModal({ shelf, onClose, onSaved }: ShelfModalProps)
           </div>
         </form>
       </div>
+      {showPicker && (
+        <DirPicker
+          initialPath={form.path || undefined}
+          onSelect={(p) => {
+            setForm((f) => ({ ...f, path: p }))
+            setShowPicker(false)
+          }}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
     </div>
   )
 }
