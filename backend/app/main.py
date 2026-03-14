@@ -1,9 +1,15 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import get_engine, Base
+
+# Frontend build output — repo_root/frontend/dist
+_FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -50,6 +56,23 @@ def create_app() -> FastAPI:
     application.include_router(import_.router, prefix="/api")
     application.include_router(kosync.router, prefix="/api")
     application.include_router(reading.router, prefix="/api")
+
+    # Serve built frontend — only when dist exists (skipped in dev / CI)
+    if _FRONTEND_DIST.exists():  # pragma: no cover
+        assets_dir = _FRONTEND_DIST / "assets"
+        if assets_dir.exists():
+            application.mount(
+                "/assets",
+                StaticFiles(directory=str(assets_dir)),
+                name="static-assets",
+            )
+
+        @application.get("/{full_path:path}", include_in_schema=False)
+        async def serve_frontend(full_path: str):  # pragma: no cover
+            file_path = _FRONTEND_DIST / full_path
+            if file_path.is_file():
+                return FileResponse(str(file_path))
+            return FileResponse(str(_FRONTEND_DIST / "index.html"))
 
     return application
 

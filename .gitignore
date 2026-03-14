@@ -12,6 +12,7 @@ build/
 .venv/
 venv/
 env/
+.data/
 
 .coverage
 .coverage.*
@@ -38,3 +39,7 @@ dist/
 Thumbs.db
 
 *.log
+
+# Root-level markdown files (project notes, plans) — except README
+/*.md
+!/README.md

@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html {
+    @apply bg-zinc-900 text-white;
+  }
+
+  html.light {
+    color-scheme: light;
+    @apply bg-gray-50 text-zinc-900;
+  }
+}
