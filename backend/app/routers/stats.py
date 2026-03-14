@@ -80,6 +80,15 @@ async def by_tag(session: AsyncSession = Depends(get_session)) -> list[dict]:
     return await stats_service.get_by_tag(session)
 
 
+@router.get("/recent-sessions")
+async def recent_sessions(
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """Most recent non-dismissed reading sessions with book info."""
+    return await stats_service.get_recent_sessions(session, limit)
+
+
 @router.get("/by-book/{book_id}")
 async def by_book(
     book_id: str,

@@ -509,3 +509,77 @@ async def test_by_book_with_sessions(client: AsyncClient, db_session: AsyncSessi
     assert data["progress"] == 0.75
     assert data["first_session"] is not None
     assert data["last_session"] is not None
+
+
+# ---------------------------------------------------------------------------
+# /api/stats/recent-sessions
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_recent_sessions_empty(client: AsyncClient) -> None:
+    resp = await client.get("/api/stats/recent-sessions")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_recent_sessions_returns_data(
+    client: AsyncClient, db_session: AsyncSession, shelf: Shelf
+) -> None:
+    book = await _make_book(db_session, shelf.id, title="The Hobbit", author="Tolkien")
+    now = datetime.now(timezone.utc)
+    await _make_session(db_session, book.id, now - timedelta(hours=1), duration=3600)
+    await _make_session(db_session, book.id, now - timedelta(hours=2), duration=1800)
+
+    resp = await client.get("/api/stats/recent-sessions")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 2
+    assert data[0]["title"] == "The Hobbit"
+    assert data[0]["author"] == "Tolkien"
+    assert data[0]["duration"] == 3600
+    assert data[0]["book_id"] == str(book.id)
+    assert data[0]["start_time"] is not None
+
+
+@pytest.mark.asyncio
+async def test_recent_sessions_excludes_dismissed(
+    client: AsyncClient, db_session: AsyncSession, shelf: Shelf
+) -> None:
+    book = await _make_book(db_session, shelf.id)
+    await _make_session(db_session, book.id, datetime.now(timezone.utc), dismissed=True)
+
+    resp = await client.get("/api/stats/recent-sessions")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_recent_sessions_limit(
+    client: AsyncClient, db_session: AsyncSession, shelf: Shelf
+) -> None:
+    book = await _make_book(db_session, shelf.id)
+    now = datetime.now(timezone.utc)
+    for i in range(12):
+        await _make_session(db_session, book.id, now - timedelta(hours=i))
+
+    resp = await client.get("/api/stats/recent-sessions?limit=5")
+    assert resp.status_code == 200
+    assert len(resp.json()) == 5
+
+
+@pytest.mark.asyncio
+async def test_recent_sessions_sorted_newest_first(
+    client: AsyncClient, db_session: AsyncSession, shelf: Shelf
+) -> None:
+    b1 = await _make_book(db_session, shelf.id, title="Old Book")
+    b2 = await _make_book(db_session, shelf.id, title="New Book")
+    now = datetime.now(timezone.utc)
+    await _make_session(db_session, b1.id, now - timedelta(days=2))
+    await _make_session(db_session, b2.id, now - timedelta(hours=1))
+
+    resp = await client.get("/api/stats/recent-sessions")
+    data = resp.json()
+    assert data[0]["title"] == "New Book"
+    assert data[1]["title"] == "Old Book"

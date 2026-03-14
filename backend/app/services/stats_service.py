@@ -294,6 +294,33 @@ async def get_by_tag(session: AsyncSession) -> list[dict]:
     ]
 
 
+async def get_recent_sessions(session: AsyncSession, limit: int = 10) -> list[dict]:
+    """Most recent non-dismissed reading sessions with book info."""
+    result = await session.execute(
+        select(ReadingSession, Book)
+        .join(Book, ReadingSession.book_id == Book.id)
+        .where(
+            ReadingSession.dismissed == False,  # noqa: E712
+            ReadingSession.start_time.is_not(None),
+            ReadingSession.duration > 0,
+        )
+        .order_by(ReadingSession.start_time.desc())
+        .limit(limit)
+    )
+    rows = result.all()
+    return [
+        {
+            "book_id": str(book.id),
+            "title": book.title,
+            "author": book.author,
+            "duration": rs.duration,
+            "pages_read": rs.pages_read,
+            "start_time": rs.start_time.isoformat() if rs.start_time else None,
+        }
+        for rs, book in rows
+    ]
+
+
 async def get_book_stats(session: AsyncSession, book_id: str) -> dict | None:
     """Per-book analytics. Returns None if book doesn't exist."""
     book = (

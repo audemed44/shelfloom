@@ -1,16 +1,117 @@
-import { Play, Clock, BookOpen, Trophy } from 'lucide-react'
+import { useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import { Flame, Clock, BookOpen } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
-import type { Book, PaginatedResponse } from '../types'
+import type { PaginatedResponse } from '../types'
+import type { Book } from '../types'
 import type { LucideIcon } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
-// Heatmap
+// Types
 // ---------------------------------------------------------------------------
 
-// Empty 53×7 grid — filled with real data when Phase 4 stats API is ready
+interface StatsOverview {
+  books_owned: number
+  books_read: number
+  total_reading_time_seconds: number
+  total_pages_read: number
+  current_streak_days: number
+}
+
+interface HeatmapEntry {
+  date: string
+  seconds: number
+}
+
+interface TimeSeriesEntry {
+  date: string
+  value: number
+}
+
+interface RecentSession {
+  book_id: string
+  title: string
+  author: string | null
+  duration: number
+  pages_read: number | null
+  start_time: string
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
+function fmtDuration(seconds: number): string {
+  if (!seconds) return '0m'
+  const m = Math.floor(seconds / 60)
+  if (m < 60) return `${m}m`
+  const h = Math.floor(m / 60)
+  const rem = m % 60
+  return rem > 0 ? `${h}h ${rem}m` : `${h}h`
+}
+
+function timeAgo(isoDate: string): string {
+  const seconds = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days}d ago`
+  const months = Math.floor(days / 30)
+  return `${months}mo ago`
+}
+
+const CURRENT_YEAR = new Date().getFullYear()
+
+const WEEK_START = (() => {
+  const now = new Date()
+  const day = now.getUTCDay()
+  const diff = day === 0 ? -6 : 1 - day
+  const d = new Date(now)
+  d.setUTCDate(d.getUTCDate() + diff)
+  d.setUTCHours(0, 0, 0, 0)
+  return d.toISOString()
+})()
+
+// ---------------------------------------------------------------------------
+// Heatmap grid builder
+// ---------------------------------------------------------------------------
+
 const EMPTY_HEATMAP: number[][] = Array.from({ length: 53 }, () =>
   Array(7).fill(0)
 )
+
+function buildHeatmapGrid(data: HeatmapEntry[]): number[][] {
+  if (!data.length) return EMPTY_HEATMAP
+  const maxSec = Math.max(...data.map((d) => d.seconds))
+  if (!maxSec) return EMPTY_HEATMAP
+
+  const dayMap = new Map<string, number>()
+  for (const d of data) {
+    dayMap.set(d.date, d.seconds / maxSec)
+  }
+
+  const year = parseInt(data[0].date.slice(0, 4), 10)
+  const jan1 = new Date(year, 0, 1)
+  const startDay = new Date(jan1)
+  startDay.setDate(jan1.getDate() - jan1.getDay()) // back to Sunday
+
+  const weeks: number[][] = []
+  const cursor = new Date(startDay)
+
+  while (weeks.length < 53) {
+    const week: number[] = []
+    for (let d = 0; d < 7; d++) {
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
+      week.push(dayMap.get(key) ?? 0)
+      cursor.setDate(cursor.getDate() + 1)
+    }
+    weeks.push(week)
+  }
+  return weeks
+}
 
 function cellClass(level: number): string {
   if (!level) return 'bg-white/5 border border-white/10'
@@ -20,15 +121,16 @@ function cellClass(level: number): string {
   return 'bg-primary'
 }
 
+// ---------------------------------------------------------------------------
+// Heatmap
+// ---------------------------------------------------------------------------
+
 interface ReadingHeatmapProps {
-  weeks?: number[][]
-  streak?: number
+  weeks: number[][]
+  streak: number
 }
 
-function ReadingHeatmap({
-  weeks = EMPTY_HEATMAP,
-  streak = 0,
-}: ReadingHeatmapProps) {
+function ReadingHeatmap({ weeks, streak }: ReadingHeatmapProps) {
   const isEmpty = weeks.every((w) => w.every((v) => !v))
   return (
     <div className="bg-white/5 border border-white/10 p-8 h-full">
@@ -38,15 +140,16 @@ function ReadingHeatmap({
             Reading Activity
           </h4>
           <p className="text-white/40 text-xs font-bold tracking-wider mt-1">
-            Yearly Activity Heatmap
+            {CURRENT_YEAR} Activity Heatmap
           </p>
         </div>
-        <div className="bg-primary text-white text-[10px] font-black px-3 py-1 tracking-widest">
+        <div className="bg-primary text-white text-[10px] font-black px-3 py-1 tracking-widest flex items-center gap-1.5">
+          <Flame size={11} />
           {streak > 0 ? `${streak} Day Streak` : 'No Streak Yet'}
         </div>
       </div>
 
-      <div className="heatmap-container overflow-x-auto pb-4">
+      <div className="overflow-x-auto pb-4">
         <div className="inline-grid grid-rows-7 grid-flow-col gap-1.5 min-w-max">
           {weeks.flatMap((week, wi) =>
             week.map((level, di) => (
@@ -62,11 +165,10 @@ function ReadingHeatmap({
       <div className="flex items-center justify-between mt-6">
         {isEmpty ? (
           <p className="text-white/40 text-xs font-medium italic normal-case">
-            No reading data yet. Sync your KOReader or start reading to see
-            activity.
+            No reading data yet. Sync your KOReader to see activity.
           </p>
         ) : (
-          <div /> /* spacer */
+          <div />
         )}
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[10px] text-white/40 font-black">Less</span>
@@ -90,16 +192,17 @@ interface StatCardProps {
   icon: LucideIcon
   label: string
   value: string | null
+  sub?: string
 }
 
-function StatCard({ icon: Icon, label, value }: StatCardProps) {
+function StatCard({ icon: Icon, label, value, sub }: StatCardProps) {
   const empty = !value
   return (
     <div className="bg-white/5 border border-white/10 p-6 flex items-center gap-6">
       <div className="w-12 h-12 bg-primary/20 flex items-center justify-center text-primary shrink-0">
         <Icon size={20} />
       </div>
-      <div>
+      <div className="min-w-0">
         <p className="text-white/40 text-[10px] font-black tracking-widest">
           {label}
         </p>
@@ -108,118 +211,107 @@ function StatCard({ icon: Icon, label, value }: StatCardProps) {
         >
           {value ?? '—'}
         </h5>
+        {sub && (
+          <p className="text-[10px] text-white/30 normal-case mt-0.5">{sub}</p>
+        )}
       </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Currently Reading card
+// Currently reading card
 // ---------------------------------------------------------------------------
 
-interface CurrentlyReadingBook {
-  id: number
-  title: string
-  author: string | null
-  cover_url?: string
-  reading_progress?: number
-  current_page?: number
-  page_count?: number | null
-}
-
-interface CurrentlyReadingCardProps {
-  book: CurrentlyReadingBook | null
-}
-
-function CurrentlyReadingCard({ book }: CurrentlyReadingCardProps) {
-  if (!book) {
-    return (
-      <div className="bg-white/5 border border-white/10 p-8 relative">
-        <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <BookOpen size={40} className="mx-auto mb-3 text-white/20" />
-            <p className="text-sm font-black tracking-widest text-white/30">
-              Nothing In Progress
-            </p>
-            <p className="text-xs mt-1 text-white/20 normal-case">
-              Open the library to start reading
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+function CurrentlyReadingCard({
+  book,
+}: {
+  book: Book & { reading_progress?: number }
+}) {
   const progress = book.reading_progress ?? 0
-  const currentPage = book.current_page ?? 0
-  const totalPages = book.page_count ?? 0
-  const pageLabel =
-    currentPage > 0 && totalPages > 0
-      ? `${currentPage} / ${totalPages} Pages`
-      : `${Math.round(progress)}% Complete`
-
   return (
-    <div className="bg-white/5 border border-white/10 p-8 flex flex-col md:flex-row gap-8 items-center relative overflow-hidden">
+    <Link
+      to={`/books/${book.id}`}
+      className="bg-white/5 border border-white/10 p-5 flex gap-4 items-start relative overflow-hidden hover:border-white/20 transition-colors group"
+      data-testid="currently-reading-card"
+    >
       <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-
-      {/* Cover */}
-      <div className="w-48 h-72 flex-shrink-0 bg-white/10 shadow-2xl relative">
-        {book.cover_url ? (
-          <img
-            src={book.cover_url}
-            alt={book.title}
-            className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-end p-3 bg-gradient-to-br from-primary/20 to-transparent">
-            <p className="text-[10px] text-white/40 leading-tight normal-case">
-              {book.title}
-            </p>
-          </div>
-        )}
+      <div className="w-16 h-24 flex-shrink-0 bg-white/10 overflow-hidden">
+        <img
+          src={`/api/books/${book.id}/cover`}
+          alt={book.title}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+          }}
+        />
       </div>
-
-      {/* Info */}
-      <div className="flex-1 space-y-6">
-        <div>
-          <span className="text-primary text-xs font-black tracking-[0.3em] mb-2 block">
-            Currently Reading
-          </span>
-          <h3 className="text-4xl lg:text-5xl font-black tracking-tighter text-white leading-none">
-            {book.title}
-          </h3>
-          <p className="text-white/60 text-xl font-medium mt-2 normal-case">
+      <div className="flex-1 min-w-0">
+        <p className="text-primary text-[10px] font-black tracking-widest mb-1">
+          Currently Reading
+        </p>
+        <h3 className="text-sm font-black tracking-tight text-white leading-snug truncate">
+          {book.title}
+        </h3>
+        {book.author && (
+          <p className="text-white/50 text-xs mt-0.5 normal-case truncate">
             {book.author}
           </p>
-        </div>
-
-        <div className="space-y-3">
-          <div className="flex justify-between items-end">
-            <span className="text-white text-sm font-bold tracking-widest">
-              {pageLabel}
-            </span>
-            <span className="text-primary text-3xl font-black leading-none">
-              {Math.round(progress)}%
-            </span>
-          </div>
-          <div className="h-4 bg-white/10 w-full overflow-hidden">
+        )}
+        <div className="mt-3 space-y-1">
+          <span className="text-[10px] text-white/40 font-black">
+            {Math.round(progress)}% Complete
+          </span>
+          <div className="h-1 bg-white/10 w-full overflow-hidden">
             <div
-              className="h-full bg-primary"
+              className="h-full bg-primary transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
+      </div>
+    </Link>
+  )
+}
 
-        <div className="flex gap-4 pt-2">
-          <button className="bg-primary hover:bg-blue-600 text-white font-black text-sm tracking-widest px-8 py-4 flex items-center gap-3 transition-colors">
-            <Play size={16} fill="currentColor" />
-            Resume Reading
-          </button>
-          <button className="border border-white/20 hover:bg-white/10 text-white font-black text-sm tracking-widest px-8 py-4 transition-colors">
-            Details
-          </button>
-        </div>
+// ---------------------------------------------------------------------------
+// Activity feed
+// ---------------------------------------------------------------------------
+
+function ActivityFeed({ sessions }: { sessions: RecentSession[] }) {
+  return (
+    <div className="bg-white/5 border border-white/10 p-6">
+      <h4 className="text-xs font-black tracking-widest text-white mb-4">
+        Recent Activity
+      </h4>
+      <div>
+        {sessions.map((s, i) => (
+          <Link
+            key={i}
+            to={`/books/${s.book_id}`}
+            className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0 hover:text-primary transition-colors group"
+            data-testid="activity-item"
+          >
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-white/80 normal-case truncate group-hover:text-primary transition-colors">
+                {s.title}
+              </p>
+              {s.author && (
+                <p className="text-[10px] text-white/30 normal-case truncate">
+                  {s.author}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-4 shrink-0 ml-4">
+              <span className="text-xs font-black text-white/60">
+                {fmtDuration(s.duration)}
+              </span>
+              <span className="text-[10px] text-white/30 font-bold w-14 text-right">
+                {timeAgo(s.start_time)}
+              </span>
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   )
@@ -230,33 +322,36 @@ function CurrentlyReadingCard({ book }: CurrentlyReadingCardProps) {
 // ---------------------------------------------------------------------------
 
 export default function Home() {
-  // Books list — used to find an in-progress book
   const { data: booksData } = useApi<
-    PaginatedResponse<
-      Book & { reading_progress?: number; current_page?: number }
-    >
-  >('/api/books?per_page=50')
+    PaginatedResponse<Book & { reading_progress?: number }>
+  >('/api/books?status=reading&sort=last_read&per_page=5')
 
-  // Find the most recently active in-progress book
-  const currentlyReading =
-    booksData?.items?.find(
-      (b) => (b.reading_progress ?? 0) > 0 && (b.reading_progress ?? 0) < 100
-    ) ?? null
+  const { data: overview } = useApi<StatsOverview>('/api/stats/overview')
 
-  // Stats require Phase 4 (/api/stats/overview) — show empty until then
-  const stats: {
-    timeRead: string | null
-    pages: string | null
-    completion: string | null
-  } = {
-    timeRead: null,
-    pages: null,
-    completion: null,
-  }
+  const { data: heatmapData } = useApi<HeatmapEntry[]>(
+    `/api/stats/heatmap?year=${CURRENT_YEAR}`
+  )
 
-  // Heatmap + streak require Phase 4 (/api/stats/heatmap)
-  const heatmapWeeks = EMPTY_HEATMAP
-  const streak = 0
+  const { data: weekTimeData } = useApi<TimeSeriesEntry[]>(
+    `/api/stats/reading-time?granularity=day&from=${encodeURIComponent(WEEK_START)}`
+  )
+
+  const { data: weekPagesData } = useApi<TimeSeriesEntry[]>(
+    `/api/stats/pages?granularity=day&from=${encodeURIComponent(WEEK_START)}`
+  )
+
+  const { data: recentSessions } = useApi<RecentSession[]>(
+    '/api/stats/recent-sessions?limit=10'
+  )
+
+  const currentlyReading = booksData?.items ?? []
+  const streak = overview?.current_streak_days ?? 0
+  const heatmapWeeks = useMemo(
+    () => buildHeatmapGrid(heatmapData ?? []),
+    [heatmapData]
+  )
+  const thisWeekSeconds = weekTimeData?.reduce((a, b) => a + b.value, 0) ?? 0
+  const thisWeekPages = weekPagesData?.reduce((a, b) => a + b.value, 0) ?? 0
 
   return (
     <div className="p-6 lg:p-12">
@@ -273,7 +368,26 @@ export default function Home() {
       <div className="grid grid-cols-12 gap-8">
         {/* Currently Reading */}
         <section className="col-span-12">
-          <CurrentlyReadingCard book={currentlyReading} />
+          {currentlyReading.length === 0 ? (
+            <div className="bg-white/5 border border-white/10 p-8 relative flex items-center justify-center py-12">
+              <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+              <div className="text-center">
+                <BookOpen size={40} className="mx-auto mb-3 text-white/20" />
+                <p className="text-sm font-black tracking-widest text-white/30">
+                  Nothing In Progress
+                </p>
+                <p className="text-xs mt-1 text-white/20 normal-case">
+                  Open the library to start reading
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {currentlyReading.map((book) => (
+                <CurrentlyReadingCard key={book.id} book={book} />
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Heatmap */}
@@ -283,25 +397,49 @@ export default function Home() {
 
         {/* Stat cards */}
         <section className="col-span-12 lg:col-span-4 grid grid-cols-1 gap-4">
-          <StatCard icon={Clock} label="Time Read" value={stats.timeRead} />
-          <StatCard icon={BookOpen} label="Volume" value={stats.pages} />
-          <StatCard icon={Trophy} label="Completion" value={stats.completion} />
+          <StatCard
+            icon={Clock}
+            label="This Week"
+            value={thisWeekSeconds > 0 ? fmtDuration(thisWeekSeconds) : null}
+            sub="reading time"
+          />
+          <StatCard
+            icon={BookOpen}
+            label="This Week"
+            value={thisWeekPages > 0 ? String(thisWeekPages) : null}
+            sub="pages read"
+          />
+          <StatCard
+            icon={Flame}
+            label="Current Streak"
+            value={streak > 0 ? `${streak} days` : null}
+            sub={streak > 0 ? 'keep it up!' : 'start reading today'}
+          />
         </section>
+
+        {/* Recent activity */}
+        {recentSessions && recentSessions.length > 0 && (
+          <section className="col-span-12">
+            <ActivityFeed sessions={recentSessions} />
+          </section>
+        )}
 
         {/* Status row */}
         <section className="col-span-12">
           <div className="border-t-2 border-primary pt-4 flex flex-wrap justify-between items-center gap-4">
             <div className="flex gap-8">
               <span className="text-[10px] font-black tracking-tighter text-white/40">
-                Version 0.1.0-Stable
+                {overview
+                  ? `${overview.books_owned} books in library`
+                  : 'Loading…'}
               </span>
               <span className="text-[10px] font-black tracking-tighter text-white/40">
-                Last Synced: Online
+                {overview ? `${overview.books_read} completed` : ''}
               </span>
             </div>
             <div className="text-[10px] font-black tracking-widest text-primary flex items-center gap-2">
               <span className="block w-2 h-2 rounded-full bg-primary animate-pulse" />
-              Live Analytics Active
+              Live Analytics
             </div>
           </div>
         </section>
