@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class SeriesCreate(BaseModel):
@@ -35,6 +35,10 @@ class BookSeriesEntry(BaseModel):
     sequence: float | None = None
 
 
+class AddBookToSeriesBody(BaseModel):
+    sequence: float | None = None
+
+
 class ReadingOrderCreate(BaseModel):
     name: str
     series_id: int
@@ -62,8 +66,40 @@ class ReadingOrderEntryResponse(BaseModel):
     note: str | None
 
 
+class ReadingOrderEntryWithBookResponse(BaseModel):
+    """Entry response that includes the book's title, author, format, and cover."""
+
+    id: int
+    reading_order_id: int
+    book_id: str
+    position: int
+    note: str | None = None
+    title: str | None = None
+    author: str | None = None
+    format: str | None = None
+    cover_path: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def extract_book(cls, v: object) -> object:
+        book = getattr(v, "book", None)
+        if book is not None:
+            return {
+                "id": v.id,  # type: ignore[union-attr]
+                "reading_order_id": v.reading_order_id,  # type: ignore[union-attr]
+                "book_id": v.book_id,  # type: ignore[union-attr]
+                "position": v.position,  # type: ignore[union-attr]
+                "note": v.note,  # type: ignore[union-attr]
+                "title": book.title,
+                "author": book.author,
+                "format": book.format,
+                "cover_path": book.cover_path,
+            }
+        return v
+
+
 class ReadingOrderDetailResponse(ReadingOrderResponse):
-    entries: list[ReadingOrderEntryResponse] = []
+    entries: list[ReadingOrderEntryWithBookResponse] = []
 
 
 class SeriesBookItem(BaseModel):

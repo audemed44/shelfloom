@@ -530,3 +530,89 @@ async def test_get_reading_order_includes_entries(client, db_session, tmp_path):
     data = resp.json()
     assert "entries" in data
     assert len(data["entries"]) == 2
+    # Book info should be embedded in each entry
+    entry = data["entries"][0]
+    assert "title" in entry
+    assert entry["title"] is not None
+
+
+async def test_reading_order_entries_include_book_info(client, db_session, tmp_path):
+    """Entries returned by both the detail endpoint and the series list carry book metadata."""
+    shelf = await _create_shelf(db_session, tmp_path)
+    book = await _create_book(db_session, shelf.id, "Embedded Title")
+    series = (await client.post("/api/series", json={"name": "S"})).json()
+    await client.post(
+        f"/api/series/{series['id']}/books/{book.id}", json={"sequence": 1}
+    )
+    ro = (
+        await client.post(
+            "/api/reading-orders", json={"name": "R", "series_id": series["id"]}
+        )
+    ).json()
+
+    # Detail endpoint
+    detail = (await client.get(f"/api/reading-orders/{ro['id']}")).json()
+    assert detail["entries"][0]["title"] == "Embedded Title"
+    assert detail["entries"][0]["format"] == "epub"
+
+    # List endpoint
+    orders = (await client.get(f"/api/series/{series['id']}/reading-orders")).json()
+    assert orders[0]["entries"][0]["title"] == "Embedded Title"
+
+
+async def test_reading_order_prepopulates_from_parent_series(client, db_session, tmp_path):
+    """Reading order on a parent series collects books from all descendant series."""
+    shelf = await _create_shelf(db_session, tmp_path)
+
+    # Parent series
+    parent = (await client.post("/api/series", json={"name": "Cosmere"})).json()
+
+    # Child series A — Stormlight Archive
+    sa = (
+        await client.post("/api/series", json={"name": "Stormlight", "parent_id": parent["id"]})
+    ).json()
+    # Child series B — Mistborn
+    mb = (
+        await client.post("/api/series", json={"name": "Mistborn", "parent_id": parent["id"]})
+    ).json()
+
+    # Books in Stormlight (seq 1, 2)
+    sa1 = await _create_book(db_session, shelf.id, "Way of Kings")
+    sa2 = await _create_book(db_session, shelf.id, "Words of Radiance")
+    await client.post(f"/api/series/{sa['id']}/books/{sa1.id}", json={"sequence": 1})
+    await client.post(f"/api/series/{sa['id']}/books/{sa2.id}", json={"sequence": 2})
+
+    # Books in Mistborn (seq 1, 2)
+    mb1 = await _create_book(db_session, shelf.id, "Final Empire")
+    mb2 = await _create_book(db_session, shelf.id, "Well of Ascension")
+    await client.post(f"/api/series/{mb['id']}/books/{mb1.id}", json={"sequence": 1})
+    await client.post(f"/api/series/{mb['id']}/books/{mb2.id}", json={"sequence": 2})
+
+    # Create reading order on the parent — should get all 4 books
+    ro = (
+        await client.post(
+            "/api/reading-orders", json={"name": "Full Cosmere", "series_id": parent["id"]}
+        )
+    ).json()
+
+    detail = (await client.get(f"/api/reading-orders/{ro['id']}")).json()
+    entries = sorted(detail["entries"], key=lambda e: e["position"])
+    assert len(entries) == 4
+
+    # First two entries are Stormlight (child series sorted before Mistborn alphabetically
+    # by name: "Mistborn" < "Stormlight" — so Mistborn comes first)
+    titles = [e["title"] for e in entries]
+    # Both sub-series books should all be present
+    assert "Way of Kings" in titles
+    assert "Words of Radiance" in titles
+    assert "Final Empire" in titles
+    assert "Well of Ascension" in titles
+    # Within each sub-series, sequence order is preserved
+    mistborn_positions = {
+        e["title"]: e["position"] for e in entries if e["title"] in ("Final Empire", "Well of Ascension")
+    }
+    assert mistborn_positions["Final Empire"] < mistborn_positions["Well of Ascension"]
+    stormlight_positions = {
+        e["title"]: e["position"] for e in entries if e["title"] in ("Way of Kings", "Words of Radiance")
+    }
+    assert stormlight_positions["Way of Kings"] < stormlight_positions["Words of Radiance"]

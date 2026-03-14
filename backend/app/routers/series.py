@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.schemas.series import (
+    AddBookToSeriesBody,
     BookSeriesEntry,
     ReadingOrderCreate,
     ReadingOrderDetailResponse,
@@ -109,8 +110,12 @@ async def add_book_endpoint(
     series_id: int,
     book_id: str,
     sequence: float | None = None,
+    body: AddBookToSeriesBody | None = None,
     session: AsyncSession = Depends(get_session),
 ):
+    # Body takes precedence over query param when provided
+    if body is not None and body.sequence is not None:
+        sequence = body.sequence
     try:
         bs = await add_book_to_series_by_id(session, series_id, book_id, sequence)
     except (SeriesNotFound, BookNotFound) as e:

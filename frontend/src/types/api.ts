@@ -140,6 +140,10 @@ export interface ReadingOrderEntry {
   book_id: string
   position: number
   note: string | null
+  title: string | null
+  author: string | null
+  format: string | null
+  cover_path: string | null
 }
 
 export interface SeriesBook {

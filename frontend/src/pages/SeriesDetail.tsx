@@ -12,7 +12,12 @@ import {
 import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
 import SeriesModal from '../components/series/SeriesModal'
-import type { SeriesWithCount, SeriesBook, ReadingOrder } from '../types/api'
+import type {
+  SeriesWithCount,
+  SeriesBook,
+  ReadingOrder,
+  ReadingOrderEntry,
+} from '../types/api'
 
 interface SeriesDetailData {
   id: number
@@ -56,6 +61,10 @@ export default function SeriesDetail() {
   const [dragOver, setDragOver] = useState<string | null>(null)
   const [localBooks, setLocalBooks] = useState<SeriesBook[] | null>(null)
   const [orderDirty, setOrderDirty] = useState(false)
+  // Reading order entry reorder state
+  const [localEntries, setLocalEntries] = useState<ReadingOrderEntry[]>([])
+  const [entriesDirty, setEntriesDirty] = useState(false)
+  const [entryDragOver, setEntryDragOver] = useState<number | null>(null)
   const [, setRefreshKey] = useState(0)
 
   // sync localBooks when books load
@@ -65,6 +74,18 @@ export default function SeriesDetail() {
       setOrderDirty(false)
     }
   }, [books])
+
+  // sync localEntries when active reading order changes
+  useEffect(() => {
+    if (activeOrderId === null) return
+    const order = (readingOrders ?? []).find((o) => o.id === activeOrderId)
+    if (order) {
+      setLocalEntries(
+        [...order.entries].sort((a, b) => a.position - b.position)
+      )
+      setEntriesDirty(false)
+    }
+  }, [activeOrderId, readingOrders])
 
   // load reading progress
   useEffect(() => {
@@ -165,6 +186,48 @@ export default function SeriesDetail() {
     if (books) setLocalBooks(books)
     setOrderDirty(false)
   }, [books])
+
+  // Reading order entry drag-and-drop
+  const handleEntryDragStart = (e: React.DragEvent, entryId: number) => {
+    e.dataTransfer.setData('entryId', String(entryId))
+  }
+
+  const handleEntryDrop = (e: React.DragEvent, targetEntryId: number) => {
+    e.preventDefault()
+    setEntryDragOver(null)
+    const draggedId = parseInt(e.dataTransfer.getData('entryId'), 10)
+    if (draggedId === targetEntryId) return
+
+    const fromIdx = localEntries.findIndex((en) => en.id === draggedId)
+    const toIdx = localEntries.findIndex((en) => en.id === targetEntryId)
+    if (fromIdx === -1 || toIdx === -1) return
+
+    const reordered = [...localEntries]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    setLocalEntries(reordered.map((en, i) => ({ ...en, position: i + 1 })))
+    setEntriesDirty(true)
+  }
+
+  const handleSaveEntries = useCallback(async () => {
+    if (!activeOrderId) return
+    await api.patch(
+      `/api/reading-orders/${activeOrderId}/entries/reorder`,
+      localEntries.map((en) => ({ id: en.id, position: en.position }))
+    )
+    setEntriesDirty(false)
+    setRefreshKey((k) => k + 1)
+  }, [activeOrderId, localEntries])
+
+  const handleDiscardEntries = useCallback(() => {
+    const order = (readingOrders ?? []).find((o) => o.id === activeOrderId)
+    if (order) {
+      setLocalEntries(
+        [...order.entries].sort((a, b) => a.position - b.position)
+      )
+      setEntriesDirty(false)
+    }
+  }, [activeOrderId, readingOrders])
 
   const displayBooks = localBooks ?? []
   const activeOrder = (readingOrders ?? []).find((o) => o.id === activeOrderId)
@@ -533,76 +596,104 @@ export default function SeriesDetail() {
                     <h4 className="text-xs font-bold uppercase tracking-widest text-white/40">
                       {activeOrder.name}
                     </h4>
-                    <span className="text-xs text-white/30 normal-case">
-                      {activeOrder.entries.length}{' '}
-                      {activeOrder.entries.length === 1 ? 'entry' : 'entries'}
-                    </span>
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs text-white/30 normal-case">
+                        {localEntries.length}{' '}
+                        {localEntries.length === 1 ? 'entry' : 'entries'}
+                      </span>
+                      {localEntries.length > 0 && (
+                        <span className="text-xs text-white/30 italic normal-case">
+                          Drag handles to reorder
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  {activeOrder.entries.length === 0 ? (
+                  {localEntries.length === 0 ? (
                     <p className="text-xs text-white/30 normal-case py-4">
                       No entries in this reading order yet.
                     </p>
                   ) : (
-                    [...activeOrder.entries]
-                      .sort((a, b) => a.position - b.position)
-                      .map((entry) => {
-                        const book = displayBooks.find(
-                          (b) => b.book_id === entry.book_id
-                        )
-                        return (
-                          <div
-                            key={entry.id}
-                            className="border border-white/10 p-4 rounded-xl flex items-center gap-4 group hover:border-white/20 transition-all shadow-sm"
-                          >
-                            {/* Cover thumbnail */}
-                            <div className="w-12 h-16 bg-white/5 rounded overflow-hidden flex-shrink-0 border border-white/10">
-                              {book && (
-                                <img
-                                  src={`/api/books/${entry.book_id}/cover`}
-                                  alt={book.title}
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    const t = e.target as HTMLImageElement
-                                    t.style.display = 'none'
-                                  }}
-                                />
-                              )}
-                            </div>
+                    localEntries.map((entry) => (
+                      <div
+                        key={entry.id}
+                        draggable
+                        onDragStart={(e) => handleEntryDragStart(e, entry.id)}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                          setEntryDragOver(entry.id)
+                        }}
+                        onDragLeave={() => setEntryDragOver(null)}
+                        onDrop={(e) => handleEntryDrop(e, entry.id)}
+                        className={`border border-white/10 p-4 rounded-xl flex items-center gap-4 group transition-all shadow-sm ${
+                          entryDragOver === entry.id
+                            ? 'bg-primary/10 border-primary/50'
+                            : 'hover:border-white/20'
+                        }`}
+                      >
+                        {/* Drag handle */}
+                        <div className="cursor-grab active:cursor-grabbing text-white/20 group-hover:text-primary transition-colors">
+                          <GripVertical size={20} />
+                        </div>
 
-                            {/* Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                {book?.format && (
-                                  <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded uppercase">
-                                    {book.format}
-                                  </span>
-                                )}
-                                <Link
-                                  to={`/books/${entry.book_id}`}
-                                  className="text-sm font-bold text-white/90 normal-case hover:text-white transition-colors truncate"
-                                >
-                                  {book ? book.title : entry.book_id}
-                                </Link>
-                              </div>
-                              {entry.note && (
-                                <p className="text-xs text-white/40 mt-1 normal-case">
-                                  {entry.note}
-                                </p>
-                              )}
-                            </div>
+                        {/* Cover thumbnail */}
+                        <div className="w-12 h-16 bg-white/5 rounded overflow-hidden flex-shrink-0 border border-white/10">
+                          <img
+                            src={`/api/books/${entry.book_id}/cover`}
+                            alt={entry.title ?? ''}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const t = e.target as HTMLImageElement
+                              t.style.display = 'none'
+                            }}
+                          />
+                        </div>
 
-                            {/* Position */}
-                            <div className="text-right pr-2">
-                              <span className="block text-[10px] uppercase text-white/40 font-bold">
-                                Position
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            {entry.format && (
+                              <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded uppercase">
+                                {entry.format}
                               </span>
-                              <span className="text-sm font-mono font-bold">
-                                {String(entry.position).padStart(2, '0')}
-                              </span>
-                            </div>
+                            )}
+                            <Link
+                              to={`/books/${entry.book_id}`}
+                              className="text-sm font-bold text-white/90 normal-case hover:text-white transition-colors truncate"
+                            >
+                              {entry.title ?? entry.book_id}
+                            </Link>
                           </div>
-                        )
-                      })
+                          {entry.author && (
+                            <p className="text-xs text-white/40 mt-1 normal-case">
+                              {entry.author}
+                            </p>
+                          )}
+                          {entry.note && (
+                            <p className="text-xs text-white/30 mt-0.5 normal-case italic">
+                              {entry.note}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Position */}
+                        <div className="flex items-center gap-6 pr-2">
+                          <div className="text-right">
+                            <span className="block text-[10px] uppercase text-white/40 font-bold">
+                              Position
+                            </span>
+                            <span className="text-sm font-mono font-bold">
+                              {String(entry.position).padStart(2, '0')}
+                            </span>
+                          </div>
+                          <Link
+                            to={`/books/${entry.book_id}`}
+                            className="text-white/30 hover:text-white transition-colors"
+                          >
+                            <MoreVertical size={16} />
+                          </Link>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </>
               )}
@@ -642,17 +733,21 @@ export default function SeriesDetail() {
         </div>
       </div>
 
-      {/* Action Bar Footer — shown when order has unsaved changes */}
-      {orderDirty && (
+      {/* Action Bar Footer — shown when series order or reading order has unsaved changes */}
+      {(orderDirty || entriesDirty) && (
         <footer className="px-8 py-4 border-t border-white/10 flex justify-end gap-3">
           <button
-            onClick={handleDiscardOrder}
+            onClick={
+              activeOrderId === null ? handleDiscardOrder : handleDiscardEntries
+            }
             className="px-6 py-2 text-sm font-bold text-white/50 hover:text-white transition-colors normal-case"
           >
             Discard Changes
           </button>
           <button
-            onClick={handleSaveOrder}
+            onClick={
+              activeOrderId === null ? handleSaveOrder : handleSaveEntries
+            }
             className="px-8 py-2 bg-primary text-white text-sm font-bold rounded-lg shadow-lg shadow-primary/30 hover:brightness-110 transition-all normal-case"
           >
             Save Order

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, nullslast, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.models.book import Book
 from app.models.series import BookSeries, ReadingOrder, ReadingOrderEntry, Series
@@ -173,26 +173,56 @@ async def purge_empty_series(session: AsyncSession) -> list[str]:
 # ── reading orders ────────────────────────────────────────────────────────────
 
 
+async def _collect_books_in_tree(session: AsyncSession, series_id: int) -> list[str]:
+    """Return all book_ids reachable from this series (depth-first, ordered by sequence).
+
+    Direct books come first (sorted by sequence), then each child sub-series
+    (sorted by sort_order / name) recursively.  Deduplication happens in the caller.
+    """
+    direct = (
+        await session.execute(
+            select(BookSeries)
+            .where(BookSeries.series_id == series_id)
+            .order_by(nullslast(BookSeries.sequence), BookSeries.book_id)
+        )
+    ).scalars().all()
+    book_ids: list[str] = [bs.book_id for bs in direct]
+
+    children = (
+        await session.execute(
+            select(Series)
+            .where(Series.parent_id == series_id)
+            .order_by(Series.sort_order, Series.name)
+        )
+    ).scalars().all()
+    for child in children:
+        book_ids.extend(await _collect_books_in_tree(session, child.id))
+
+    return book_ids
+
+
 async def create_reading_order(session: AsyncSession, data: ReadingOrderCreate) -> ReadingOrder:
     await get_series(session, data.series_id)
     ro = ReadingOrder(name=data.name, series_id=data.series_id)
     session.add(ro)
     await session.flush()  # assign ro.id so entries can reference it
 
-    # Pre-populate with all books in the series, ordered by sequence
-    from sqlalchemy import nullslast
+    # Pre-populate with all books reachable from the series tree, ordered
+    # depth-first (direct books first, then each child sub-series in order).
+    raw_ids = await _collect_books_in_tree(session, data.series_id)
+    # Deduplicate while preserving first-seen order
+    seen: set[str] = set()
+    unique_ids: list[str] = []
+    for bid in raw_ids:
+        if bid not in seen:
+            seen.add(bid)
+            unique_ids.append(bid)
 
-    result = await session.execute(
-        select(BookSeries)
-        .where(BookSeries.series_id == data.series_id)
-        .order_by(nullslast(BookSeries.sequence), BookSeries.book_id)
-    )
-    book_entries = result.scalars().all()
-    for position, bs in enumerate(book_entries, start=1):
+    for position, book_id in enumerate(unique_ids, start=1):
         session.add(
             ReadingOrderEntry(
                 reading_order_id=ro.id,
-                book_id=bs.book_id,
+                book_id=book_id,
                 position=position,
             )
         )
@@ -206,7 +236,7 @@ async def get_reading_order(session: AsyncSession, order_id: int) -> ReadingOrde
     result = await session.execute(
         select(ReadingOrder)
         .where(ReadingOrder.id == order_id)
-        .options(selectinload(ReadingOrder.entries))
+        .options(selectinload(ReadingOrder.entries).joinedload(ReadingOrderEntry.book))
     )
     ro = result.scalar_one_or_none()
     if ro is None:
@@ -246,7 +276,7 @@ async def list_reading_orders_for_series(
     result = await session.execute(
         select(ReadingOrder)
         .where(ReadingOrder.series_id == series_id)
-        .options(selectinload(ReadingOrder.entries))
+        .options(selectinload(ReadingOrder.entries).joinedload(ReadingOrderEntry.book))
         .order_by(ReadingOrder.name)
     )
     return result.scalars().all()  # type: ignore[return-value]
