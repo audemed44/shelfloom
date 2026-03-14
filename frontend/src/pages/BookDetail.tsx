@@ -1,22 +1,22 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   Download,
   Edit2,
   Trash2,
-  ChevronLeft,
   ChevronRight,
   BookOpen,
   Clock,
-  Highlighter,
   AlertTriangle,
+  CheckCircle2,
+  ArrowRight,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import EditBookModal from '../components/book-detail/EditBookModal'
 import DeleteBookModal from '../components/book-detail/DeleteBookModal'
-import AssignSeriesModal from '../components/series/AssignSeriesModal'
 import type { BookDetail, Shelf, ReadingSession, Highlight } from '../types'
+import type { SeriesBook } from '../types/api'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -33,38 +33,8 @@ function fmtDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-// ── sub-components ─────────────────────────────────────────────────────────────
+// ── extended session display type ───────────────────────────────────────────────
 
-interface BadgeProps {
-  children: React.ReactNode
-  className?: string
-}
-
-function Badge({ children, className = '' }: BadgeProps) {
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 text-[10px] font-black tracking-widest uppercase border rounded ${className}`}>
-      {children}
-    </span>
-  )
-}
-
-interface ProgressBarProps {
-  percent: number | null
-}
-
-function ProgressBar({ percent }: ProgressBarProps) {
-  const pct = Math.min(100, Math.max(0, percent ?? 0))
-  return (
-    <div className="relative h-1.5 bg-white/10 rounded-full overflow-hidden">
-      <div
-        className="absolute left-0 top-0 h-full bg-primary transition-all"
-        style={{ width: `${pct}%` }}
-      />
-    </div>
-  )
-}
-
-// Extended session type for display (backend may include extra fields)
 interface SessionDisplay extends ReadingSession {
   start_time?: string
   device?: string
@@ -72,16 +42,16 @@ interface SessionDisplay extends ReadingSession {
   duration?: number
 }
 
-interface SessionRowProps {
-  session: SessionDisplay
-}
+// ── sub-components ─────────────────────────────────────────────────────────────
 
-function SessionRow({ session }: SessionRowProps) {
+function SessionRow({ session }: { session: SessionDisplay }) {
   return (
     <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
       <div className="flex items-center gap-3">
         <Clock size={13} className="text-white/30 shrink-0" />
-        <span className="text-xs text-white/60 normal-case">{fmtDate(session.start_time)}</span>
+        <span className="text-xs text-white/60 normal-case">
+          {fmtDate(session.start_time ?? session.started_at)}
+        </span>
         {session.device && (
           <span className="text-[10px] text-white/30 normal-case">{session.device}</span>
         )}
@@ -90,39 +60,21 @@ function SessionRow({ session }: SessionRowProps) {
         {session.pages_read != null && (
           <span className="text-white/50 normal-case">{session.pages_read} pages</span>
         )}
-        <span className="text-white font-black">{fmtDuration(session.duration)}</span>
+        <span className="text-white font-black">
+          {fmtDuration(session.duration ?? session.duration_seconds)}
+        </span>
       </div>
     </div>
   )
 }
 
-interface HighlightCardProps {
-  highlight: Highlight
-}
-
-function HighlightCard({ highlight }: HighlightCardProps) {
-  return (
-    <div className="bg-white/5 border border-white/10 rounded p-3 space-y-1">
-      <p className="text-sm text-white/90 normal-case leading-relaxed">&ldquo;{highlight.text}&rdquo;</p>
-      {highlight.note && (
-        <p className="text-xs text-primary/80 normal-case">{highlight.note}</p>
-      )}
-      {highlight.chapter && (
-        <p className="text-[10px] text-white/30 tracking-widest uppercase">{highlight.chapter}</p>
-      )}
-    </div>
-  )
-}
-
-// ── reading summary type ────────────────────────────────────────────────────────
+// ── types ──────────────────────────────────────────────────────────────────────
 
 interface ReadingSummary {
   percent_finished: number | null
   total_time_seconds: number
   total_sessions: number
 }
-
-// ── series membership with nav ─────────────────────────────────────────────────
 
 interface SeriesNavBook {
   id: number
@@ -137,9 +89,15 @@ interface SeriesMembership {
   next_book?: SeriesNavBook | null
 }
 
+interface SeriesInfo {
+  id: number
+  name: string
+  parent_id: number | null
+}
+
 // ── main component ─────────────────────────────────────────────────────────────
 
-export default function BookDetail() {
+export default function BookDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
@@ -148,16 +106,45 @@ export default function BookDetail() {
   const [notFound, setNotFound] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
-  const [showAssignSeries, setShowAssignSeries] = useState(false)
   const [seriesRefreshKey, setSeriesRefreshKey] = useState(0)
   const [moveOpen, setMoveOpen] = useState(false)
   const [movingTo, setMovingTo] = useState<number | null>(null)
 
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
   const { data: summary } = useApi<ReadingSummary>(id ? `/api/books/${id}/reading-summary` : null)
-  const { data: sessionsData } = useApi<{ items: SessionDisplay[] }>(id ? `/api/books/${id}/sessions?per_page=5` : null)
-  const { data: highlightsData } = useApi<{ items: Highlight[] }>(id ? `/api/books/${id}/highlights?per_page=5` : null)
-  const { data: seriesMemberships } = useApi<SeriesMembership[]>(id ? `/api/books/${id}/series?_k=${seriesRefreshKey}` : null)
+  const { data: sessionsData } = useApi<{ items: SessionDisplay[] }>(
+    id ? `/api/books/${id}/sessions?per_page=10` : null
+  )
+  const { data: highlightsData } = useApi<{ items: Highlight[] }>(
+    id ? `/api/books/${id}/highlights?per_page=5` : null
+  )
+  const { data: seriesMemberships } = useApi<SeriesMembership[]>(
+    id ? `/api/books/${id}/series?_k=${seriesRefreshKey}` : null
+  )
+  const primarySeries = seriesMemberships?.[0] ?? null
+  const { data: seriesBooks } = useApi<SeriesBook[]>(
+    primarySeries ? `/api/series/${primarySeries.series_id}/books` : null
+  )
+  // Fetch all series (flat list) only when this book is in a series, to build ancestry chain
+  const { data: allSeriesList } = useApi<SeriesInfo[]>(
+    primarySeries ? '/api/series/tree' : null
+  )
+
+  // Walk parent_id links from the direct series up to the root
+  const seriesAncestors = useMemo((): SeriesInfo[] => {
+    if (!primarySeries || !Array.isArray(allSeriesList)) return []
+    const byId = new Map(allSeriesList.map((s) => [s.id, s]))
+    const chain: SeriesInfo[] = []
+    const visited = new Set<number>()
+    let current = byId.get(primarySeries.series_id)
+    while (current) {
+      if (visited.has(current.id)) break // cycle guard
+      visited.add(current.id)
+      chain.unshift(current)
+      current = current.parent_id != null ? byId.get(current.parent_id) : undefined
+    }
+    return chain
+  }, [primarySeries, allSeriesList])
 
   const fetchBook = useCallback(async () => {
     if (!id) return
@@ -188,19 +175,48 @@ export default function BookDetail() {
     }
   }
 
+  // Weekly reading activity bars from sessions data
+  const weeklyBars = useMemo(() => {
+    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const totals = new Array(7).fill(0)
+    const now = new Date()
+    ;(sessionsData?.items ?? []).forEach((s) => {
+      const dateStr = s.start_time ?? s.started_at
+      if (!dateStr) return
+      const d = new Date(dateStr)
+      const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+      if (diffDays >= 7) return
+      let idx = d.getDay() - 1 // Mon = 0
+      if (idx < 0) idx = 6   // Sun = 6
+      totals[idx] += s.duration ?? s.duration_seconds ?? 0
+    })
+    const max = Math.max(...totals, 1)
+    return dayLabels.map((label, i) => ({
+      label,
+      heightPct: Math.max(6, Math.round((totals[i] / max) * 100)),
+      active: totals[i] > 0,
+    }))
+  }, [sessionsData])
+
   // ── loading / error states ──────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6 animate-pulse">
-        <div className="h-3 w-40 bg-white/10 rounded" />
-        <div className="flex gap-6">
-          <div className="w-40 aspect-[2/3] bg-white/5 rounded shrink-0" />
-          <div className="flex-1 space-y-3">
-            <div className="h-6 w-3/4 bg-white/10 rounded" />
-            <div className="h-4 w-1/2 bg-white/5 rounded" />
-            <div className="h-3 w-full bg-white/5 rounded mt-4" />
-            <div className="h-3 w-5/6 bg-white/5 rounded" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 animate-pulse">
+        <div className="h-3 w-40 bg-white/10 rounded mb-10" />
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+          <div className="lg:col-span-5">
+            <div className="aspect-[2/3] bg-white/5 rounded-xl" />
+          </div>
+          <div className="lg:col-span-7 space-y-6 pt-4">
+            <div className="h-4 w-32 bg-white/10 rounded" />
+            <div className="h-14 w-3/4 bg-white/10 rounded" />
+            <div className="h-5 w-1/3 bg-white/5 rounded" />
+            <div className="flex gap-3 mt-8">
+              <div className="h-10 w-28 bg-white/10 rounded-lg" />
+              <div className="h-10 w-28 bg-white/5 rounded-lg" />
+              <div className="h-10 w-28 bg-white/5 rounded-lg" />
+            </div>
           </div>
         </div>
       </div>
@@ -222,21 +238,28 @@ export default function BookDetail() {
   const percent = summary?.percent_finished != null ? Math.round(summary.percent_finished) : null
   const sessions = sessionsData?.items ?? []
   const highlights = highlightsData?.items ?? []
-  const primarySeries = seriesMemberships?.[0] ?? null
 
-  // ── breadcrumb ──────────────────────────────────────────────────────────────
-
+  // Breadcrumb — Library → ancestor0 → … → ancestorN (direct series) → Book
   const crumbs: Array<{ to: string | null; label: string }> = [
     { to: '/library', label: 'Library' },
-    ...(primarySeries ? [{ to: `/series/${primarySeries.series_id}`, label: primarySeries.series_name }] : []),
+    ...seriesAncestors.map((s) => ({ to: `/series/${s.id}`, label: s.name })),
     { to: null, label: book.title },
   ]
 
+  // Circular progress (conic-gradient)
+  const pct = percent ?? 0
+  const circularStyle = {
+    background: `conic-gradient(#258cf4 ${pct}%, #1a1a1a ${pct}%)`,
+  }
+
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-white/40" aria-label="breadcrumb">
+      <nav
+        className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-white/40 mb-10"
+        aria-label="breadcrumb"
+      >
         {crumbs.map((c, i) => (
           <span key={i} className="flex items-center gap-1.5">
             {i > 0 && <ChevronRight size={10} className="text-white/20" />}
@@ -249,78 +272,271 @@ export default function BookDetail() {
         ))}
       </nav>
 
-      {/* Hero */}
-      <div className="flex gap-6 sm:gap-8">
-        {/* Cover */}
-        <div className="shrink-0 w-28 sm:w-40">
-          <div className="aspect-[2/3] bg-white/5 border border-white/10 rounded overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
+
+        {/* ── Left Column ── */}
+        <div className="lg:col-span-5 space-y-6">
+
+          {/* Cover */}
+          <div className="aspect-[2/3] w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 shadow-2xl shadow-primary/5">
             <img
               src={`/api/books/${book.id}/cover`}
-              alt=""
+              alt={book.title}
               className="w-full h-full object-cover"
               onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
           </div>
-        </div>
 
-        {/* Info */}
-        <div className="flex-1 min-w-0 space-y-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
-              {book.title}
-            </h1>
-            {book.author && (
-              <p className="text-sm text-white/60 normal-case mt-0.5">{book.author}</p>
-            )}
-          </div>
-
-          {/* Badges */}
-          <div className="flex flex-wrap gap-2" data-testid="book-badges">
-            <Badge className="border-primary/40 text-primary">{book.format}</Badge>
-            {currentShelf && (
-              <Badge className="border-white/20 text-white/60">{currentShelf.name}</Badge>
-            )}
-            {primarySeries && (
-              <Badge className="border-white/20 text-white/50">
-                {primarySeries.series_name}
-                {primarySeries.sequence != null && ` #${primarySeries.sequence}`}
-              </Badge>
-            )}
-          </div>
-
-          {/* Reading progress */}
-          {percent != null && (
-            <div className="space-y-1" data-testid="reading-progress">
-              <div className="flex justify-between text-[10px] tracking-widest uppercase text-white/40">
-                <span>Progress</span>
-                <span className="text-primary">{percent}%</span>
-              </div>
-              <ProgressBar percent={percent} />
-              {summary && summary.total_time_seconds > 0 && (
-                <p className="text-[10px] text-white/30 tracking-widest uppercase">
-                  {fmtDuration(summary.total_time_seconds)} read · {summary.total_sessions} session{summary.total_sessions !== 1 ? 's' : ''}
+          {/* Progress card */}
+          <div className="bg-slate-900/60 border border-white/10 rounded-xl p-6 space-y-6" data-testid={percent != null ? 'reading-progress' : undefined}>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">
+                  Book Progress
                 </p>
+                {percent != null ? (
+                  <p className="text-3xl font-black tracking-tight">
+                    {percent}%{' '}
+                    <span className="text-sm font-normal text-white/40">Complete</span>
+                  </p>
+                ) : (
+                  <p className="text-lg font-black tracking-tight text-white/30">Not started</p>
+                )}
+                {summary && summary.total_time_seconds > 0 && (
+                  <p className="text-[10px] text-white/30 tracking-widest uppercase mt-1">
+                    {fmtDuration(summary.total_time_seconds)} · {summary.total_sessions} session{summary.total_sessions !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+
+              {percent != null && (
+                <div
+                  className="relative size-16 rounded-full p-0.5 shrink-0"
+                  style={circularStyle}
+                >
+                  <div className="size-full bg-black rounded-full" />
+                </div>
+              )}
+            </div>
+
+            {/* Weekly activity bars */}
+            <div>
+              <div className="flex items-end gap-1 h-14">
+                {weeklyBars.map((bar) => (
+                  <div
+                    key={bar.label}
+                    className={`flex-1 rounded-t-sm transition-all ${bar.active ? 'bg-primary/70' : 'bg-white/10'}`}
+                    style={{ height: `${bar.heightPct}%` }}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between mt-1.5">
+                {weeklyBars.map((bar) => (
+                  <span
+                    key={bar.label}
+                    className="flex-1 text-center text-[9px] font-bold uppercase tracking-tighter text-white/30"
+                  >
+                    {bar.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Series navigation tree */}
+          {primarySeries && (
+            <div className="bg-slate-900/60 border border-white/10 rounded-xl p-6 space-y-6" data-testid="series-nav">
+
+              {/* Prev / Next navigation */}
+              {(primarySeries.prev_book || primarySeries.next_book) && (
+                <div className="flex gap-2">
+                  {primarySeries.prev_book ? (
+                    <Link
+                      to={`/books/${primarySeries.prev_book.id}`}
+                      data-testid="prev-book-link"
+                      className="flex-1 flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
+                    >
+                      <ChevronRight size={13} className="text-white/40 shrink-0 rotate-180" />
+                      <div className="min-w-0">
+                        <p className="text-[9px] tracking-widest uppercase text-white/30">Previous</p>
+                        <p className="text-xs text-white/80 normal-case truncate">{primarySeries.prev_book.title}</p>
+                      </div>
+                    </Link>
+                  ) : <div className="flex-1" />}
+                  {primarySeries.next_book ? (
+                    <Link
+                      to={`/books/${primarySeries.next_book.id}`}
+                      data-testid="next-book-link"
+                      className="flex-1 flex items-center justify-end gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
+                    >
+                      <div className="min-w-0 text-right">
+                        <p className="text-[9px] tracking-widest uppercase text-white/30">Next</p>
+                        <p className="text-xs text-white/80 normal-case truncate">{primarySeries.next_book.title}</p>
+                      </div>
+                      <ChevronRight size={13} className="text-white/40 shrink-0" />
+                    </Link>
+                  ) : <div className="flex-1" />}
+                </div>
+              )}
+
+              {/* Hierarchy */}
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-4">
+                  Navigation Tree
+                </p>
+                <div className="space-y-2">
+                  {/* All ancestors from root down to direct series */}
+                  {seriesAncestors.map((s, i) => {
+                    const isLast = i === seriesAncestors.length - 1
+                    return (
+                      <div
+                        key={s.id}
+                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                        style={{ paddingLeft: `${i * 1}rem` }}
+                      >
+                        {i > 0 && <span className="text-white/10 border-l border-white/10 self-stretch mr-1" />}
+                        <span className="text-white/30">{i === 0 ? 'Collection' : 'Series'}</span>
+                        <ChevronRight size={10} className="text-white/20" />
+                        <Link
+                          to={`/series/${s.id}`}
+                          className={isLast ? 'text-primary hover:underline' : 'text-white/60 hover:text-primary hover:underline transition-colors'}
+                        >
+                          {s.name}
+                        </Link>
+                      </div>
+                    )
+                  })}
+                  {/* Current book position */}
+                  {primarySeries.sequence != null && (
+                    <div
+                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                      style={{ paddingLeft: `${seriesAncestors.length * 1}rem` }}
+                    >
+                      <span className="text-white/30">Current</span>
+                      <ChevronRight size={10} className="text-white/20" />
+                      <span className="text-white/80">Book {primarySeries.sequence}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Series book list */}
+              {seriesBooks && seriesBooks.length > 0 && (
+                <div className="pt-4 border-t border-white/10">
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                      Series Progress
+                    </p>
+                    <Link
+                      to={`/series/${primarySeries.series_id}`}
+                      className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
+                    >
+                      {seriesBooks.length} Books
+                    </Link>
+                  </div>
+
+                  {/* Progress dots */}
+                  <div className="flex gap-1 h-1 mb-4">
+                    {seriesBooks.map((sb) => (
+                      <div
+                        key={sb.book_id}
+                        className={`flex-1 rounded-full ${String(sb.book_id) === String(book.id) ? 'bg-primary' : 'bg-white/10'}`}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="space-y-2">
+                    {seriesBooks.slice(0, 5).map((sb) => {
+                      const isCurrent = String(sb.book_id) === String(book.id)
+                      return (
+                        <Link
+                          key={sb.book_id}
+                          to={`/books/${sb.book_id}`}
+                          className={`flex items-center gap-3 ${isCurrent ? '' : 'opacity-50 hover:opacity-100 transition-opacity'}`}
+                        >
+                          <div className={`size-7 rounded text-[9px] font-black flex items-center justify-center shrink-0 ${isCurrent ? 'bg-primary text-white' : 'bg-white/10 text-white/50'}`}>
+                            {sb.sequence != null ? String(sb.sequence).padStart(2, '0') : '—'}
+                          </div>
+                          <div className="flex-1 min-w-0 border-b border-white/5 pb-2 flex items-center justify-between">
+                            <span className={`text-xs truncate normal-case ${isCurrent ? 'font-bold text-white' : 'font-medium text-white/70'}`}>
+                              {sb.title}
+                            </span>
+                            {isCurrent ? (
+                              <CheckCircle2 size={13} className="text-primary shrink-0 ml-2" />
+                            ) : (
+                              <ArrowRight size={13} className="text-white/20 shrink-0 ml-2" />
+                            )}
+                          </div>
+                        </Link>
+                      )
+                    })}
+                    {seriesBooks.length > 5 && (
+                      <Link
+                        to={`/series/${primarySeries.series_id}`}
+                        className="text-[10px] text-primary hover:underline uppercase tracking-widest font-black pl-10 block pt-1"
+                      >
+                        +{seriesBooks.length - 5} more
+                      </Link>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           )}
+        </div>
 
-          {/* Meta row */}
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] tracking-widest uppercase text-white/30">
-            {book.page_count && <span>{book.page_count} pages</span>}
-            {book.language && <span>{book.language}</span>}
-            {book.publisher && <span className="normal-case">{book.publisher}</span>}
-            {book.date_published && <span>{book.date_published}</span>}
-            <span>Added {fmtDate(book.created_at)}</span>
+        {/* ── Right Column ── */}
+        <div className="lg:col-span-7 flex flex-col">
+
+          {/* Series label */}
+          {primarySeries && (
+            <div className="flex items-center gap-3 mb-4">
+              <span className="bg-primary/20 text-primary px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest">
+                {primarySeries.sequence != null ? `Book ${primarySeries.sequence}` : 'Series'}
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                of {primarySeries.series_name}
+              </span>
+            </div>
+          )}
+
+          {/* Title + Author */}
+          <div className="mb-6">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter text-white leading-[0.95] mb-3 uppercase">
+              {book.title}
+            </h1>
+            {book.author && (
+              <p className="text-xl font-light text-white/50 tracking-tight normal-case">{book.author}</p>
+            )}
           </div>
 
-          {/* Actions */}
-          <div className="flex flex-wrap gap-2 pt-1">
+          {/* Format / shelf badges */}
+          <div className="flex flex-wrap gap-2 mb-8" data-testid="book-badges">
+            {book.format && (
+              <span className="px-2.5 py-0.5 text-[10px] font-black tracking-widest uppercase border border-primary/40 text-primary rounded">
+                {book.format}
+              </span>
+            )}
+            {currentShelf && (
+              <span className="px-2.5 py-0.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/50 rounded">
+                {currentShelf.name}
+              </span>
+            )}
+            {primarySeries && (
+              <span className="px-2.5 py-0.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/40 rounded normal-case">
+                {primarySeries.series_name}{primarySeries.sequence != null ? ` #${primarySeries.sequence}` : ''}
+              </span>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-3 mb-10">
             <a
               href={`/api/books/${book.id}/download`}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 transition-colors"
+              className="flex items-center gap-2 px-6 py-3 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 rounded-lg transition-all"
               data-testid="download-btn"
             >
-              <Download size={12} />
+              <Download size={14} />
               Download
             </a>
 
@@ -330,21 +546,21 @@ export default function BookDetail() {
                 onClick={() => setMoveOpen((v) => !v)}
                 disabled={movingTo != null || otherShelves.length === 0}
                 data-testid="move-shelf-btn"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-2 px-6 py-3 text-[10px] font-black tracking-widest uppercase bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-white/30 disabled:opacity-40 rounded-lg transition-all"
               >
-                Move shelf
-                <ChevronRight size={10} className={`transition-transform ${moveOpen ? 'rotate-90' : ''}`} />
+                Move Shelf
+                <ChevronRight size={12} className={`transition-transform ${moveOpen ? 'rotate-90' : ''}`} />
               </button>
               {moveOpen && (
                 <div
-                  className="absolute left-0 top-full mt-1 z-30 min-w-[160px] bg-black border border-white/20 rounded shadow-xl"
+                  className="absolute left-0 top-full mt-1 z-30 min-w-[160px] bg-black border border-white/20 rounded-lg shadow-xl"
                   data-testid="move-shelf-dropdown"
                 >
                   {otherShelves.map((s) => (
                     <button
                       key={s.id}
                       onClick={() => handleMove(s.id)}
-                      className="w-full text-left px-3 py-2 text-xs text-white/70 normal-case hover:bg-white/5 hover:text-white transition-colors"
+                      className="w-full text-left px-4 py-2.5 text-xs text-white/70 normal-case hover:bg-white/5 hover:text-white transition-colors"
                     >
                       {s.name}
                     </button>
@@ -356,110 +572,139 @@ export default function BookDetail() {
             <button
               onClick={() => setShowEdit(true)}
               data-testid="edit-btn"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition-colors"
+              className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 rounded-lg transition-all"
             >
-              <Edit2 size={12} />
+              <Edit2 size={13} />
               Edit
-            </button>
-
-            <button
-              onClick={() => setShowAssignSeries(true)}
-              data-testid="assign-series-btn"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition-colors"
-            >
-              Series
             </button>
 
             <button
               onClick={() => setShowDelete(true)}
               data-testid="delete-btn"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase border border-red-500/30 text-red-400/70 hover:text-red-400 hover:border-red-400/60 transition-colors"
+              className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border border-red-500/20 text-red-400/50 hover:text-red-400 hover:border-red-400/50 rounded-lg transition-all"
             >
-              <Trash2 size={12} />
-              Delete
+              <Trash2 size={13} />
             </button>
           </div>
+
+          {/* Metadata grid */}
+          <div className="grid grid-cols-3 gap-6 py-8 border-y border-white/10 mb-10">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">Series</p>
+              <p className="text-base font-medium normal-case">{primarySeries?.series_name ?? '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">Pages</p>
+              <p className="text-base font-medium">{book.page_count ? book.page_count.toLocaleString() : '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">Shelf</p>
+              <p className="text-base font-medium normal-case">{currentShelf?.name ?? '—'}</p>
+            </div>
+          </div>
+
+          {/* Description */}
+          {book.description && (
+            <div className="mb-8">
+              <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40 mb-3">Description</h2>
+              <p className="text-sm text-white/70 normal-case leading-relaxed">{book.description}</p>
+            </div>
+          )}
+
+          {/* Highlights */}
+          {highlights.length > 0 && (
+            <section className="space-y-4 mb-8" data-testid="highlights-section">
+              <h2 className="text-sm font-black uppercase tracking-widest text-white/80">
+                Recent Highlights
+              </h2>
+              <div className="space-y-5">
+                {highlights.map((h, i) => (
+                  <div
+                    key={h.id}
+                    className={`relative pl-5 border-l-2 ${i === 0 ? 'border-primary/50' : 'border-white/10'}`}
+                  >
+                    <p className="text-base leading-relaxed text-white/80 normal-case italic">
+                      &ldquo;{h.text}&rdquo;
+                    </p>
+                    {h.note && (
+                      <p className="text-sm text-primary/70 normal-case mt-1">{h.note}</p>
+                    )}
+                    {h.chapter && (
+                      <div className="mt-1.5 flex gap-3 text-[10px] font-bold uppercase tracking-widest text-white/30">
+                        <span>{h.chapter}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Reading sessions */}
+          {sessions.length > 0 && (
+            <section className="space-y-3" data-testid="sessions-section">
+              <h2 className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase text-white/40">
+                <BookOpen size={12} />
+                Reading Sessions
+              </h2>
+              <div className="bg-white/5 border border-white/10 rounded-xl px-4">
+                {sessions.slice(0, 5).map((s) => <SessionRow key={s.id} session={s} />)}
+              </div>
+            </section>
+          )}
         </div>
       </div>
 
-      {/* Description */}
-      {book.description && (
-        <section className="space-y-2">
-          <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40">Description</h2>
-          <p className="text-sm text-white/70 normal-case leading-relaxed">{book.description}</p>
-        </section>
-      )}
-
-      {/* Series navigation */}
-      {primarySeries && (primarySeries.prev_book || primarySeries.next_book) && (
-        <section className="bg-white/5 border border-white/10 rounded p-4 space-y-3" data-testid="series-nav">
-          <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40">
-            {primarySeries.series_name}
-          </h2>
-          <div className="flex gap-3">
-            {primarySeries.prev_book ? (
-              <Link
-                to={`/books/${primarySeries.prev_book.id}`}
-                data-testid="prev-book-link"
-                className="flex-1 flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
-              >
-                <ChevronLeft size={14} className="text-white/40 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-[9px] tracking-widest uppercase text-white/30">Previous</p>
-                  <p className="text-xs text-white/80 normal-case truncate">{primarySeries.prev_book.title}</p>
-                </div>
-              </Link>
-            ) : <div className="flex-1" />}
-
-            {primarySeries.next_book ? (
-              <Link
-                to={`/books/${primarySeries.next_book.id}`}
-                data-testid="next-book-link"
-                className="flex-1 flex items-center justify-end gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
-              >
-                <div className="min-w-0 text-right">
-                  <p className="text-[9px] tracking-widest uppercase text-white/30">Next</p>
-                  <p className="text-xs text-white/80 normal-case truncate">{primarySeries.next_book.title}</p>
-                </div>
-                <ChevronRight size={14} className="text-white/40 shrink-0" />
-              </Link>
-            ) : <div className="flex-1" />}
+      {/* Footer: publication details */}
+      {(book.date_published || book.publisher || book.language || book.isbn || book.format) && (
+        <footer className="mt-20 pt-8 border-t border-white/10 opacity-70">
+          <div className="flex flex-wrap gap-x-12 gap-y-4 text-[10px] font-black uppercase tracking-widest">
+            {book.date_published && (
+              <div className="flex flex-col gap-1">
+                <span className="text-white/30">Published</span>
+                <span>{book.date_published}</span>
+              </div>
+            )}
+            {book.publisher && (
+              <div className="flex flex-col gap-1">
+                <span className="text-white/30">Publisher</span>
+                <span className="normal-case">{book.publisher}</span>
+              </div>
+            )}
+            {book.language && (
+              <div className="flex flex-col gap-1">
+                <span className="text-white/30">Language</span>
+                <span>{book.language}</span>
+              </div>
+            )}
+            {book.isbn && (
+              <div className="flex flex-col gap-1">
+                <span className="text-white/30">ISBN</span>
+                <span>{book.isbn}</span>
+              </div>
+            )}
+            {book.format && (
+              <div className="flex flex-col gap-1">
+                <span className="text-white/30">Format</span>
+                <span>{book.format}</span>
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              <span className="text-white/30">Added</span>
+              <span className="normal-case">{fmtDate(book.created_at)}</span>
+            </div>
           </div>
-        </section>
-      )}
-
-      {/* Reading sessions */}
-      {sessions.length > 0 && (
-        <section className="space-y-3" data-testid="sessions-section">
-          <h2 className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase text-white/40">
-            <BookOpen size={12} />
-            Reading Sessions
-          </h2>
-          <div className="bg-white/5 border border-white/10 rounded px-4">
-            {sessions.map((s) => <SessionRow key={s.id} session={s} />)}
-          </div>
-        </section>
-      )}
-
-      {/* Highlights */}
-      {highlights.length > 0 && (
-        <section className="space-y-3" data-testid="highlights-section">
-          <h2 className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase text-white/40">
-            <Highlighter size={12} />
-            Highlights
-          </h2>
-          <div className="space-y-2">
-            {highlights.map((h) => <HighlightCard key={h.id} highlight={h} />)}
-          </div>
-        </section>
+        </footer>
       )}
 
       {/* Modals */}
       {showEdit && (
         <EditBookModal
           book={book}
+          currentSeries={seriesMemberships ?? []}
           onClose={() => setShowEdit(false)}
           onSaved={(updated) => { setBook(updated); setShowEdit(false) }}
+          onSeriesChange={() => setSeriesRefreshKey((k) => k + 1)}
         />
       )}
       {showDelete && (
@@ -467,14 +712,6 @@ export default function BookDetail() {
           book={book}
           onClose={() => setShowDelete(false)}
           onDeleted={() => navigate('/library')}
-        />
-      )}
-      {showAssignSeries && (
-        <AssignSeriesModal
-          bookId={book.id}
-          currentSeries={seriesMemberships ?? []}
-          onClose={() => setShowAssignSeries(false)}
-          onSaved={() => { setShowAssignSeries(false); setSeriesRefreshKey((k) => k + 1) }}
         />
       )}
     </div>
