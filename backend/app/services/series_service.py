@@ -223,6 +223,42 @@ async def add_reading_order_entry(
     return entry
 
 
+async def list_reading_orders_for_series(
+    session: AsyncSession, series_id: int
+) -> list[ReadingOrder]:
+    await get_series(session, series_id)  # raises SeriesNotFound if missing
+    result = await session.execute(
+        select(ReadingOrder)
+        .where(ReadingOrder.series_id == series_id)
+        .options(selectinload(ReadingOrder.entries))
+        .order_by(ReadingOrder.name)
+    )
+    return result.scalars().all()  # type: ignore[return-value]
+
+
+async def list_books_in_series(
+    session: AsyncSession, series_id: int
+) -> list[dict]:
+    await get_series(session, series_id)  # raises SeriesNotFound if missing
+    from sqlalchemy import nullsfirst
+    result = await session.execute(
+        select(BookSeries, Book)
+        .join(Book, Book.id == BookSeries.book_id)
+        .where(BookSeries.series_id == series_id)
+        .order_by(nullsfirst(BookSeries.sequence), Book.title)
+    )
+    return [
+        {
+            "book_id": bs.book_id,
+            "sequence": bs.sequence,
+            "title": book.title,
+            "author": book.author,
+            "format": book.format,
+        }
+        for bs, book in result
+    ]
+
+
 async def reorder_entries(
     session: AsyncSession, order_id: int, entry_positions: list[tuple[int, int]]
 ) -> None:

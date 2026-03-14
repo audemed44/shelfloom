@@ -5,9 +5,11 @@ from app.database import get_session
 from app.schemas.series import (
     BookSeriesEntry,
     ReadingOrderCreate,
+    ReadingOrderDetailResponse,
     ReadingOrderEntryCreate,
     ReadingOrderEntryResponse,
     ReadingOrderResponse,
+    SeriesBookItem,
     SeriesCreate,
     SeriesResponse,
     SeriesTreeNode,
@@ -26,6 +28,8 @@ from app.services.series_service import (
     get_reading_order,
     get_series,
     get_series_tree,
+    list_books_in_series,
+    list_reading_orders_for_series,
     list_series,
     purge_empty_series,
     remove_book_from_series,
@@ -121,6 +125,28 @@ async def remove_book_endpoint(
     await remove_book_from_series(session, series_id, book_id)
 
 
+@router.get("/series/{series_id}/reading-orders", response_model=list[ReadingOrderDetailResponse])
+async def list_series_reading_orders_endpoint(
+    series_id: int, session: AsyncSession = Depends(get_session)
+):
+    try:
+        orders = await list_reading_orders_for_series(session, series_id)
+    except SeriesNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return [ReadingOrderDetailResponse.model_validate(ro) for ro in orders]
+
+
+@router.get("/series/{series_id}/books", response_model=list[SeriesBookItem])
+async def list_series_books_endpoint(
+    series_id: int, session: AsyncSession = Depends(get_session)
+):
+    try:
+        books = await list_books_in_series(session, series_id)
+    except SeriesNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return [SeriesBookItem(**b) for b in books]
+
+
 # ── reading orders ────────────────────────────────────────────────────────────
 
 @router.post("/reading-orders", response_model=ReadingOrderResponse, status_code=status.HTTP_201_CREATED)
@@ -134,7 +160,7 @@ async def create_reading_order_endpoint(
     return ReadingOrderResponse.model_validate(ro)
 
 
-@router.get("/reading-orders/{order_id}", response_model=ReadingOrderResponse)
+@router.get("/reading-orders/{order_id}", response_model=ReadingOrderDetailResponse)
 async def get_reading_order_endpoint(
     order_id: int, session: AsyncSession = Depends(get_session)
 ):
@@ -142,7 +168,7 @@ async def get_reading_order_endpoint(
         ro = await get_reading_order(session, order_id)
     except ReadingOrderNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return ReadingOrderResponse.model_validate(ro)
+    return ReadingOrderDetailResponse.model_validate(ro)
 
 
 @router.delete("/reading-orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT)

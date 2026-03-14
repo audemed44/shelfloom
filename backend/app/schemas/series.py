@@ -60,3 +60,15 @@ class ReadingOrderEntryResponse(BaseModel):
     book_id: str
     position: int
     note: str | None
+
+
+class ReadingOrderDetailResponse(ReadingOrderResponse):
+    entries: list[ReadingOrderEntryResponse] = []
+
+
+class SeriesBookItem(BaseModel):
+    book_id: str
+    sequence: float | None = None
+    title: str
+    author: str | None = None
+    format: str | None = None

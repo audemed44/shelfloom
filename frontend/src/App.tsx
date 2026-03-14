@@ -5,6 +5,8 @@ import Library from "./pages/Library";
 import BookDetail from "./pages/BookDetail";
 import Stats from "./pages/Stats";
 import Serials from "./pages/Serials";
+import SeriesList from "./pages/SeriesList";
+import SeriesDetail from "./pages/SeriesDetail";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -19,6 +21,8 @@ export default function App() {
           <Route path="books/:id" element={<BookDetail />} />
           <Route path="stats" element={<Stats />} />
           <Route path="serials" element={<Serials />} />
+          <Route path="series" element={<SeriesList />} />
+          <Route path="series/:id" element={<SeriesDetail />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

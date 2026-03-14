@@ -22,7 +22,7 @@ describe('Layout', () => {
     // Nav items appear in both Sidebar and BottomNav — assert at least one each
     expect(screen.getAllByText('Library').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Stats').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Serials').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Series').length).toBeGreaterThan(0)
     expect(screen.getByText('Settings')).toBeInTheDocument() // sidebar only
   })
 

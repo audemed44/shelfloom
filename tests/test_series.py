@@ -365,3 +365,58 @@ async def test_purge_empty_series_noop_when_nothing_empty(client):
     resp = await client.delete("/api/series/empty")
     assert resp.status_code == 200
     assert resp.json()["count"] == 0
+
+
+# ── new endpoints: list reading orders for series, list books in series ────────
+
+async def test_list_series_reading_orders(client):
+    series = (await client.post("/api/series", json={"name": "Cosmere"})).json()
+    await client.post("/api/reading-orders", json={"name": "Publication Order", "series_id": series["id"]})
+    await client.post("/api/reading-orders", json={"name": "Chronological Order", "series_id": series["id"]})
+
+    resp = await client.get(f"/api/series/{series['id']}/reading-orders")
+    assert resp.status_code == 200
+    names = [ro["name"] for ro in resp.json()]
+    assert "Publication Order" in names
+    assert "Chronological Order" in names
+
+
+async def test_list_series_reading_orders_not_found(client):
+    resp = await client.get("/api/series/99999/reading-orders")
+    assert resp.status_code == 404
+
+
+async def test_list_series_books(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "The Way of Kings")
+    book2 = await _create_book(db_session, shelf.id, "Words of Radiance")
+    series = (await client.post("/api/series", json={"name": "Stormlight"})).json()
+    await client.post(f"/api/series/{series['id']}/books/{book1.id}?sequence=1")
+    await client.post(f"/api/series/{series['id']}/books/{book2.id}?sequence=2")
+
+    resp = await client.get(f"/api/series/{series['id']}/books")
+    assert resp.status_code == 200
+    titles = [b["title"] for b in resp.json()]
+    assert "The Way of Kings" in titles
+    assert "Words of Radiance" in titles
+
+
+async def test_list_series_books_not_found(client):
+    resp = await client.get("/api/series/99999/books")
+    assert resp.status_code == 404
+
+
+async def test_get_reading_order_includes_entries(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "Book A")
+    book2 = await _create_book(db_session, shelf.id, "Book B")
+    series = (await client.post("/api/series", json={"name": "S"})).json()
+    ro = (await client.post("/api/reading-orders", json={"name": "R", "series_id": series["id"]})).json()
+    await client.post(f"/api/reading-orders/{ro['id']}/entries", json={"book_id": book1.id, "position": 1})
+    await client.post(f"/api/reading-orders/{ro['id']}/entries", json={"book_id": book2.id, "position": 2})
+
+    resp = await client.get(f"/api/reading-orders/{ro['id']}")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "entries" in data
+    assert len(data["entries"]) == 2

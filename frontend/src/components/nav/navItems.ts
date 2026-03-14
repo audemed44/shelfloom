@@ -11,5 +11,5 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/', icon: Home, label: 'Home', end: true },
   { to: '/library', icon: BookOpen, label: 'Library' },
   { to: '/stats', icon: BarChart3, label: 'Stats' },
-  { to: '/serials', icon: BookMarked, label: 'Serials' },
+  { to: '/series', icon: BookMarked, label: 'Series' },
 ]

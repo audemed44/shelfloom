@@ -85,3 +85,36 @@ export interface ApiError {
   status: number
   data: { detail?: string } | null
 }
+
+export interface SeriesWithCount {
+  id: number
+  name: string
+  description: string | null
+  parent_id: number | null
+  sort_order: number
+  cover_path: string | null
+  book_count: number
+}
+
+export interface ReadingOrder {
+  id: number
+  name: string
+  series_id: number
+  entries: ReadingOrderEntry[]
+}
+
+export interface ReadingOrderEntry {
+  id: number
+  reading_order_id: number
+  book_id: string
+  position: number
+  note: string | null
+}
+
+export interface SeriesBook {
+  book_id: string
+  sequence: number | null
+  title: string
+  author: string | null
+  format: string | null
+}

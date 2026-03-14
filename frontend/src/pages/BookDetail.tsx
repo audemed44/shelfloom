@@ -15,6 +15,7 @@ import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import EditBookModal from '../components/book-detail/EditBookModal'
 import DeleteBookModal from '../components/book-detail/DeleteBookModal'
+import AssignSeriesModal from '../components/series/AssignSeriesModal'
 import type { BookDetail, Shelf, ReadingSession, Highlight } from '../types'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -147,6 +148,8 @@ export default function BookDetail() {
   const [notFound, setNotFound] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [showAssignSeries, setShowAssignSeries] = useState(false)
+  const [seriesRefreshKey, setSeriesRefreshKey] = useState(0)
   const [moveOpen, setMoveOpen] = useState(false)
   const [movingTo, setMovingTo] = useState<number | null>(null)
 
@@ -154,7 +157,7 @@ export default function BookDetail() {
   const { data: summary } = useApi<ReadingSummary>(id ? `/api/books/${id}/reading-summary` : null)
   const { data: sessionsData } = useApi<{ items: SessionDisplay[] }>(id ? `/api/books/${id}/sessions?per_page=5` : null)
   const { data: highlightsData } = useApi<{ items: Highlight[] }>(id ? `/api/books/${id}/highlights?per_page=5` : null)
-  const { data: seriesMemberships } = useApi<SeriesMembership[]>(id ? `/api/books/${id}/series` : null)
+  const { data: seriesMemberships } = useApi<SeriesMembership[]>(id ? `/api/books/${id}/series?_k=${seriesRefreshKey}` : null)
 
   const fetchBook = useCallback(async () => {
     if (!id) return
@@ -225,7 +228,7 @@ export default function BookDetail() {
 
   const crumbs: Array<{ to: string | null; label: string }> = [
     { to: '/library', label: 'Library' },
-    ...(primarySeries ? [{ to: null, label: primarySeries.series_name }] : []),
+    ...(primarySeries ? [{ to: `/series/${primarySeries.series_id}`, label: primarySeries.series_name }] : []),
     { to: null, label: book.title },
   ]
 
@@ -360,6 +363,14 @@ export default function BookDetail() {
             </button>
 
             <button
+              onClick={() => setShowAssignSeries(true)}
+              data-testid="assign-series-btn"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition-colors"
+            >
+              Series
+            </button>
+
+            <button
               onClick={() => setShowDelete(true)}
               data-testid="delete-btn"
               className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase border border-red-500/30 text-red-400/70 hover:text-red-400 hover:border-red-400/60 transition-colors"
@@ -456,6 +467,14 @@ export default function BookDetail() {
           book={book}
           onClose={() => setShowDelete(false)}
           onDeleted={() => navigate('/library')}
+        />
+      )}
+      {showAssignSeries && (
+        <AssignSeriesModal
+          bookId={book.id}
+          currentSeries={seriesMemberships ?? []}
+          onClose={() => setShowAssignSeries(false)}
+          onSaved={() => { setShowAssignSeries(false); setSeriesRefreshKey((k) => k + 1) }}
         />
       )}
     </div>

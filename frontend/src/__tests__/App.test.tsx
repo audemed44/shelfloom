@@ -22,7 +22,7 @@ describe('App', () => {
     // Both Sidebar and BottomNav render the same labels — getAllByText asserts ≥1
     expect(screen.getAllByText('Library').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Stats').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Serials').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Series').length).toBeGreaterThan(0)
   })
 
   it('shows dashboard page by default', () => {
@@ -45,10 +45,10 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: /stats/i })).toBeInTheDocument()
   })
 
-  it('navigates to serials page', async () => {
+  it('navigates to series page', async () => {
     const user = userEvent.setup()
     render(<App />)
-    await user.click(screen.getAllByText('Serials')[0])
-    expect(screen.getByRole('heading', { name: /serials/i })).toBeInTheDocument()
+    await user.click(screen.getAllByText('Series')[0])
+    expect(screen.getByRole('heading', { name: /series/i })).toBeInTheDocument()
   })
 })
