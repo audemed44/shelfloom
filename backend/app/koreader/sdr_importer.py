@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from pathlib import Path
 
@@ -124,6 +124,13 @@ async def import_sdr(
         sdr_data.partial_md5,
         sdr_data.doc_path,
     )
+
+    # Set updated_at to the real last-read timestamp rather than import time
+    if aggregated:
+        last_sess = max(aggregated, key=lambda s: s["start_time"])
+        progress_record.updated_at = last_sess["start_time"] + timedelta(
+            seconds=last_sess["duration"]
+        )
 
     for sess_data in aggregated:
         source_key = sess_data["source_key"]

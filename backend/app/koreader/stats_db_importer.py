@@ -7,9 +7,11 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from datetime import timedelta
+
 from app.koreader.stats_db_reader import StatsBook, StatsSession, read_stats_db
 from app.models.book import Book, BookHash
-from app.models.reading import ReadingSession
+from app.models.reading import ReadingProgress, ReadingSession
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +84,30 @@ async def import_stats_db(
             continue
 
         book_sessions = sessions_by_book.get(stats_book.id, [])
+
+        # Upsert ReadingProgress with real last-read timestamp
+        if book_sessions and stats_book.ko_total_pages:
+            last_sess = max(book_sessions, key=lambda s: s.start_time)
+            last_end = last_sess.start_time + timedelta(seconds=last_sess.duration)
+            progress_pct = round(
+                (stats_book.total_read_pages or 0) / stats_book.ko_total_pages * 100, 2
+            )
+            prog_result = await session.execute(
+                select(ReadingProgress).where(
+                    ReadingProgress.book_id == shelfloom_book.id,
+                    ReadingProgress.device == "stats_db",
+                )
+            )
+            prog_record = prog_result.scalar_one_or_none()
+            if prog_record is None:
+                prog_record = ReadingProgress(
+                    book_id=shelfloom_book.id,
+                    device="stats_db",
+                )
+                session.add(prog_record)
+            prog_record.progress = progress_pct
+            prog_record.updated_at = last_end
+
         for sess in book_sessions:
             # Check if already imported (including dismissed)
             existing = await session.execute(
