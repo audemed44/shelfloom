@@ -221,7 +221,7 @@ describe('Library', () => {
     await waitFor(() =>
       expect(screen.getByText('Main Library')).toBeInTheDocument()
     )
-    expect(screen.getByText('All')).toBeInTheDocument()
+    expect(screen.getByTestId('shelf-tab-all')).toBeInTheDocument()
   })
 
   it('passes shelf_id param when shelf tab is selected', async () => {

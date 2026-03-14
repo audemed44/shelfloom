@@ -26,6 +26,7 @@ from app.services.book_service import (
     move_book,
     refresh_book_cover,
     update_book,
+    upload_book_cover,
 )
 
 router = APIRouter(prefix="/books", tags=["books"])
@@ -229,6 +230,27 @@ async def refresh_cover_endpoint(
     except BookNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
     except (ShelfNotFound, FileOperationError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return _book_response(book)
+
+
+@router.post("/{book_id}/upload-cover", response_model=BookResponse)
+async def upload_cover_endpoint(
+    book_id: str,
+    file: UploadFile,
+    session: AsyncSession = Depends(get_session),
+):
+    from app.config import get_settings
+
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image.")
+    settings = get_settings()
+    image_data = await file.read()
+    try:
+        book = await upload_book_cover(session, book_id, settings.covers_dir, image_data)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except FileOperationError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return _book_response(book)
 

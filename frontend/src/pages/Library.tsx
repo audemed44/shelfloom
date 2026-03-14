@@ -44,7 +44,11 @@ interface ShelfTabsProps {
 function ShelfTabs({ shelves, selectedId, onSelect }: ShelfTabsProps) {
   return (
     <div className="flex gap-0 border-b border-white/10 mb-6 overflow-x-auto no-scrollbar">
-      <TabButton active={!selectedId} onClick={() => onSelect(null)}>
+      <TabButton
+        active={!selectedId}
+        onClick={() => onSelect(null)}
+        data-testid="shelf-tab-all"
+      >
         All
       </TabButton>
       {shelves.map((s) => (
@@ -60,16 +64,17 @@ function ShelfTabs({ shelves, selectedId, onSelect }: ShelfTabsProps) {
   )
 }
 
-interface TabButtonProps {
+interface TabButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   active: boolean
   onClick: () => void
   children: React.ReactNode
 }
 
-function TabButton({ active, onClick, children }: TabButtonProps) {
+function TabButton({ active, onClick, children, ...rest }: TabButtonProps) {
   return (
     <button
       onClick={onClick}
+      {...rest}
       className={`px-5 py-3 text-xs font-black tracking-widest whitespace-nowrap border-b-2 -mb-px transition-colors ${
         active
           ? 'text-primary border-primary'
@@ -336,7 +341,10 @@ export default function Library() {
         {STATUS_OPTIONS.map((opt) => (
           <button
             key={String(opt.value)}
-            onClick={() => { setStatus(opt.value); resetPage() }}
+            onClick={() => {
+              setStatus(opt.value)
+              resetPage()
+            }}
             className={`px-3 py-1.5 text-[10px] font-black tracking-widest uppercase rounded transition-colors ${
               status === opt.value
                 ? 'bg-primary text-white'

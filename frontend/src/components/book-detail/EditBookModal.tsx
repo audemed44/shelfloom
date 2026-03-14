@@ -47,8 +47,14 @@ function CreateSeriesModal({
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [parentId, setParentId] = useState('')
+  const [parentSearch, setParentSearch] = useState('')
+  const [parentOpen, setParentOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const filteredParents = allSeries.filter((s) =>
+    s.name.toLowerCase().includes(parentSearch.toLowerCase())
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -134,18 +140,55 @@ function CreateSeriesModal({
                 Hierarchical
               </span>
             </label>
-            <select
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 px-4 py-3 text-sm text-white normal-case focus:outline-none focus:border-primary transition-colors appearance-none"
-            >
-              <option value="">— None (Top Level) —</option>
-              {allSeries.map((s) => (
-                <option key={s.id} value={s.id.toString()}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={parentSearch}
+                onChange={(e) => {
+                  setParentSearch(e.target.value)
+                  setParentOpen(true)
+                  if (!e.target.value) setParentId('')
+                }}
+                onFocus={() => setParentOpen(true)}
+                onBlur={() => setTimeout(() => setParentOpen(false), 150)}
+                placeholder="Search parent series…"
+                className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white normal-case placeholder:text-white/30 focus:outline-none focus:border-primary transition-colors"
+              />
+              {parentOpen && (
+                <div className="absolute z-10 w-full bg-black border border-white/10 mt-0.5 max-h-40 overflow-y-auto">
+                  <button
+                    type="button"
+                    onMouseDown={() => {
+                      setParentId('')
+                      setParentSearch('')
+                      setParentOpen(false)
+                    }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-white/40 hover:bg-white/5 hover:text-white transition-colors"
+                  >
+                    — None (Top Level) —
+                  </button>
+                  {filteredParents.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onMouseDown={() => {
+                        setParentId(s.id.toString())
+                        setParentSearch(s.name)
+                        setParentOpen(false)
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm normal-case transition-colors ${parentId === s.id.toString() ? 'bg-primary/20 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                  {filteredParents.length === 0 && (
+                    <p className="px-4 py-2.5 text-sm text-white/30 normal-case">
+                      No series found.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
             <p className="text-[10px] text-white/30 normal-case">
               Leave empty to create a primary series.
             </p>

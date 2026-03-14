@@ -98,7 +98,7 @@ export interface Book {
   shelfloom_id: string | null
   created_at: string
   updated_at: string
-  reading_progress: number | null  // 0–100, null = unread
+  reading_progress: number | null // 0–100, null = unread
 }
 
 export interface BookDetail extends Book {

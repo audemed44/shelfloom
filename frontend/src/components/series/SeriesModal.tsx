@@ -21,8 +21,18 @@ export default function SeriesModal({
   const [parentId, setParentId] = useState<string>(
     series?.parent_id?.toString() ?? ''
   )
+  const [parentSearch, setParentSearch] = useState(
+    series?.parent_id
+      ? (allSeries.find((s) => s.id === series.parent_id)?.name ?? '')
+      : ''
+  )
+  const [parentOpen, setParentOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const filteredParents = allSeries
+    .filter((s) => s.id !== series?.id)
+    .filter((s) => s.name.toLowerCase().includes(parentSearch.toLowerCase()))
 
   // Close on Escape
   useEffect(() => {
@@ -60,8 +70,6 @@ export default function SeriesModal({
       setSaving(false)
     }
   }
-
-  const parentOptions = allSeries.filter((s) => s.id !== series?.id)
 
   return (
     <div
@@ -122,18 +130,55 @@ export default function SeriesModal({
             <label className="text-[10px] font-black tracking-widest uppercase text-white/40">
               Parent Series
             </label>
-            <select
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded px-3 py-2 text-sm text-white normal-case focus:outline-none focus:border-white/30"
-            >
-              <option value="">— None —</option>
-              {parentOptions.map((s) => (
-                <option key={s.id} value={s.id.toString()}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={parentSearch}
+                onChange={(e) => {
+                  setParentSearch(e.target.value)
+                  setParentOpen(true)
+                  if (!e.target.value) setParentId('')
+                }}
+                onFocus={() => setParentOpen(true)}
+                onBlur={() => setTimeout(() => setParentOpen(false), 150)}
+                placeholder="Search parent series…"
+                className="w-full bg-black border border-white/10 px-3 py-2 text-sm text-white normal-case placeholder:text-white/30 focus:outline-none focus:border-primary transition-colors"
+              />
+              {parentOpen && (
+                <div className="absolute z-10 w-full bg-black border border-white/10 mt-0.5 max-h-40 overflow-y-auto">
+                  <button
+                    type="button"
+                    onMouseDown={() => {
+                      setParentId('')
+                      setParentSearch('')
+                      setParentOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-white/40 hover:bg-white/5 hover:text-white transition-colors"
+                  >
+                    — None —
+                  </button>
+                  {filteredParents.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onMouseDown={() => {
+                        setParentId(s.id.toString())
+                        setParentSearch(s.name)
+                        setParentOpen(false)
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm normal-case transition-colors ${parentId === s.id.toString() ? 'bg-primary/20 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                  {filteredParents.length === 0 && (
+                    <p className="px-3 py-2 text-sm text-white/30 normal-case">
+                      No series found.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

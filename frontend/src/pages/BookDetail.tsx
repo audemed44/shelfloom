@@ -12,6 +12,7 @@ import {
   ArrowRight,
   RefreshCw,
   Loader2,
+  Upload,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
@@ -120,6 +121,7 @@ export default function BookDetailPage() {
   const [moveOpen, setMoveOpen] = useState(false)
   const [movingTo, setMovingTo] = useState<number | null>(null)
   const [coverRefreshing, setCoverRefreshing] = useState(false)
+  const [coverUploading, setCoverUploading] = useState(false)
   const [coverKey, setCoverKey] = useState(0)
   const [markingRead, setMarkingRead] = useState(false)
   const [summaryKey, setSummaryKey] = useState(0)
@@ -197,6 +199,29 @@ export default function BookDetailPage() {
       // silently ignore
     } finally {
       setCoverRefreshing(false)
+    }
+  }
+
+  const handleUploadCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !id) return
+    e.target.value = ''
+    setCoverUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const updated = await api.upload<BookDetail>(
+        `/api/books/${id}/upload-cover`,
+        formData
+      )
+      if (updated) {
+        setBook(updated)
+        setCoverKey((k) => k + 1)
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setCoverUploading(false)
     }
   }
 
@@ -346,7 +371,7 @@ export default function BookDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
         {/* ── Left Column ── */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
           {/* Cover */}
           <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 shadow-2xl shadow-primary/5">
             <img
@@ -358,19 +383,37 @@ export default function BookDetailPage() {
                 e.currentTarget.style.display = 'none'
               }}
             />
-            <button
-              onClick={handleRefreshCover}
-              disabled={coverRefreshing}
-              data-testid="refresh-cover-btn"
-              title="Refresh cover"
-              className="absolute bottom-2 right-2 p-2 bg-black/60 border border-white/10 text-white/50 hover:text-white hover:border-white/30 rounded-lg transition-all disabled:opacity-40"
-            >
-              {coverRefreshing ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <RefreshCw size={13} />
-              )}
-            </button>
+            <div className="absolute bottom-2 right-2 flex gap-1.5">
+              <label
+                title="Upload cover image"
+                className={`p-2 bg-black/60 border border-white/10 text-white/50 hover:text-white hover:border-white/30 rounded-lg transition-all cursor-pointer ${coverUploading ? 'opacity-40 pointer-events-none' : ''}`}
+              >
+                {coverUploading ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Upload size={13} />
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleUploadCover}
+                />
+              </label>
+              <button
+                onClick={handleRefreshCover}
+                disabled={coverRefreshing}
+                data-testid="refresh-cover-btn"
+                title="Refresh cover from file"
+                className="p-2 bg-black/60 border border-white/10 text-white/50 hover:text-white hover:border-white/30 rounded-lg transition-all disabled:opacity-40"
+              >
+                {coverRefreshing ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={13} />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Progress card */}
@@ -451,7 +494,7 @@ export default function BookDetailPage() {
                     <Link
                       to={`/books/${primarySeries.prev_book.id}`}
                       data-testid="prev-book-link"
-                      className="flex-1 flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
+                      className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
                     >
                       <ChevronRight
                         size={13}
@@ -473,7 +516,7 @@ export default function BookDetailPage() {
                     <Link
                       to={`/books/${primarySeries.next_book.id}`}
                       data-testid="next-book-link"
-                      className="flex-1 flex items-center justify-end gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
+                      className="flex-1 min-w-0 flex items-center justify-end gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
                     >
                       <div className="min-w-0 text-right">
                         <p className="text-[9px] tracking-widest uppercase text-white/30">
@@ -625,7 +668,7 @@ export default function BookDetailPage() {
         </div>
 
         {/* ── Right Column ── */}
-        <div className="lg:col-span-7 flex flex-col">
+        <div className="lg:col-span-7 flex flex-col order-1 lg:order-2">
           {/* Series label */}
           {primarySeries && (
             <div className="flex items-center gap-3 mb-4">

@@ -77,13 +77,55 @@ def extract_pdf_cover(file_path: str | Path, output_path: str | Path) -> bool:
     return True
 
 
-def _save_as_jpeg(data: bytes, output_path: str | Path) -> None:
+def _save_as_jpeg(data: bytes, output_path: str | Path, max_size: int | None = None) -> None:
     """Convert image bytes to JPEG and save to output_path."""
     try:
         img = Image.open(io.BytesIO(data))
         if img.mode not in ("RGB", "L"):
             img = img.convert("RGB")
+        if max_size and (img.width > max_size or img.height > max_size):
+            img.thumbnail((max_size, max_size), Image.LANCZOS)
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         img.save(str(output_path), "JPEG", quality=85, optimize=True)
     except Exception as e:
         raise CoverExtractionError(f"Failed to save cover image: {e}") from e
+
+
+def embed_epub_cover(epub_path: str | Path, cover_image_path: str | Path) -> None:
+    """Embed a cover image into an EPUB file in-place, replacing any existing cover."""
+    try:
+        from ebooklib import epub, ITEM_IMAGE, ITEM_COVER
+    except ImportError:  # pragma: no cover
+        raise CoverExtractionError("ebooklib is required")
+
+    try:
+        book = epub.read_epub(str(epub_path), options={"ignore_ncx": True})
+    except Exception as e:
+        raise CoverExtractionError(f"Failed to open EPUB: {e}") from e
+
+    with open(str(cover_image_path), "rb") as f:
+        cover_data = f.read()
+
+    # Replace content of existing cover item if found
+    updated = False
+    for item in book.get_items():
+        if item.get_type() == ITEM_COVER:
+            item.content = cover_data
+            item.media_type = "image/jpeg"
+            updated = True
+            break
+    if not updated:
+        for item in book.get_items():
+            if item.get_type() == ITEM_IMAGE and "cover" in (item.file_name or "").lower():
+                item.content = cover_data
+                item.media_type = "image/jpeg"
+                updated = True
+                break
+
+    if not updated:
+        book.set_cover("images/cover.jpg", cover_data, create_page=False)
+
+    try:
+        epub.write_epub(str(epub_path), book)
+    except Exception as e:
+        raise CoverExtractionError(f"Failed to write EPUB: {e}") from e

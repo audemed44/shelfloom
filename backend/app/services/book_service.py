@@ -224,6 +224,41 @@ async def refresh_book_cover(
     return book
 
 
+async def upload_book_cover(
+    session: AsyncSession,
+    book_id: str,
+    covers_dir: str | Path,
+    image_data: bytes,
+) -> Book:
+    """Save an uploaded image as the book cover (max 1200 px), embed in EPUB if applicable."""
+    from app.services.metadata.cover import CoverExtractionError, _save_as_jpeg, embed_epub_cover
+
+    book = await get_book(session, book_id)
+
+    output = Path(covers_dir) / f"{book.id}.jpg"
+    try:
+        _save_as_jpeg(image_data, output, max_size=1200)
+    except CoverExtractionError as e:
+        raise FileOperationError(str(e)) from e
+
+    book.cover_path = str(output)
+
+    if book.format == "epub":
+        shelf_result = await session.execute(select(Shelf).where(Shelf.id == book.shelf_id))
+        shelf = shelf_result.scalar_one_or_none()
+        if shelf:
+            full_path = Path(shelf.path) / book.file_path
+            if full_path.exists():
+                try:
+                    embed_epub_cover(full_path, output)
+                except CoverExtractionError:
+                    pass  # Cover image saved; embedding failed non-fatally
+
+    await session.commit()
+    await session.refresh(book)
+    return book
+
+
 async def backfill_covers(
     session: AsyncSession,
     covers_dir: str | Path,

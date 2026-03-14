@@ -39,6 +39,8 @@ export default function SeriesDetail() {
   const navigate = useNavigate()
   const seriesId = id ? parseInt(id, 10) : null
 
+  const [refreshKey, setRefreshKey] = useState(0)
+
   const { data: series } = useApi<SeriesDetailData>(
     seriesId ? `/api/series/${seriesId}` : null
   )
@@ -47,9 +49,10 @@ export default function SeriesDetail() {
   )
   const { data: allSeries } = useApi<SeriesWithCount[]>('/api/series/tree')
   const { data: readingOrders } = useApi<ReadingOrder[]>(
-    seriesId ? `/api/series/${seriesId}/reading-orders?_rev=${refreshKey}` : null
+    seriesId
+      ? `/api/series/${seriesId}/reading-orders?_rev=${refreshKey}`
+      : null
   )
-
   const [showEdit, setShowEdit] = useState(false)
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null)
   const [newOrderName, setNewOrderName] = useState('')
@@ -65,7 +68,6 @@ export default function SeriesDetail() {
   const [localEntries, setLocalEntries] = useState<ReadingOrderEntry[]>([])
   const [entriesDirty, setEntriesDirty] = useState(false)
   const [entryDragOver, setEntryDragOver] = useState<number | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
 
   // sync localBooks when books load
   useEffect(() => {

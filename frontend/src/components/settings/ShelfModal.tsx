@@ -37,13 +37,13 @@ export default function ShelfModal({
     koreader_stats_db_path: shelf?.koreader_stats_db_path ?? '',
     auto_organize: shelf?.auto_organize ?? false,
     organize_template:
-      shelf?.organize_template ??
-      '{author}/{series_path}/{sequence| - }{title}',
+      shelf?.organize_template ?? '{series_path}/{sequence| - }{title}',
     seq_pad: shelf?.seq_pad ?? 2,
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showPicker, setShowPicker] = useState(false)
+  const [showStatsPicker, setShowStatsPicker] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -201,17 +201,31 @@ export default function ShelfModal({
               <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
                 KOReader Statistics DB
               </label>
-              <input
-                type="text"
-                value={form.koreader_stats_db_path}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, koreader_stats_db_path: e.target.value }))
-                }
-                placeholder="e.g., /koreader/statistics.sqlite3"
-                className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={form.koreader_stats_db_path}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      koreader_stats_db_path: e.target.value,
+                    }))
+                  }
+                  placeholder="e.g., /koreader/statistics.sqlite3"
+                  className="flex-1 bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowStatsPicker(true)}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-2 border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors"
+                  title="Browse"
+                >
+                  <FolderOpen size={14} />
+                </button>
+              </div>
               <p className="text-[10px] text-white/30 normal-case">
-                Path to the KOReader statistics.sqlite3 for this shelf's device. Scanned automatically to import reading sessions.
+                Path to the KOReader statistics.sqlite3 for this shelf&apos;s
+                device. Scanned automatically to import reading sessions.
               </p>
             </div>
 
@@ -236,7 +250,7 @@ export default function ShelfModal({
                         organize_template: e.target.value,
                       }))
                     }
-                    placeholder="{author}/{series_path}/{sequence| - }{title}"
+                    placeholder="{series_path}/{sequence| - }{title}"
                     className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
                   />
                   <p className="text-[10px] text-white/30 normal-case">
@@ -302,6 +316,16 @@ export default function ShelfModal({
             setShowPicker(false)
           }}
           onClose={() => setShowPicker(false)}
+        />
+      )}
+      {showStatsPicker && (
+        <DirPicker
+          initialPath={form.koreader_stats_db_path || undefined}
+          onSelect={(p) => {
+            setForm((f) => ({ ...f, koreader_stats_db_path: p }))
+            setShowStatsPicker(false)
+          }}
+          onClose={() => setShowStatsPicker(false)}
         />
       )}
     </div>

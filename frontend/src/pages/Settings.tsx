@@ -63,7 +63,7 @@ const TOKENS = [
   { label: '{sequence| - }', example: '01 - ' },
 ]
 
-const DEFAULT_TEMPLATE = '{author}/{series_path}/{sequence| - }{title}'
+const DEFAULT_TEMPLATE = '{series_path}/{sequence| - }{title}'
 
 function computeExamplePath(template: string): string {
   const examples: Record<string, string> = {

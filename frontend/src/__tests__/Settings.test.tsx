@@ -271,7 +271,7 @@ describe('Settings', () => {
     renderSettings()
     await waitFor(() => screen.getByTestId('example-path'))
     const examplePath = screen.getByTestId('example-path')
-    expect(examplePath.textContent).toContain('Brandon Sanderson')
+    expect(examplePath.textContent).toContain('Stormlight Archive')
     expect(examplePath.textContent).toContain('.epub')
   })
 
