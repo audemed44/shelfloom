@@ -1,4 +1,5 @@
 """Tests for EPUB/PDF metadata extraction and cover extraction."""
+
 from pathlib import Path
 
 import pytest
@@ -10,8 +11,10 @@ PDF_PATH = FIXTURES / "test.pdf"
 
 # ── EPUB parser ───────────────────────────────────────────────────────────────
 
+
 async def test_parse_epub_basic():
     from app.services.metadata.epub import parse_epub
+
     meta = parse_epub(EPUB_PATH)
     assert meta.title == "Test Book Title"
     assert meta.author == "Test Author"
@@ -22,6 +25,7 @@ async def test_parse_epub_basic():
 
 async def test_parse_epub_page_count():
     from app.services.metadata.epub import parse_epub
+
     meta = parse_epub(EPUB_PATH)
     assert meta.page_count is not None
     assert meta.page_count >= 1
@@ -29,6 +33,7 @@ async def test_parse_epub_page_count():
 
 async def test_parse_epub_uid():
     from app.services.metadata.epub import parse_epub
+
     meta = parse_epub(EPUB_PATH)
     # Our test EPUB has identifier 'test-epub-001'
     assert meta.epub_uid == "test-epub-001"
@@ -36,6 +41,7 @@ async def test_parse_epub_uid():
 
 async def test_parse_epub_shelfloom_id_absent():
     from app.services.metadata.epub import parse_epub
+
     meta = parse_epub(EPUB_PATH)
     assert meta.shelfloom_id is None
 
@@ -43,8 +49,10 @@ async def test_parse_epub_shelfloom_id_absent():
 async def test_parse_epub_shelfloom_id_present(tmp_path):
     """EPUB with a Shelfloom URN identifier — ID is extracted."""
     import uuid
+
     from ebooklib import epub
-    from app.services.metadata.epub import parse_epub, SHELFLOOM_URN_PREFIX
+
+    from app.services.metadata.epub import SHELFLOOM_URN_PREFIX, parse_epub
 
     uid = str(uuid.uuid4())
     book = epub.EpubBook()
@@ -66,6 +74,7 @@ async def test_parse_epub_shelfloom_id_present(tmp_path):
 
 async def test_parse_epub_raw_metadata():
     from app.services.metadata.epub import parse_epub
+
     meta = parse_epub(EPUB_PATH)
     assert isinstance(meta.raw, dict)
     assert "titles" in meta.raw
@@ -74,6 +83,7 @@ async def test_parse_epub_raw_metadata():
 async def test_parse_epub_missing_optional_fields(tmp_path):
     """EPUB with only title — optional fields fall back gracefully."""
     from ebooklib import epub
+
     from app.services.metadata.epub import parse_epub
 
     book = epub.EpubBook()
@@ -95,7 +105,8 @@ async def test_parse_epub_missing_optional_fields(tmp_path):
 
 
 async def test_parse_epub_malformed_file(tmp_path):
-    from app.services.metadata.epub import parse_epub, EPUBParseError
+    from app.services.metadata.epub import EPUBParseError, parse_epub
+
     bad = tmp_path / "bad.epub"
     bad.write_bytes(b"this is not an epub file at all")
     with pytest.raises(EPUBParseError):
@@ -104,6 +115,7 @@ async def test_parse_epub_malformed_file(tmp_path):
 
 async def test_parse_epub_isbn_extraction(tmp_path):
     from ebooklib import epub
+
     from app.services.metadata.epub import parse_epub
 
     book = epub.EpubBook()
@@ -126,8 +138,10 @@ async def test_parse_epub_isbn_extraction(tmp_path):
 
 # ── PDF parser ────────────────────────────────────────────────────────────────
 
+
 async def test_parse_pdf_basic():
     from app.services.metadata.pdf import parse_pdf
+
     meta = parse_pdf(PDF_PATH)
     assert meta.title == "Test PDF Title"
     assert meta.author == "Test PDF Author"
@@ -135,12 +149,14 @@ async def test_parse_pdf_basic():
 
 async def test_parse_pdf_page_count():
     from app.services.metadata.pdf import parse_pdf
+
     meta = parse_pdf(PDF_PATH)
     assert meta.page_count == 1
 
 
 async def test_parse_pdf_raw_metadata():
     from app.services.metadata.pdf import parse_pdf
+
     meta = parse_pdf(PDF_PATH)
     assert isinstance(meta.raw, dict)
 
@@ -148,6 +164,7 @@ async def test_parse_pdf_raw_metadata():
 async def test_parse_pdf_missing_metadata(tmp_path):
     """PDF without metadata — falls back to 'Unknown Title'."""
     import fitz
+
     from app.services.metadata.pdf import parse_pdf
 
     doc = fitz.open()
@@ -162,7 +179,8 @@ async def test_parse_pdf_missing_metadata(tmp_path):
 
 
 async def test_parse_pdf_malformed_file(tmp_path):
-    from app.services.metadata.pdf import parse_pdf, PDFParseError
+    from app.services.metadata.pdf import PDFParseError, parse_pdf
+
     bad = tmp_path / "bad.pdf"
     bad.write_bytes(b"not a pdf")
     with pytest.raises(PDFParseError):
@@ -171,8 +189,10 @@ async def test_parse_pdf_malformed_file(tmp_path):
 
 # ── filename parser ───────────────────────────────────────────────────────────
 
+
 async def test_filename_author_dash_title():
     from app.services.metadata.filename import parse_filename
+
     meta = parse_filename("Brandon Sanderson - The Way of Kings.epub")
     assert meta.author == "Brandon Sanderson"
     assert meta.title == "The Way of Kings"
@@ -180,6 +200,7 @@ async def test_filename_author_dash_title():
 
 async def test_filename_title_only():
     from app.services.metadata.filename import parse_filename
+
     meta = parse_filename("just-a-title.epub")
     assert meta.title == "just a title"
     assert meta.author is None
@@ -187,6 +208,7 @@ async def test_filename_title_only():
 
 async def test_filename_underscores():
     from app.services.metadata.filename import parse_filename
+
     meta = parse_filename("some_book_title.pdf")
     assert meta.author is None
     assert "some book title" in meta.title.lower()
@@ -194,8 +216,10 @@ async def test_filename_underscores():
 
 # ── cover extraction ──────────────────────────────────────────────────────────
 
+
 async def test_extract_pdf_cover(tmp_path):
     from app.services.metadata.cover import extract_pdf_cover
+
     output = tmp_path / "cover.jpg"
     result = extract_pdf_cover(PDF_PATH, output)
     assert result is True
@@ -204,6 +228,7 @@ async def test_extract_pdf_cover(tmp_path):
 
     # Verify it's a valid JPEG
     from PIL import Image
+
     img = Image.open(output)
     assert img.format == "JPEG"
 
@@ -211,6 +236,7 @@ async def test_extract_pdf_cover(tmp_path):
 async def test_extract_epub_cover_no_cover(tmp_path):
     """EPUB without a cover image returns False."""
     from app.services.metadata.cover import extract_epub_cover
+
     output = tmp_path / "cover.jpg"
     result = extract_epub_cover(EPUB_PATH, output)
     # Our minimal test EPUB has no cover image
@@ -220,8 +246,10 @@ async def test_extract_epub_cover_no_cover(tmp_path):
 async def test_extract_epub_cover_with_cover(tmp_path):
     """EPUB with a cover image — cover extracted successfully."""
     import io
+
     from ebooklib import epub
     from PIL import Image
+
     from app.services.metadata.cover import extract_epub_cover
 
     # Create an EPUB with a cover image
@@ -258,6 +286,7 @@ async def test_extract_epub_cover_with_cover(tmp_path):
 
 async def test_extract_cover_creates_parent_dirs(tmp_path):
     from app.services.metadata.cover import extract_pdf_cover
+
     output = tmp_path / "deep" / "nested" / "cover.jpg"
     result = extract_pdf_cover(PDF_PATH, output)
     assert result is True
@@ -265,16 +294,17 @@ async def test_extract_cover_creates_parent_dirs(tmp_path):
 
 
 async def test_extract_epub_cover_bad_file(tmp_path):
-    from app.services.metadata.cover import extract_epub_cover, CoverExtractionError
+    from app.services.metadata.cover import CoverExtractionError, extract_epub_cover
+
     bad = tmp_path / "bad.epub"
     bad.write_bytes(b"not an epub")
     with pytest.raises(CoverExtractionError):
         extract_epub_cover(bad, tmp_path / "out.jpg")
 
 
-
 async def test_extract_pdf_cover_bad_file(tmp_path):
-    from app.services.metadata.cover import extract_pdf_cover, CoverExtractionError
+    from app.services.metadata.cover import CoverExtractionError, extract_pdf_cover
+
     bad = tmp_path / "bad.pdf"
     bad.write_bytes(b"not a pdf")
     with pytest.raises(CoverExtractionError):
@@ -284,7 +314,9 @@ async def test_extract_pdf_cover_bad_file(tmp_path):
 async def test_save_as_jpeg_non_rgb(tmp_path):
     """RGBA image is converted to RGB before saving."""
     import io
+
     from PIL import Image
+
     from app.services.metadata.cover import _save_as_jpeg
 
     img_data = io.BytesIO()
@@ -296,6 +328,7 @@ async def test_save_as_jpeg_non_rgb(tmp_path):
 
 
 async def test_save_as_jpeg_invalid_data(tmp_path):
-    from app.services.metadata.cover import _save_as_jpeg, CoverExtractionError
+    from app.services.metadata.cover import CoverExtractionError, _save_as_jpeg
+
     with pytest.raises(CoverExtractionError):
         _save_as_jpeg(b"not image data", tmp_path / "out.jpg")

@@ -1,7 +1,8 @@
 """Reading statistics service."""
+
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
 from sqlalchemy import func, select
@@ -45,7 +46,7 @@ def _streak_from_dates(dates: list[date]) -> dict:
     if not dates:
         return {"current": 0, "longest": 0, "last_read_date": None, "history": []}
 
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
 
     # Build consecutive runs
     runs: list[dict] = []
@@ -55,7 +56,13 @@ def _streak_from_dates(dates: list[date]) -> dict:
         if (dates[i] - dates[i - 1]).days == 1:
             run_len += 1
         else:
-            runs.append({"start": run_start.isoformat(), "end": dates[i - 1].isoformat(), "days": run_len})
+            runs.append(
+                {
+                    "start": run_start.isoformat(),
+                    "end": dates[i - 1].isoformat(),
+                    "days": run_len,
+                }
+            )
             run_start = dates[i]
             run_len = 1
     runs.append({"start": run_start.isoformat(), "end": dates[-1].isoformat(), "days": run_len})
@@ -79,9 +86,7 @@ def _streak_from_dates(dates: list[date]) -> dict:
 
 async def get_overview(session: AsyncSession) -> dict:
     """High-level totals: books owned, read, time, pages, current streak."""
-    books_owned: int = (
-        await session.execute(select(func.count()).select_from(Book))
-    ).scalar_one()
+    books_owned: int = (await session.execute(select(func.count()).select_from(Book))).scalar_one()
 
     books_read: int = (
         await session.execute(
@@ -125,15 +130,12 @@ async def get_time_series(
     fmt = _STRFTIME_FMTS[granularity]
     col = ReadingSession.duration if metric == "duration" else ReadingSession.pages_read
 
-    q = (
-        select(
-            func.strftime(fmt, ReadingSession.start_time).label("bucket"),
-            func.coalesce(func.sum(col), 0).label("value"),
-        )
-        .where(
-            ReadingSession.dismissed == False,  # noqa: E712
-            ReadingSession.start_time.is_not(None),
-        )
+    q = select(
+        func.strftime(fmt, ReadingSession.start_time).label("bucket"),
+        func.coalesce(func.sum(col), 0).label("value"),
+    ).where(
+        ReadingSession.dismissed == False,  # noqa: E712
+        ReadingSession.start_time.is_not(None),
     )
     if from_dt:
         q = q.where(ReadingSession.start_time >= from_dt)
@@ -267,7 +269,11 @@ async def get_by_author(session: AsyncSession) -> list[dict]:
         )
     ).all()
     return [
-        {"author": r.author, "total_seconds": r.total_seconds or 0, "session_count": r.session_count}
+        {
+            "author": r.author,
+            "total_seconds": r.total_seconds or 0,
+            "session_count": r.session_count,
+        }
         for r in rows
     ]
 
@@ -289,7 +295,11 @@ async def get_by_tag(session: AsyncSession) -> list[dict]:
         )
     ).all()
     return [
-        {"tag": r.name, "total_seconds": r.total_seconds or 0, "session_count": r.session_count}
+        {
+            "tag": r.name,
+            "total_seconds": r.total_seconds or 0,
+            "session_count": r.session_count,
+        }
         for r in rows
     ]
 
@@ -323,22 +333,24 @@ async def get_recent_sessions(session: AsyncSession, limit: int = 10) -> list[di
 
 async def get_book_stats(session: AsyncSession, book_id: str) -> dict | None:
     """Per-book analytics. Returns None if book doesn't exist."""
-    book = (
-        await session.execute(select(Book).where(Book.id == book_id))
-    ).scalar_one_or_none()
+    book = (await session.execute(select(Book).where(Book.id == book_id))).scalar_one_or_none()
     if book is None:
         return None
 
     sessions = (
-        await session.execute(
-            select(ReadingSession)
-            .where(
-                ReadingSession.book_id == book_id,
-                ReadingSession.dismissed == False,  # noqa: E712
+        (
+            await session.execute(
+                select(ReadingSession)
+                .where(
+                    ReadingSession.book_id == book_id,
+                    ReadingSession.dismissed == False,  # noqa: E712
+                )
+                .order_by(ReadingSession.start_time)
             )
-            .order_by(ReadingSession.start_time)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     total_seconds = sum(s.duration or 0 for s in sessions)
     total_pages = sum(s.pages_read or 0 for s in sessions)

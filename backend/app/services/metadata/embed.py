@@ -1,4 +1,5 @@
 """Embed a Shelfloom UUID into an EPUB's OPF metadata."""
+
 from __future__ import annotations
 
 import hashlib
@@ -7,7 +8,6 @@ import re
 import uuid
 import zipfile
 from pathlib import Path
-
 
 SHELFLOOM_URN_PREFIX = "urn:shelfloom:"
 _SHELFLOOM_ID_ATTR = 'id="shelfloom-id"'
@@ -41,8 +41,8 @@ def _find_opf_path(zf: zipfile.ZipFile) -> str:
 def _has_shelfloom_id(opf_content: str) -> str | None:
     """Return the existing Shelfloom UUID if already embedded, else None."""
     pattern = re.compile(
-        rf'<dc:identifier[^>]*{re.escape(_SHELFLOOM_ID_ATTR)}[^>]*>'
-        rf'\s*{re.escape(SHELFLOOM_URN_PREFIX)}([^<]+)\s*</dc:identifier>',
+        rf"<dc:identifier[^>]*{re.escape(_SHELFLOOM_ID_ATTR)}[^>]*>"
+        rf"\s*{re.escape(SHELFLOOM_URN_PREFIX)}([^<]+)\s*</dc:identifier>",
         re.IGNORECASE,
     )
     match = pattern.search(opf_content)
@@ -50,23 +50,28 @@ def _has_shelfloom_id(opf_content: str) -> str | None:
         return match.group(1).strip()
 
     # Also check attribute in any order
-    for m in re.finditer(r'<dc:identifier([^>]*)>([^<]*)</dc:identifier>', opf_content, re.IGNORECASE):
+    for m in re.finditer(
+        r"<dc:identifier([^>]*)>([^<]*)</dc:identifier>", opf_content, re.IGNORECASE
+    ):
         attrs = m.group(1)
         value = m.group(2).strip()
-        if 'shelfloom-id' in attrs and value.startswith(SHELFLOOM_URN_PREFIX):
-            return value[len(SHELFLOOM_URN_PREFIX):]
+        if "shelfloom-id" in attrs and value.startswith(SHELFLOOM_URN_PREFIX):
+            return value[len(SHELFLOOM_URN_PREFIX) :]
     return None
 
 
 def _inject_identifier(opf_content: str, book_uuid: str) -> str:
     """Insert a shelfloom dc:identifier before </metadata>."""
     tag = (
-        f'\n    <dc:identifier id="shelfloom-id">'
-        f'{SHELFLOOM_URN_PREFIX}{book_uuid}</dc:identifier>'
+        f'\n    <dc:identifier id="shelfloom-id">{SHELFLOOM_URN_PREFIX}{book_uuid}</dc:identifier>'
     )
     # Insert before closing </metadata>
     new_content, count = re.subn(
-        r'(</(?:opf:)?metadata>)', tag + r'\n    \1', opf_content, count=1, flags=re.IGNORECASE
+        r"(</(?:opf:)?metadata>)",
+        tag + r"\n    \1",
+        opf_content,
+        count=1,
+        flags=re.IGNORECASE,
     )
     if count == 0:
         raise EmbedError("Could not find </metadata> tag in OPF")
@@ -122,8 +127,10 @@ def embed_shelfloom_id(
 
     # Rebuild the zip
     output = io.BytesIO()
-    with zipfile.ZipFile(io.BytesIO(original_bytes)) as src, \
-         zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as dst:
+    with (
+        zipfile.ZipFile(io.BytesIO(original_bytes)) as src,
+        zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as dst,
+    ):
         for item in src.infolist():
             if item.filename == opf_path:
                 dst.writestr(item, new_opf_bytes)

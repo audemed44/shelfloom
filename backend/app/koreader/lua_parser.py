@@ -9,6 +9,7 @@ Handles the subset of Lua syntax produced by KOReader:
 - Single-line comments ``-- ...`` and long comments ``--[[ ... ]]``
 - Top-level ``return <value>`` and ``local IDENT = <value> return IDENT`` wrappers
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -35,7 +36,7 @@ class _Parser:
         self._skip_whitespace_and_comments()
         if self._pos < len(self._src):
             # Allow trailing content only if it's just whitespace / comments
-            remaining = self._src[self._pos:]
+            remaining = self._src[self._pos :]
             if remaining.strip():
                 raise LuaParseError(
                     f"Unexpected content at position {self._pos}: {remaining[:20]!r}"
@@ -97,7 +98,7 @@ class _Parser:
             return self._parse_number()
         # Try booleans / nil
         for keyword, val in (("true", True), ("false", False), ("nil", None)):
-            if self._src[self._pos:self._pos + len(keyword)] == keyword:
+            if self._src[self._pos : self._pos + len(keyword)] == keyword:
                 # Make sure it's not part of a longer identifier
                 after = self._pos + len(keyword)
                 if after >= len(self._src) or not (
@@ -109,9 +110,7 @@ class _Parser:
         if ch.isdigit():
             return self._parse_number()
 
-        raise LuaParseError(
-            f"Unexpected character {ch!r} at position {self._pos}"
-        )
+        raise LuaParseError(f"Unexpected character {ch!r} at position {self._pos}")
 
     # ------------------------------------------------------------------
     # Table
@@ -181,7 +180,7 @@ class _Parser:
             self._skip_whitespace_and_comments()
             if self._peek() == "=":
                 # But make sure it's "=" not "=="
-                if self._src[self._pos:self._pos + 2] != "==":
+                if self._src[self._pos : self._pos + 2] != "==":
                     self._pos += 1  # consume '='
                     self._skip_whitespace_and_comments()
                     value = self._parse_value()
@@ -209,9 +208,7 @@ class _Parser:
             if ch == "\\":
                 parts.append(self._parse_escape())
             elif ch in ("\n", "\r"):
-                raise LuaParseError(
-                    f"Unescaped newline in short string at position {self._pos}"
-                )
+                raise LuaParseError(f"Unescaped newline in short string at position {self._pos}")
             else:
                 parts.append(ch)
                 self._pos += 1
@@ -269,7 +266,10 @@ class _Parser:
         raise LuaParseError(f"Unknown escape sequence '\\{ch}' at position {self._pos}")
 
     def _peek_long_string_level(self) -> int | None:
-        """Return the level (number of '=' signs) if the current position starts a long string/comment bracket, else None."""
+        """Return the nesting level if the current position starts a long string/comment bracket.
+
+        Returns the number of '=' signs in the opening bracket, or None if not at one.
+        """
         i = self._pos
         if i >= len(self._src) or self._src[i] != "[":
             return None
@@ -292,7 +292,7 @@ class _Parser:
         # Skip immediate newline after opening bracket (Lua spec)
         if self._pos < len(self._src) and self._src[self._pos] == "\n":
             self._pos += 1
-        elif self._pos + 1 < len(self._src) and self._src[self._pos:self._pos + 2] == "\r\n":
+        elif self._pos + 1 < len(self._src) and self._src[self._pos : self._pos + 2] == "\r\n":
             self._pos += 2
         elif self._pos < len(self._src) and self._src[self._pos] == "\r":
             self._pos += 1
@@ -301,9 +301,10 @@ class _Parser:
         end = self._src.find(closing, self._pos)
         if end == -1:
             raise LuaParseError(
-                f"Unterminated long string (expected {closing!r}) starting near position {self._pos}"
+                f"Unterminated long string (expected {closing!r})"
+                f" starting near position {self._pos}"
             )
-        content = self._src[self._pos:end]
+        content = self._src[self._pos : end]
         self._pos = end + len(closing)
         return content
 
@@ -320,12 +321,12 @@ class _Parser:
             self._pos += 1
 
         # Hex
-        if self._pos + 1 < len(src) and src[self._pos:self._pos + 2] in ("0x", "0X"):
+        if self._pos + 1 < len(src) and src[self._pos : self._pos + 2] in ("0x", "0X"):
             self._pos += 2
-            hex_start = self._pos
+            _hex_start = self._pos
             while self._pos < len(src) and src[self._pos] in "0123456789abcdefABCDEF_":
                 self._pos += 1
-            token = src[start:self._pos].replace("_", "")
+            token = src[start : self._pos].replace("_", "")
             try:
                 return int(token, 16)
             except ValueError:
@@ -356,7 +357,7 @@ class _Parser:
             if self._pos == exp_start:
                 raise LuaParseError(f"Invalid exponent in number at position {self._pos}")
 
-        token = src[start:self._pos].replace("_", "")
+        token = src[start : self._pos].replace("_", "")
         if not token or token in ("-", "+"):
             raise LuaParseError(f"Expected number at position {start}")
         try:
@@ -375,16 +376,21 @@ class _Parser:
         src = self._src
         if self._pos >= len(src) or not (src[self._pos].isalpha() or src[self._pos] == "_"):
             raise LuaParseError(
-                f"Expected identifier at position {self._pos}, got {src[self._pos:self._pos+5]!r}"
+                f"Expected identifier at position {self._pos},"
+                f" got {src[self._pos : self._pos + 5]!r}"
             )
         while self._pos < len(src) and (src[self._pos].isalnum() or src[self._pos] == "_"):
             self._pos += 1
-        return src[start:self._pos]
+        return src[start : self._pos]
 
     def _match_keyword(self, keyword: str) -> bool:
-        """Consume *keyword* if it appears at the current position and is not part of a longer identifier."""
+        """Consume *keyword* if it appears at the current position.
+
+        Returns False if the keyword is followed by identifier characters
+        (i.e. it is part of a longer name).
+        """
         end = self._pos + len(keyword)
-        if self._src[self._pos:end] != keyword:
+        if self._src[self._pos : end] != keyword:
             return False
         # Make sure it's not a longer identifier
         if end < len(self._src) and (self._src[end].isalnum() or self._src[end] == "_"):
@@ -394,7 +400,7 @@ class _Parser:
 
     def _expect(self, char: str) -> None:
         if self._pos >= len(self._src) or self._src[self._pos] != char:
-            got = self._src[self._pos:self._pos + 5] if self._pos < len(self._src) else "<EOF>"
+            got = self._src[self._pos : self._pos + 5] if self._pos < len(self._src) else "<EOF>"
             raise LuaParseError(f"Expected {char!r} at position {self._pos}, got {got!r}")
         self._pos += 1
 
@@ -435,6 +441,7 @@ class _Parser:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def parse_lua(text: str) -> Any:
     """Parse a Lua value (table, string, number, bool, nil) from *text*.

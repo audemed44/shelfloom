@@ -11,6 +11,7 @@ from app.main import create_app
 async def db_engine():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     import app.models  # noqa: F401 — register all models
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
@@ -37,24 +38,27 @@ async def client(db_engine):
 
     # Attach a fresh scheduler so import endpoints work without a real lifespan
     from app.services.scheduler import Scheduler
+
     application.state.scheduler = Scheduler()
 
-    async with AsyncClient(
-        transport=ASGITransport(app=application), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=application), base_url="http://test") as ac:
         ac.app = application  # expose app for tests that need app.state
         yield ac
 
 
 @pytest.fixture
 def shelf_factory(db_session: AsyncSession):
-    async def _make(name: str = "Test Shelf", path: str = "/shelves/test", is_default: bool = False):
+    async def _make(
+        name: str = "Test Shelf", path: str = "/shelves/test", is_default: bool = False
+    ):
         from app.models.shelf import Shelf
+
         shelf = Shelf(name=name, path=path, is_default=is_default)
         db_session.add(shelf)
         await db_session.commit()
         await db_session.refresh(shelf)
         return shelf
+
     return _make
 
 
@@ -70,6 +74,7 @@ def book_factory(db_session: AsyncSession):
         file_path: str = "test.epub",
     ):
         from app.models.book import Book
+
         book = Book(
             id=str(uuid.uuid4()),
             title=title,
@@ -82,4 +87,5 @@ def book_factory(db_session: AsyncSession):
         await db_session.commit()
         await db_session.refresh(book)
         return book
+
     return _make

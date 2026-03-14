@@ -28,6 +28,7 @@ dev = [
     "pytest-cov>=5.0.0",
     "ruff>=0.6.0",
     "mypy>=1.11.0",
+    "pre-commit>=4.0.0",
 ]
 
 [tool.pytest.ini_options]

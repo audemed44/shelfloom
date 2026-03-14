@@ -14,7 +14,6 @@ from app.models.series import BookSeries, Series
 from app.models.shelf import Shelf, ShelfTemplate
 from app.services.organizer import (
     FileOperationError,
-    OrganizerResult,
     _safe_copy,
     format_sequence,
     list_rename_logs,
@@ -24,7 +23,6 @@ from app.services.organizer import (
     safe_move_with_sdr,
     sanitize_component,
 )
-
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -165,10 +163,7 @@ def test_resolve_all_tokens():
         sequence=1.0,
         seq_pad=2,
     )
-    assert (
-        result
-        == "Brandon Sanderson/Cosmere/Stormlight Archive/01 - The Way of Kings.epub"
-    )
+    assert result == "Brandon Sanderson/Cosmere/Stormlight Archive/01 - The Way of Kings.epub"
 
 
 def test_resolve_no_series_drops_segment():
@@ -350,10 +345,7 @@ def test_resolve_conditional_sequence_full_template():
         sequence=1,
         seq_pad=2,
     )
-    assert (
-        result
-        == "Brandon Sanderson/Cosmere/Stormlight Archive/01 - The Way of Kings.epub"
-    )
+    assert result == "Brandon Sanderson/Cosmere/Stormlight Archive/01 - The Way of Kings.epub"
 
 
 def test_resolve_conditional_sequence_full_template_no_series():
@@ -483,9 +475,7 @@ async def test_organize_book_dry_run_does_not_move_file(db_session, tmp_path):
     src = Path(shelf.path) / "Dune.epub"
     src.write_bytes(b"epub content")
 
-    await organize_book(
-        db_session, book, shelf, "{author}/{title}.{format}", dry_run=True
-    )
+    await organize_book(db_session, book, shelf, "{author}/{title}.{format}", dry_run=True)
 
     assert src.exists()  # not moved
     assert book.file_path == "Dune.epub"  # DB unchanged
@@ -574,9 +564,7 @@ async def test_organize_book_with_series(db_session, tmp_path):
     src.write_bytes(b"epub")
 
     cosmere = await _make_series(db_session, "Cosmere")
-    stormlight = await _make_series(
-        db_session, "Stormlight Archive", parent_id=cosmere.id
-    )
+    stormlight = await _make_series(db_session, "Stormlight Archive", parent_id=cosmere.id)
     await _assign_series(db_session, book.id, stormlight.id, sequence=1.0)
 
     result = await organize_book(
@@ -690,7 +678,7 @@ async def test_organize_shelf_uses_shelf_template(db_session, tmp_path):
     db_session.add(tmpl)
     await db_session.commit()
 
-    book = await _make_book(
+    _book = await _make_book(
         db_session,
         shelf.id,
         title="Dune",
@@ -711,7 +699,7 @@ async def test_organize_shelf_template_override(db_session, tmp_path):
     db_session.add(tmpl)
     await db_session.commit()
 
-    book = await _make_book(
+    _book = await _make_book(
         db_session,
         shelf.id,
         title="Dune",
@@ -736,7 +724,7 @@ async def test_organize_shelf_template_override(db_session, tmp_path):
 
 async def test_list_rename_logs(db_session, tmp_path):
     shelf = await _make_shelf(db_session, tmp_path)
-    book = await _make_book(
+    _book = await _make_book(
         db_session,
         shelf.id,
         title="Dune",
@@ -745,9 +733,7 @@ async def test_list_rename_logs(db_session, tmp_path):
     )
     (Path(shelf.path) / "Dune.epub").write_bytes(b"x")
 
-    await organize_shelf(
-        db_session, shelf.id, template="{author}/{title}.{format}", dry_run=False
-    )
+    await organize_shelf(db_session, shelf.id, template="{author}/{title}.{format}", dry_run=False)
 
     logs = await list_rename_logs(db_session)
     assert len(logs) == 1
@@ -760,21 +746,13 @@ async def test_list_rename_logs_filter_by_shelf(db_session, tmp_path):
     shelf2 = await _make_shelf(db_session, tmp_path / "s2", name="S2")
     (tmp_path / "s2").mkdir()
 
-    book1 = await _make_book(
-        db_session, shelf1.id, title="A", author="X", file_path="A.epub"
-    )
+    _book1 = await _make_book(db_session, shelf1.id, title="A", author="X", file_path="A.epub")
     (tmp_path / "s1" / "A.epub").write_bytes(b"x")
-    book2 = await _make_book(
-        db_session, shelf2.id, title="B", author="Y", file_path="B.epub"
-    )
+    _book2 = await _make_book(db_session, shelf2.id, title="B", author="Y", file_path="B.epub")
     (tmp_path / "s2" / "B.epub").write_bytes(b"x")
 
-    await organize_shelf(
-        db_session, shelf1.id, template="{author}/{title}.{format}", dry_run=False
-    )
-    await organize_shelf(
-        db_session, shelf2.id, template="{author}/{title}.{format}", dry_run=False
-    )
+    await organize_shelf(db_session, shelf1.id, template="{author}/{title}.{format}", dry_run=False)
+    await organize_shelf(db_session, shelf2.id, template="{author}/{title}.{format}", dry_run=False)
 
     logs = await list_rename_logs(db_session, shelf_id=shelf1.id)
     assert len(logs) == 1
@@ -802,8 +780,7 @@ async def test_preview_endpoint(client, db_session, tmp_path):
     await db_session.commit()
 
     resp = await client.get(
-        f"/api/organize/preview?shelf_id={shelf.id}"
-        "&template={author}/{title}.{format}"
+        f"/api/organize/preview?shelf_id={shelf.id}&template={{author}}/{{title}}.{{format}}"
     )
     assert resp.status_code == 200
     data = resp.json()

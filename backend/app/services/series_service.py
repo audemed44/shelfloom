@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy import func, nullslast, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload
 
 from app.models.book import Book
 from app.models.series import BookSeries, ReadingOrder, ReadingOrderEntry, Series
@@ -90,7 +90,6 @@ async def add_book_to_series(
     session: AsyncSession, series_id: int, data: BookSeriesEntry
 ) -> BookSeries:
     await get_series(session, series_id)
-    book_result = await session.execute(select(Book).where(Book.id == data.series_id))  # noqa: reusing field name
     # Actually series_id in BookSeriesEntry is wrong — it's book_id
     # BookSeriesEntry has no book_id field, let's handle via separate param
     raise NotImplementedError("use add_book_to_series_by_id")
@@ -180,21 +179,29 @@ async def _collect_books_in_tree(session: AsyncSession, series_id: int) -> list[
     (sorted by sort_order / name) recursively.  Deduplication happens in the caller.
     """
     direct = (
-        await session.execute(
-            select(BookSeries)
-            .where(BookSeries.series_id == series_id)
-            .order_by(nullslast(BookSeries.sequence), BookSeries.book_id)
+        (
+            await session.execute(
+                select(BookSeries)
+                .where(BookSeries.series_id == series_id)
+                .order_by(nullslast(BookSeries.sequence), BookSeries.book_id)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     book_ids: list[str] = [bs.book_id for bs in direct]
 
     children = (
-        await session.execute(
-            select(Series)
-            .where(Series.parent_id == series_id)
-            .order_by(Series.sort_order, Series.name)
+        (
+            await session.execute(
+                select(Series)
+                .where(Series.parent_id == series_id)
+                .order_by(Series.sort_order, Series.name)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for child in children:
         book_ids.extend(await _collect_books_in_tree(session, child.id))
 

@@ -1,4 +1,5 @@
 """EPUB metadata extraction via ebooklib."""
+
 from __future__ import annotations
 
 import re
@@ -80,7 +81,7 @@ def parse_epub(file_path: str | Path) -> EPUBMetadata:
             continue
         v = str(value).strip()
         if v.startswith(SHELFLOOM_URN_PREFIX):
-            meta.shelfloom_id = v[len(SHELFLOOM_URN_PREFIX):]
+            meta.shelfloom_id = v[len(SHELFLOOM_URN_PREFIX) :]
         elif _looks_like_isbn(v):
             meta.isbn = _normalize_isbn(v)
         elif meta.epub_uid is None:
@@ -88,10 +89,7 @@ def parse_epub(file_path: str | Path) -> EPUBMetadata:
     raw["identifiers"] = [(v, a) for v, a in identifiers]
 
     # Page count estimate: count HTML/XHTML items
-    html_items = [
-        item for item in book.get_items()
-        if item.get_type() == ebooklib.ITEM_DOCUMENT
-    ]
+    html_items = [item for item in book.get_items() if item.get_type() == ebooklib.ITEM_DOCUMENT]
     if html_items:
         total_chars = sum(len(item.get_content()) for item in html_items)
         meta.page_count = max(1, total_chars // 2000)

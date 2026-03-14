@@ -1,9 +1,10 @@
 """Background scan scheduler."""
+
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from app.services.import_service import ImportProgress
@@ -29,9 +30,7 @@ class Scheduler:
 
     async def start(self, session_factory, settings, covers_dir: str) -> None:
         """Start the background scan loop (runs scan once, then on interval)."""
-        self._loop_task = asyncio.create_task(
-            self._loop(session_factory, settings, covers_dir)
-        )
+        self._loop_task = asyncio.create_task(self._loop(session_factory, settings, covers_dir))
 
     async def stop(self) -> None:
         """Cancel the background loop."""
@@ -74,14 +73,15 @@ class Scheduler:
                 combined = ImportProgress()
                 for shelf in shelves:
                     from pathlib import Path as _Path
+
                     stats_db = shelf.koreader_stats_db_path
                     stats_db_path = (
-                        _Path(stats_db)
-                        if stats_db and _Path(stats_db).is_file()
-                        else None
+                        _Path(stats_db) if stats_db and _Path(stats_db).is_file() else None
                     )
                     p = await import_shelf(
-                        session, shelf, covers_dir,
+                        session,
+                        shelf,
+                        covers_dir,
                         mtime_cache=self.mtime_cache,
                         stats_db_path=stats_db_path,
                     )

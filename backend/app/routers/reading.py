@@ -1,4 +1,5 @@
 """Reading data API router."""
+
 from __future__ import annotations
 
 import math
@@ -8,7 +9,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.models.book import Book
 from app.models.reading import Highlight, ReadingProgress, ReadingSession
 from app.schemas.reading import (
     BookReadingSummary,
@@ -86,9 +86,7 @@ async def get_highlights(
 
     offset = (page - 1) * per_page
 
-    total_result = await session.execute(
-        select(func.count()).where(Highlight.book_id == book_id)
-    )
+    total_result = await session.execute(select(func.count()).where(Highlight.book_id == book_id))
     total = total_result.scalar_one()
 
     result = await session.execute(

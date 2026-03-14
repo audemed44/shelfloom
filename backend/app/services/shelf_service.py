@@ -3,6 +3,7 @@ import os
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.book import Book
 from app.models.shelf import Shelf, ShelfTemplate
 from app.schemas.shelf import ShelfCreate, ShelfUpdate
@@ -101,9 +102,7 @@ async def create_shelf(
     return shelf
 
 
-async def update_shelf(
-    session: AsyncSession, shelf_id: int, data: ShelfUpdate
-) -> Shelf:
+async def update_shelf(session: AsyncSession, shelf_id: int, data: ShelfUpdate) -> Shelf:
     shelf_row = await get_shelf(session, shelf_id)
     shelf = shelf_row[0]
 
@@ -129,11 +128,13 @@ async def update_shelf(
             if data.seq_pad is not None:
                 existing_tmpl.seq_pad = data.seq_pad
         else:
-            session.add(ShelfTemplate(
-                shelf_id=shelf.id,
-                template=data.organize_template,
-                seq_pad=data.seq_pad if data.seq_pad is not None else 2,
-            ))
+            session.add(
+                ShelfTemplate(
+                    shelf_id=shelf.id,
+                    template=data.organize_template,
+                    seq_pad=data.seq_pad if data.seq_pad is not None else 2,
+                )
+            )
 
     try:
         await session.commit()
@@ -149,9 +150,7 @@ async def delete_shelf(session: AsyncSession, shelf_id: int) -> None:
     shelf, book_count = shelf_row
 
     if book_count > 0:
-        raise ShelfHasBooks(
-            f"Cannot delete shelf '{shelf.name}': it contains {book_count} book(s)"
-        )
+        raise ShelfHasBooks(f"Cannot delete shelf '{shelf.name}': it contains {book_count} book(s)")
     await session.delete(shelf)
     await session.commit()
 

@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.schemas.organizer import ApplyRequest, OrganizerResultResponse, RenameLogResponse
+from app.schemas.organizer import (
+    ApplyRequest,
+    OrganizerResultResponse,
+    RenameLogResponse,
+)
 from app.services.organizer import (
     ShelfNotFound,
     list_rename_logs,
@@ -49,7 +53,11 @@ async def apply_endpoint(
     """Execute organization: move files to their computed paths."""
     try:
         results = await organize_shelf(
-            session, data.shelf_id, template=data.template, seq_pad=data.seq_pad, dry_run=False
+            session,
+            data.shelf_id,
+            template=data.template,
+            seq_pad=data.seq_pad,
+            dry_run=False,
         )
     except ShelfNotFound as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

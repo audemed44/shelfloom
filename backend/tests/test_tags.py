@@ -1,4 +1,5 @@
 """Tests for tag CRUD and book-tag assignment (Step 1.10)."""
+
 from __future__ import annotations
 
 import uuid
@@ -8,7 +9,7 @@ from sqlalchemy import select
 
 from app.models.book import Book
 from app.models.shelf import Shelf
-from app.models.tag import BookTag, Tag
+from app.models.tag import BookTag
 from app.services.tag_service import (
     BookNotFound,
     TagConflict,
@@ -19,7 +20,6 @@ from app.services.tag_service import (
     list_tags,
     remove_tag,
 )
-
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 

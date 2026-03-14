@@ -1,15 +1,17 @@
 """Tests for Shelfloom ID embedding into EPUB files."""
+
 import uuid
 from pathlib import Path
 
 import pytest
 from ebooklib import epub
 
-
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def _make_epub(tmp_path: Path, name: str = "book.epub", with_shelfloom_id: str | None = None) -> Path:
+def _make_epub(
+    tmp_path: Path, name: str = "book.epub", with_shelfloom_id: str | None = None
+) -> Path:
     """Create a minimal valid EPUB and return its path."""
     book = epub.EpubBook()
     book.set_identifier("pub-id-001")
@@ -17,7 +19,8 @@ def _make_epub(tmp_path: Path, name: str = "book.epub", with_shelfloom_id: str |
     book.add_author("Test Author")
     if with_shelfloom_id:
         book.add_metadata(
-            "DC", "identifier",
+            "DC",
+            "identifier",
             f"urn:shelfloom:{with_shelfloom_id}",
             {"id": "shelfloom-id"},
         )
@@ -33,6 +36,7 @@ def _make_epub(tmp_path: Path, name: str = "book.epub", with_shelfloom_id: str |
 
 
 # ── basic embedding ───────────────────────────────────────────────────────────
+
 
 async def test_embed_adds_shelfloom_id(tmp_path):
     from app.services.metadata.embed import embed_shelfloom_id
@@ -58,6 +62,7 @@ async def test_embed_hash_changes(tmp_path):
 
 async def test_embed_returns_correct_pre_hash(tmp_path):
     import hashlib
+
     from app.services.metadata.embed import embed_shelfloom_id
 
     path = _make_epub(tmp_path)
@@ -72,6 +77,7 @@ async def test_embed_returns_correct_pre_hash(tmp_path):
 
 async def test_embed_post_hash_matches_disk(tmp_path):
     import hashlib
+
     from app.services.metadata.embed import embed_shelfloom_id
 
     path = _make_epub(tmp_path)
@@ -96,6 +102,7 @@ async def test_embed_with_specified_uuid(tmp_path):
 
 
 # ── idempotency ───────────────────────────────────────────────────────────────
+
 
 async def test_embed_idempotent_already_has_id(tmp_path):
     """If EPUB already has a Shelfloom ID, embedding is a no-op."""
@@ -129,6 +136,7 @@ async def test_embed_idempotent_double_embed(tmp_path):
 
 # ── original metadata preserved ──────────────────────────────────────────────
 
+
 async def test_embed_preserves_existing_identifiers(tmp_path):
     """Original dc:identifier elements remain after embedding."""
     from app.services.metadata.embed import embed_shelfloom_id
@@ -157,14 +165,17 @@ async def test_embed_epub_still_parseable(tmp_path):
 
 # ── error cases ───────────────────────────────────────────────────────────────
 
+
 async def test_embed_file_not_found(tmp_path):
-    from app.services.metadata.embed import embed_shelfloom_id, EmbedError
+    from app.services.metadata.embed import EmbedError, embed_shelfloom_id
+
     with pytest.raises(EmbedError, match="File not found"):
         embed_shelfloom_id(tmp_path / "nonexistent.epub")
 
 
 async def test_embed_bad_zip(tmp_path):
-    from app.services.metadata.embed import embed_shelfloom_id, EmbedError
+    from app.services.metadata.embed import EmbedError, embed_shelfloom_id
+
     bad = tmp_path / "bad.epub"
     bad.write_bytes(b"this is not a zip file")
     with pytest.raises(EmbedError):

@@ -1,8 +1,9 @@
 """Read and parse KOReader .sdr folder contents."""
+
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -24,16 +25,17 @@ class SdrAnnotation:
 @dataclass
 class SdrReadingData:
     """Parsed data from a KOReader .sdr folder."""
+
     # Book identity (for matching)
-    partial_md5: str | None        # partial_md5_checksum
-    doc_path: str | None           # doc_path (original path on device)
-    title: str | None              # doc_props.title
-    authors: str | None            # doc_props.authors
+    partial_md5: str | None  # partial_md5_checksum
+    doc_path: str | None  # doc_path (original path on device)
+    title: str | None  # doc_props.title
+    authors: str | None  # doc_props.authors
     # Reading state
     percent_finished: float | None  # 0.0–1.0
     last_xpointer: str | None
     doc_pages: int | None
-    status: str | None             # summary.status ("reading", "complete", etc.)
+    status: str | None  # summary.status ("reading", "complete", etc.)
     # Reading sessions (from stats.performance_in_pages)
     performance_in_pages: dict[int, int]  # {unix_timestamp: pages}
     total_time_in_sec: int | None
@@ -70,13 +72,15 @@ def _extract_annotations(raw: dict[str, Any]) -> list[SdrAnnotation]:
             continue
         note_raw = ann.get("note", "")
         note = note_raw if note_raw else None
-        result.append(SdrAnnotation(
-            text=str(text),
-            note=note if isinstance(note, str) and note else None,
-            chapter=ann.get("chapter") or None,
-            page=ann.get("pageno") or None,
-            datetime=_parse_datetime(ann.get("datetime")),
-        ))
+        result.append(
+            SdrAnnotation(
+                text=str(text),
+                note=note if isinstance(note, str) and note else None,
+                chapter=ann.get("chapter") or None,
+                page=ann.get("pageno") or None,
+                datetime=_parse_datetime(ann.get("datetime")),
+            )
+        )
     return result
 
 

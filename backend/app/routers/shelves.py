@@ -54,9 +54,7 @@ async def get_shelf_endpoint(shelf_id: int, session: AsyncSession = Depends(get_
 
 
 @router.post("", response_model=ShelfResponse, status_code=status.HTTP_201_CREATED)
-async def create_shelf_endpoint(
-    data: ShelfCreate, session: AsyncSession = Depends(get_session)
-):
+async def create_shelf_endpoint(data: ShelfCreate, session: AsyncSession = Depends(get_session)):
     try:
         shelf = await create_shelf(session, data)
     except PathNotFound as e:

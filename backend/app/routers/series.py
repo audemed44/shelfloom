@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.schemas.series import (
     AddBookToSeriesBody,
-    BookSeriesEntry,
     ReadingOrderCreate,
     ReadingOrderDetailResponse,
     ReadingOrderEntryCreate,
@@ -13,7 +12,6 @@ from app.schemas.series import (
     SeriesBookItem,
     SeriesCreate,
     SeriesResponse,
-    SeriesTreeNode,
     SeriesUpdate,
 )
 from app.services.series_service import (
@@ -42,6 +40,7 @@ router = APIRouter(tags=["series"])
 
 
 # ── series ────────────────────────────────────────────────────────────────────
+
 
 @router.get("/series", response_model=list[SeriesResponse])
 async def list_series_endpoint(session: AsyncSession = Depends(get_session)):
@@ -130,7 +129,10 @@ async def remove_book_endpoint(
     await remove_book_from_series(session, series_id, book_id)
 
 
-@router.get("/series/{series_id}/reading-orders", response_model=list[ReadingOrderDetailResponse])
+@router.get(
+    "/series/{series_id}/reading-orders",
+    response_model=list[ReadingOrderDetailResponse],
+)
 async def list_series_reading_orders_endpoint(
     series_id: int, session: AsyncSession = Depends(get_session)
 ):
@@ -142,9 +144,7 @@ async def list_series_reading_orders_endpoint(
 
 
 @router.get("/series/{series_id}/books", response_model=list[SeriesBookItem])
-async def list_series_books_endpoint(
-    series_id: int, session: AsyncSession = Depends(get_session)
-):
+async def list_series_books_endpoint(series_id: int, session: AsyncSession = Depends(get_session)):
     try:
         books = await list_books_in_series(session, series_id)
     except SeriesNotFound as e:
@@ -154,7 +154,12 @@ async def list_series_books_endpoint(
 
 # ── reading orders ────────────────────────────────────────────────────────────
 
-@router.post("/reading-orders", response_model=ReadingOrderResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/reading-orders",
+    response_model=ReadingOrderResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_reading_order_endpoint(
     data: ReadingOrderCreate, session: AsyncSession = Depends(get_session)
 ):
@@ -166,9 +171,7 @@ async def create_reading_order_endpoint(
 
 
 @router.get("/reading-orders/{order_id}", response_model=ReadingOrderDetailResponse)
-async def get_reading_order_endpoint(
-    order_id: int, session: AsyncSession = Depends(get_session)
-):
+async def get_reading_order_endpoint(order_id: int, session: AsyncSession = Depends(get_session)):
     try:
         ro = await get_reading_order(session, order_id)
     except ReadingOrderNotFound as e:
@@ -192,7 +195,9 @@ async def delete_reading_order_endpoint(
     status_code=status.HTTP_201_CREATED,
 )
 async def add_entry_endpoint(
-    order_id: int, data: ReadingOrderEntryCreate, session: AsyncSession = Depends(get_session)
+    order_id: int,
+    data: ReadingOrderEntryCreate,
+    session: AsyncSession = Depends(get_session),
 ):
     try:
         entry = await add_reading_order_entry(session, order_id, data)

@@ -1,12 +1,12 @@
 """Book import orchestration: discover → hash → metadata → embed → DB."""
+
 from __future__ import annotations
 
 import json
 import logging
-import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,8 +113,8 @@ async def _ingest_sdr(
 ) -> None:
     """Read and import .sdr data for a book."""
     try:
+        from app.koreader.sdr_importer import find_book_for_sdr, import_sdr
         from app.koreader.sdr_reader import read_sdr
-        from app.koreader.sdr_importer import import_sdr, find_book_for_sdr
 
         sdr_data = read_sdr(sdr_folder)
         if sdr_data is None:
@@ -144,6 +144,7 @@ async def _ingest_stats_db(
     """Import sessions from a KOReader statistics.sqlite3."""
     try:
         from app.koreader.stats_db_importer import import_stats_db
+
         result = await import_stats_db(session, stats_db_path)
         progress.sdr_imported += result.get("imported", 0)
     except Exception as e:
@@ -191,19 +192,28 @@ async def _process_file(
 
     # New book — extract metadata, embed ID (EPUB), save cover
     import uuid as _uuid
+
     book_uuid = str(_uuid.uuid4())
     book_path_str = str(book_path.relative_to(shelf.path))
 
     # Extract metadata
-    title, author, publisher, language, description, page_count, epub_uid, metadata_raw = (
-        _extract_metadata(book_path, fmt)
-    )
+    (
+        title,
+        author,
+        publisher,
+        language,
+        description,
+        page_count,
+        epub_uid,
+        metadata_raw,
+    ) = _extract_metadata(book_path, fmt)
 
     # Embed Shelfloom ID into EPUB
     post_sha, post_md5 = pre_sha, pre_md5
     if fmt == "epub":
         try:
             from app.services.metadata.embed import embed_shelfloom_id
+
             book_uuid, pre_sha, pre_md5, post_sha, post_md5 = embed_shelfloom_id(
                 book_path, book_uuid=book_uuid
             )
@@ -248,11 +258,10 @@ async def _find_by_shelfloom_id(session: AsyncSession, book_path: Path) -> Book 
     """Check if this EPUB already has an embedded Shelfloom ID in the DB."""
     try:
         from app.services.metadata.epub import parse_epub
+
         meta = parse_epub(book_path)
         if meta.shelfloom_id:
-            result = await session.execute(
-                select(Book).where(Book.id == meta.shelfloom_id)
-            )
+            result = await session.execute(select(Book).where(Book.id == meta.shelfloom_id))
             return result.scalar_one_or_none()
     except Exception:
         pass
@@ -261,16 +270,13 @@ async def _find_by_shelfloom_id(session: AsyncSession, book_path: Path) -> Book 
 
 async def _find_by_hash(session: AsyncSession, sha: str, md5: str) -> Book | None:
     # Check current hash
-    result = await session.execute(
-        select(Book).where(Book.file_hash == sha)
-    )
+    result = await session.execute(select(Book).where(Book.file_hash == sha))
     book = result.scalar_one_or_none()
     if book:
         return book
     # Check historical hashes
     result = await session.execute(
-        select(Book).join(BookHash, Book.id == BookHash.book_id)
-        .where(BookHash.hash_sha == sha)
+        select(Book).join(BookHash, Book.id == BookHash.book_id).where(BookHash.hash_sha == sha)
     )
     return result.scalar_one_or_none()
 
@@ -302,47 +308,66 @@ def _extract_metadata(
     try:
         if fmt == "epub":
             from app.services.metadata.epub import parse_epub
+
             m = parse_epub(book_path)
             return (
-                m.title, m.author, m.publisher, m.language,
-                m.description, m.page_count, m.epub_uid, m.raw,
+                m.title,
+                m.author,
+                m.publisher,
+                m.language,
+                m.description,
+                m.page_count,
+                m.epub_uid,
+                m.raw,
             )
         else:
-            from app.services.metadata.pdf import parse_pdf
             from app.services.metadata.filename import parse_filename
+            from app.services.metadata.pdf import parse_pdf
+
             m = parse_pdf(book_path)
             if m.title == "Unknown Title":
                 fn = parse_filename(book_path)
                 m.title = fn.title
                 if fn.author and not m.author:
                     m.author = fn.author
-            return (m.title, m.author, m.publisher, m.language, m.description, m.page_count, None, m.raw)
+            return (
+                m.title,
+                m.author,
+                m.publisher,
+                m.language,
+                m.description,
+                m.page_count,
+                None,
+                m.raw,
+            )
     except Exception as e:
         log.warning("Metadata extraction failed for %s: %s", book_path.name, e)
         from app.services.metadata.filename import parse_filename
+
         fn = parse_filename(book_path)
         return fn.title, fn.author, None, None, None, None, None, {}
 
 
-async def _deduplicate_all(session: AsyncSession, shelf: "Shelf") -> None:  # type: ignore[name-defined]  # noqa: F821
+async def _deduplicate_all(session: AsyncSession, shelf: Shelf) -> None:  # type: ignore[name-defined]  # noqa: F821
     """Run cross-source deduplication for every book in the shelf."""
     from app.koreader.dedup import deduplicate_sessions
+
     result = await session.execute(select(Book).where(Book.shelf_id == shelf.id))
     books = result.scalars().all()
     for book in books:
         await deduplicate_sessions(session, book.id)
 
 
-def _extract_cover(
-    book_path: Path, fmt: str, book_uuid: str, covers_dir: str | Path
-) -> str | None:
+def _extract_cover(book_path: Path, fmt: str, book_uuid: str, covers_dir: str | Path) -> str | None:
     output = Path(covers_dir) / f"{book_uuid}.jpg"
     try:
         if fmt == "epub":
             from app.services.metadata.cover import extract_epub_cover
+
             success = extract_epub_cover(book_path, output)
         else:
             from app.services.metadata.cover import extract_pdf_cover
+
             success = extract_pdf_cover(book_path, output)
         return str(output) if success else None
     except Exception as e:

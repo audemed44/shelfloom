@@ -7,13 +7,9 @@ import uuid
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-from sqlalchemy.ext.asyncio import async_sessionmaker
-
 from app.models.shelf import Shelf
 from app.services.import_service import import_shelf
-from app.services.scheduler import Scheduler, ScanStatus
-
+from app.services.scheduler import Scheduler
 
 # ── Scheduler unit tests ──────────────────────────────────────────────────────
 
@@ -42,9 +38,7 @@ async def test_scheduler_run_scan_updates_status():
     settings = MagicMock(covers_dir="/tmp/covers")
 
     session = AsyncMock()
-    session.execute = AsyncMock(
-        return_value=MagicMock(scalars=lambda: MagicMock(all=lambda: []))
-    )
+    session.execute = AsyncMock(return_value=MagicMock(scalars=lambda: MagicMock(all=lambda: [])))
     factory = _make_factory(session=session)
 
     await s._run_scan(factory, settings, "/tmp/covers")
@@ -101,8 +95,6 @@ async def test_scheduler_loop_runs_scan_then_sleeps():
         calls.append(f"sleep:{n}")
         raise asyncio.CancelledError()
 
-    import asyncio
-
     with patch.object(s, "_run_scan", fake_run):
         with patch("app.services.scheduler.asyncio.sleep", fake_sleep):
             try:
@@ -119,14 +111,11 @@ async def test_scheduler_stop_cancels_loop():
 
     # Start a loop that would sleep forever
     session = AsyncMock()
-    session.execute = AsyncMock(
-        return_value=MagicMock(scalars=lambda: MagicMock(all=lambda: []))
-    )
+    session.execute = AsyncMock(return_value=MagicMock(scalars=lambda: MagicMock(all=lambda: [])))
     factory = _make_factory(session=session)
 
     await s.start(factory, settings, "/tmp")
     # Give the loop task a moment to start
-    import asyncio
 
     await asyncio.sleep(0)
     await s.stop()
@@ -287,9 +276,7 @@ async def test_scan_status_after_scan(client, tmp_path):
     settings = MagicMock(covers_dir=str(tmp_path))
 
     session = AsyncMock()
-    session.execute = AsyncMock(
-        return_value=MagicMock(scalars=lambda: MagicMock(all=lambda: []))
-    )
+    session.execute = AsyncMock(return_value=MagicMock(scalars=lambda: MagicMock(all=lambda: [])))
     factory = _make_factory(session=session)
 
     await scheduler._run_scan(factory, settings, str(tmp_path))
@@ -315,11 +302,10 @@ async def test_backfill_covers_no_books(client):
     assert data["skipped"] == 0
 
 
-async def test_backfill_covers_skips_books_with_existing_cover(
-    client, db_session, tmp_path
-):
+async def test_backfill_covers_skips_books_with_existing_cover(client, db_session, tmp_path):
     """Books whose cover file already exists on disk are skipped."""
     import uuid as _uuid
+
     from app.models.book import Book
     from app.models.shelf import Shelf
 
@@ -352,11 +338,10 @@ async def test_backfill_covers_skips_books_with_existing_cover(
     assert data["refreshed"] == 0
 
 
-async def test_backfill_covers_fails_book_with_missing_file(
-    client, db_session, tmp_path
-):
+async def test_backfill_covers_fails_book_with_missing_file(client, db_session, tmp_path):
     """Books whose file doesn't exist on disk count as failed, not errored."""
     import uuid as _uuid
+
     from app.models.book import Book
     from app.models.shelf import Shelf
 

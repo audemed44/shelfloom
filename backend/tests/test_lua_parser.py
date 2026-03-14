@@ -1,4 +1,5 @@
 """Comprehensive tests for the Lua table parser (step 2.1)."""
+
 from __future__ import annotations
 
 import pathlib

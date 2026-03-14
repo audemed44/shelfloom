@@ -1,4 +1,5 @@
 """Cover image extraction from EPUB and PDF files."""
+
 from __future__ import annotations
 
 import io
@@ -20,7 +21,7 @@ def extract_epub_cover(file_path: str | Path, output_path: str | Path) -> bool:
     Returns True if a cover was extracted, False if none found.
     """
     try:
-        from ebooklib import epub, ITEM_IMAGE, ITEM_COVER
+        from ebooklib import ITEM_COVER, ITEM_IMAGE, epub
     except ImportError:  # pragma: no cover
         raise CoverExtractionError("ebooklib is required")
 
@@ -94,7 +95,7 @@ def _save_as_jpeg(data: bytes, output_path: str | Path, max_size: int | None = N
 def embed_epub_cover(epub_path: str | Path, cover_image_path: str | Path) -> None:
     """Embed a cover image into an EPUB file in-place, replacing any existing cover."""
     try:
-        from ebooklib import epub, ITEM_IMAGE, ITEM_COVER
+        from ebooklib import ITEM_COVER, ITEM_IMAGE, epub
     except ImportError:  # pragma: no cover
         raise CoverExtractionError("ebooklib is required")
 

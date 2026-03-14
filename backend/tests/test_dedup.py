@@ -1,10 +1,8 @@
 """Tests for cross-source session deduplication (step 2.4)."""
+
 from __future__ import annotations
 
 from datetime import datetime
-
-import pytest
-from sqlalchemy import select
 
 from app.models.reading import ReadingSession
 
@@ -61,6 +59,7 @@ async def test_dedup_within_tolerance(db_session, book_factory, shelf_factory):
     book = await book_factory()
 
     from datetime import timedelta
+
     t1 = datetime(2024, 1, 15, 10, 0, 0)
     t2 = t1 + timedelta(seconds=200)  # within 300s tolerance
 
@@ -82,6 +81,7 @@ async def test_dedup_outside_tolerance(db_session, book_factory, shelf_factory):
     book = await book_factory()
 
     from datetime import timedelta
+
     t1 = datetime(2024, 1, 15, 10, 0, 0)
     t2 = t1 + timedelta(seconds=600)  # 10 min apart, > 300s tolerance
 
@@ -103,6 +103,7 @@ async def test_dedup_at_tolerance_boundary(db_session, book_factory, shelf_facto
     book = await book_factory()
 
     from datetime import timedelta
+
     t1 = datetime(2024, 1, 15, 10, 0, 0)
     t2 = t1 + timedelta(seconds=300)  # exactly at boundary
 
@@ -123,7 +124,6 @@ async def test_dedup_no_duplicates_non_overlapping(db_session, book_factory, she
     await shelf_factory()
     book = await book_factory()
 
-    from datetime import timedelta
     t1 = datetime(2024, 1, 15, 8, 0, 0)
     t2 = datetime(2024, 1, 15, 20, 0, 0)
 

@@ -54,8 +54,10 @@ class ReadingOrder(Base):
 
     series: Mapped["Series"] = relationship("Series", back_populates="reading_orders")
     entries: Mapped[list["ReadingOrderEntry"]] = relationship(
-        "ReadingOrderEntry", back_populates="reading_order", cascade="all, delete-orphan",
-        order_by="ReadingOrderEntry.position"
+        "ReadingOrderEntry",
+        back_populates="reading_order",
+        cascade="all, delete-orphan",
+        order_by="ReadingOrderEntry.position",
     )
 
 

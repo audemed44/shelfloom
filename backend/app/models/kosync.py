@@ -1,4 +1,5 @@
 """KOSync user and progress models."""
+
 from __future__ import annotations
 
 from sqlalchemy import Float, Integer, Text

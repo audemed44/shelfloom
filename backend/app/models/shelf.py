@@ -23,7 +23,10 @@ class Shelf(Base):
 
     books: Mapped[list["Book"]] = relationship("Book", back_populates="shelf")  # type: ignore[name-defined]  # noqa: F821
     template: Mapped["ShelfTemplate | None"] = relationship(
-        "ShelfTemplate", back_populates="shelf", uselist=False, cascade="all, delete-orphan"
+        "ShelfTemplate",
+        back_populates="shelf",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
 

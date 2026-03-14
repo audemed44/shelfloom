@@ -1,21 +1,21 @@
 """Tests for book import service and scanner."""
+
 import hashlib
 import shutil
 import uuid
 from pathlib import Path
 
-import pytest
 from ebooklib import epub
 from sqlalchemy import select
 
 from app.models.book import Book, BookHash
 from app.models.shelf import Shelf
 
-
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _make_epub(path: Path, title: str = "Book", author: str = "Author") -> Path:
     book = epub.EpubBook()
@@ -34,6 +34,7 @@ def _make_epub(path: Path, title: str = "Book", author: str = "Author") -> Path:
 
 def _make_pdf(path: Path, title: str = "PDF Book", author: str = "PDF Author") -> Path:
     import fitz
+
     doc = fitz.open()
     page = doc.new_page()
     page.insert_text((50, 50), f"{title}", fontsize=14)
@@ -53,18 +54,22 @@ async def _make_shelf_in_db(session, path: str) -> Shelf:
 
 # ── scanner ───────────────────────────────────────────────────────────────────
 
+
 def test_discover_books_empty_dir(tmp_path):
     from app.services.scanner import discover_books
+
     assert discover_books(tmp_path) == []
 
 
 def test_discover_books_nonexistent_dir(tmp_path):
     from app.services.scanner import discover_books
+
     assert discover_books(tmp_path / "nope") == []
 
 
 def test_discover_books_finds_epub_and_pdf(tmp_path):
     from app.services.scanner import discover_books
+
     _make_epub(tmp_path / "a.epub")
     _make_pdf(tmp_path / "b.pdf")
     (tmp_path / "readme.txt").write_text("hi")
@@ -77,6 +82,7 @@ def test_discover_books_finds_epub_and_pdf(tmp_path):
 
 def test_discover_books_recursive(tmp_path):
     from app.services.scanner import discover_books
+
     subdir = tmp_path / "sub"
     subdir.mkdir()
     _make_epub(subdir / "nested.epub")
@@ -86,6 +92,7 @@ def test_discover_books_recursive(tmp_path):
 
 def test_discover_books_sorted(tmp_path):
     from app.services.scanner import discover_books
+
     _make_epub(tmp_path / "z.epub")
     _make_epub(tmp_path / "a.epub")
     found = discover_books(tmp_path)
@@ -95,6 +102,7 @@ def test_discover_books_sorted(tmp_path):
 
 def test_find_sdr_folder_present(tmp_path):
     from app.services.scanner import find_sdr_folder
+
     book = tmp_path / "book.epub"
     book.write_bytes(b"fake")
     sdr = tmp_path / "book.epub.sdr"
@@ -105,6 +113,7 @@ def test_find_sdr_folder_present(tmp_path):
 
 def test_find_sdr_folder_absent(tmp_path):
     from app.services.scanner import find_sdr_folder
+
     book = tmp_path / "book.epub"
     book.write_bytes(b"fake")
     assert find_sdr_folder(book) is None
@@ -112,8 +121,10 @@ def test_find_sdr_folder_absent(tmp_path):
 
 # ── hash service ──────────────────────────────────────────────────────────────
 
+
 def test_compute_hashes(tmp_path):
     from app.services.hash_service import compute_hashes
+
     data = b"hello world"
     f = tmp_path / "test.bin"
     f.write_bytes(data)
@@ -124,8 +135,10 @@ def test_compute_hashes(tmp_path):
 
 # ── import service ────────────────────────────────────────────────────────────
 
+
 async def test_import_epub(tmp_path, db_session):
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     covers = tmp_path / "covers"
@@ -146,6 +159,7 @@ async def test_import_epub(tmp_path, db_session):
 
 async def test_import_pdf(tmp_path, db_session):
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     covers = tmp_path / "covers"
@@ -163,6 +177,7 @@ async def test_import_pdf(tmp_path, db_session):
 
 async def test_import_multiple_books(tmp_path, db_session):
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     covers = tmp_path / "covers"
@@ -182,6 +197,7 @@ async def test_import_multiple_books(tmp_path, db_session):
 
 async def test_import_ignores_non_book_files(tmp_path, db_session):
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     (shelf_path / "notes.txt").write_text("notes")
@@ -195,6 +211,7 @@ async def test_import_ignores_non_book_files(tmp_path, db_session):
 
 async def test_import_empty_directory(tmp_path, db_session):
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "empty"
     shelf_path.mkdir()
     shelf = await _make_shelf_in_db(db_session, str(shelf_path))
@@ -206,6 +223,7 @@ async def test_import_empty_directory(tmp_path, db_session):
 
 async def test_rescan_no_duplicates(tmp_path, db_session):
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     covers = tmp_path / "covers"
@@ -222,6 +240,7 @@ async def test_rescan_no_duplicates(tmp_path, db_session):
 
 async def test_rescan_detects_content_change(tmp_path, db_session):
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     covers = tmp_path / "covers"
@@ -243,6 +262,7 @@ async def test_rescan_detects_content_change(tmp_path, db_session):
 
 async def test_import_records_hashes(tmp_path, db_session):
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     covers = tmp_path / "covers"
@@ -257,7 +277,8 @@ async def test_import_records_hashes(tmp_path, db_session):
 
 
 async def test_import_progress_callback(tmp_path, db_session):
-    from app.services.import_service import import_shelf, ImportProgress
+    from app.services.import_service import ImportProgress, import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     for i in range(3):
@@ -273,6 +294,7 @@ async def test_import_progress_callback(tmp_path, db_session):
 
 async def test_import_malformed_file_skipped(tmp_path, db_session):
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     covers = tmp_path / "covers"
@@ -293,6 +315,7 @@ async def test_import_malformed_file_skipped(tmp_path, db_session):
 async def test_import_shelfloom_id_reidentification(tmp_path, db_session):
     """Re-importing a moved EPUB with Shelfloom ID finds the existing record."""
     from app.services.import_service import import_shelf
+
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
     covers = tmp_path / "covers"
@@ -316,11 +339,11 @@ async def test_import_shelfloom_id_reidentification(tmp_path, db_session):
 
 # ── sdr + stats_db integration ────────────────────────────────────────────────
 
+
 async def test_import_shelf_with_sdr_folder(tmp_path, db_session):
     """Full scan with .sdr folder present → reading data imported."""
-    import sqlite3
-    from app.services.import_service import import_shelf
     from app.models.reading import ReadingSession
+    from app.services.import_service import import_shelf
 
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
@@ -368,8 +391,9 @@ async def test_import_shelf_with_sdr_folder(tmp_path, db_session):
 async def test_import_shelf_with_stats_db(tmp_path, db_session):
     """stats_db_path passed → stats DB sessions imported."""
     import sqlite3
-    from app.services.import_service import import_shelf
+
     from app.models.reading import ReadingSession
+    from app.services.import_service import import_shelf
 
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
@@ -403,9 +427,7 @@ async def test_import_shelf_with_stats_db(tmp_path, db_session):
         "INSERT INTO book VALUES (1, ?, ?, ?, NULL, NULL, 3600, 100, 1705000000)",
         (book.title, book.author, book.file_hash_md5),
     )
-    conn.execute(
-        "INSERT INTO page_stat_data VALUES (1, 1, 1705359000, 120, 300)"
-    )
+    conn.execute("INSERT INTO page_stat_data VALUES (1, 1, 1705359000, 120, 300)")
     conn.commit()
     conn.close()
 

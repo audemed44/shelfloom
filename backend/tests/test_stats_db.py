@@ -1,4 +1,5 @@
 """Tests for KOReader statistics.sqlite3 reader and importer (step 2.3)."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -160,9 +161,11 @@ async def test_import_stats_db_by_md5(tmp_path, db_session, book_factory, shelf_
     assert result["imported"] == 1
     assert result["unmatched"] == []
 
-    sessions = (await db_session.execute(
-        select(ReadingSession).where(ReadingSession.book_id == book.id)
-    )).scalars().all()
+    sessions = (
+        (await db_session.execute(select(ReadingSession).where(ReadingSession.book_id == book.id)))
+        .scalars()
+        .all()
+    )
     assert len(sessions) == 1
     assert sessions[0].source == "stats_db"
 
@@ -228,7 +231,9 @@ async def test_import_stats_db_no_duplicates(tmp_path, db_session, book_factory,
     assert result2["skipped"] == 1
 
 
-async def test_import_stats_db_dismissed_stays_dismissed(tmp_path, db_session, book_factory, shelf_factory):
+async def test_import_stats_db_dismissed_stays_dismissed(
+    tmp_path, db_session, book_factory, shelf_factory
+):
     """Dismissed session not re-imported."""
     from app.koreader.stats_db_importer import import_stats_db
 
@@ -246,18 +251,20 @@ async def test_import_stats_db_dismissed_stays_dismissed(tmp_path, db_session, b
     await import_stats_db(db_session, db)
 
     # Dismiss the session
-    sess = (await db_session.execute(
-        select(ReadingSession).where(ReadingSession.book_id == book.id)
-    )).scalar_one()
+    sess = (
+        await db_session.execute(select(ReadingSession).where(ReadingSession.book_id == book.id))
+    ).scalar_one()
     sess.dismissed = True
     await db_session.commit()
 
     result2 = await import_stats_db(db_session, db)
     assert result2["imported"] == 0
 
-    sessions = (await db_session.execute(
-        select(ReadingSession).where(ReadingSession.book_id == book.id)
-    )).scalars().all()
+    sessions = (
+        (await db_session.execute(select(ReadingSession).where(ReadingSession.book_id == book.id)))
+        .scalars()
+        .all()
+    )
     assert len(sessions) == 1
     assert sessions[0].dismissed is True
 
@@ -272,6 +279,7 @@ async def test_import_stats_db_multiple_books_same_shelfloom_book(
     book = await book_factory(title="My Book", author="Author X")
     book.file_hash_md5 = "hash_primary"
     from app.models.book import BookHash
+
     bh = BookHash(book_id=book.id, hash_sha="sha_hist", hash_md5="hash_historical")
     db_session.add(bh)
     await db_session.commit()
@@ -291,7 +299,9 @@ async def test_import_stats_db_multiple_books_same_shelfloom_book(
     result = await import_stats_db(db_session, db)
     assert result["imported"] == 2
 
-    sessions = (await db_session.execute(
-        select(ReadingSession).where(ReadingSession.book_id == book.id)
-    )).scalars().all()
+    sessions = (
+        (await db_session.execute(select(ReadingSession).where(ReadingSession.book_id == book.id)))
+        .scalars()
+        .all()
+    )
     assert len(sessions) == 2

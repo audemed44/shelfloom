@@ -1,4 +1,5 @@
 """File organization engine: template resolution, safe move, rename logging."""
+
 from __future__ import annotations
 
 import re
@@ -71,15 +72,17 @@ def resolve_template(
     author = sanitize_component(book.author or "Unknown Author")
     title = sanitize_component(book.title)
     series_name_clean = sanitize_component(series_name)
-    series_path_clean = "/".join(sanitize_component(p) for p in series_path.split("/")) if series_path else ""
+    series_path_clean = (
+        "/".join(sanitize_component(p) for p in series_path.split("/")) if series_path else ""
+    )
     seq_str = format_sequence(sequence, seq_pad) if sequence is not None else ""
 
     raw = template
     # Strip {format} (and any preceding dot) — extension is always auto-appended
-    raw = re.sub(r'\.?\{format\}', '', raw)
+    raw = re.sub(r"\.?\{format\}", "", raw)
     # Conditional sequence token: {sequence|suffix} → "seq_strsuffix" if present, else ""
     raw = re.sub(
-        r'\{sequence\|([^}]*)\}',
+        r"\{sequence\|([^}]*)\}",
         lambda m: f"{seq_str}{m.group(1)}" if sequence is not None else "",
         raw,
     )
@@ -127,9 +130,7 @@ def safe_move_with_sdr(src: Path, dst: Path) -> None:
 # ── DB queries ────────────────────────────────────────────────────────────────
 
 
-async def _get_series_info(
-    session: AsyncSession, book_id: str
-) -> tuple[str, str, float | None]:
+async def _get_series_info(session: AsyncSession, book_id: str) -> tuple[str, str, float | None]:
     """Return (series_name, series_path, sequence) for the book's primary series.
 
     series_path is the full hierarchy, e.g. "Cosmere/Stormlight Archive".
@@ -152,9 +153,7 @@ async def _get_series_info(
     path_parts: list[str] = [series.name]
     current = series
     while current.parent_id is not None:
-        parent_res = await session.execute(
-            select(Series).where(Series.id == current.parent_id)
-        )
+        parent_res = await session.execute(select(Series).where(Series.id == current.parent_id))
         parent = parent_res.scalar_one_or_none()
         if parent is None:
             break
@@ -167,9 +166,7 @@ async def _get_series_info(
 
 async def _get_shelf_template(session: AsyncSession, shelf_id: int) -> tuple[str, int]:
     """Return (template_str, seq_pad) for a shelf, falling back to defaults."""
-    result = await session.execute(
-        select(ShelfTemplate).where(ShelfTemplate.shelf_id == shelf_id)
-    )
+    result = await session.execute(select(ShelfTemplate).where(ShelfTemplate.shelf_id == shelf_id))
     tmpl = result.scalar_one_or_none()
     if tmpl:
         return tmpl.template, tmpl.seq_pad
@@ -189,9 +186,7 @@ async def organize_book(
 ) -> OrganizerResult:
     """Compute (and optionally execute) the target path for one book."""
     series_name, series_path, sequence = await _get_series_info(session, book.id)
-    new_rel_path = resolve_template(
-        template, book, series_name, series_path, sequence, seq_pad
-    )
+    new_rel_path = resolve_template(template, book, series_name, series_path, sequence, seq_pad)
 
     result = OrganizerResult(
         book_id=book.id,

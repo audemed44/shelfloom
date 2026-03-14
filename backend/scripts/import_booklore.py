@@ -31,6 +31,7 @@ Usage (run from backend/ with venv active):
     # Preview phase 3 overrides without writing:
     python scripts/import_booklore.py ... --dry-run
 """
+
 from __future__ import annotations
 
 import argparse
@@ -45,16 +46,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-
-from app.database import Base
-from app.models.book import Book
-from app.models.series import Series, BookSeries
-from app.models.shelf import Shelf
-from app.models.tag import Tag, BookTag
-from app.services.import_service import import_shelf
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import app.models  # noqa: F401 — registers all models with Base.metadata
+from app.database import Base
+from app.models.book import Book
+from app.models.series import BookSeries, Series
+from app.models.shelf import Shelf
+from app.models.tag import BookTag, Tag
+from app.services.import_service import import_shelf
 
 log = logging.getLogger(__name__)
 
@@ -65,12 +65,12 @@ SUPPORTED_FORMATS = {".epub", ".pdf"}
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(
-        description="Import a Booklore library export into Shelfloom"
-    )
+    p = argparse.ArgumentParser(description="Import a Booklore library export into Shelfloom")
     p.add_argument(
-        "--source", required=True,
+        "--source",
+        required=True,
         help="Booklore books directory (e.g. C:/BookloreLibrary/books)",
     )
     p.add_argument(
@@ -79,11 +79,13 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument("--shelf-name", default="Library", help="Display name for the shelf")
     p.add_argument(
-        "--db-path", default="./shelfloom.db",
+        "--db-path",
+        default="./shelfloom.db",
         help="Shelfloom SQLite database file path",
     )
     p.add_argument(
-        "--covers-dir", default="./covers",
+        "--covers-dir",
+        default="./covers",
         help="Directory where cover images are stored",
     )
     p.add_argument(
@@ -91,11 +93,13 @@ def parse_args() -> argparse.Namespace:
         help="Path to a KOReader statistics.sqlite3 to import reading sessions from",
     )
     p.add_argument(
-        "--in-place", action="store_true",
+        "--in-place",
+        action="store_true",
         help="Don't copy files; use the source directory as the shelf path directly",
     )
     p.add_argument(
-        "--dry-run", action="store_true",
+        "--dry-run",
+        action="store_true",
         help="Run phases 1–2 normally but skip writing phase-3 metadata overrides",
     )
     p.add_argument("--verbose", "-v", action="store_true")
@@ -106,17 +110,18 @@ def parse_args() -> argparse.Namespace:
 # Phase 1: Copy files
 # ---------------------------------------------------------------------------
 
+
 def find_books(source: Path) -> list[Path]:
     return sorted(
-        p for p in source.rglob("*")
-        if p.is_file() and p.suffix.lower() in SUPPORTED_FORMATS
+        p for p in source.rglob("*") if p.is_file() and p.suffix.lower() in SUPPORTED_FORMATS
     )
 
 
 def strip_sequence_prefix(name: str) -> str:
-    """Remove leading 'N. ' series-sequence prefix from a filename (e.g. '3. Foo.epub' → 'Foo.epub')."""
+    """Remove leading 'N. ' series-sequence prefix from a filename (e.g. '3. Foo.epub' → 'Foo.epub')."""  # noqa: E501
     import re
-    return re.sub(r'^\d+\.\s+', '', name)
+
+    return re.sub(r"^\d+\.\s+", "", name)
 
 
 def copy_book_files(book_path: Path, target_root: Path) -> Path:
@@ -159,6 +164,7 @@ def phase1_copy(source: Path, shelf_path: Path) -> dict[str, Path]:
 # ---------------------------------------------------------------------------
 # Phase 2: Scan (delegates entirely to existing import_shelf service)
 # ---------------------------------------------------------------------------
+
 
 async def phase2_scan(
     session: AsyncSession,
@@ -203,6 +209,7 @@ async def phase2_scan(
 # ---------------------------------------------------------------------------
 # Phase 3: Enrich from .metadata.json sidecars
 # ---------------------------------------------------------------------------
+
 
 def read_sidecar(book_path: Path) -> dict | None:
     """Read Booklore's .metadata.json adjacent to the original source file."""
@@ -275,11 +282,13 @@ async def apply_sidecar_to_book(
             )
         )
         if existing_link is None:
-            session.add(BookSeries(
-                book_id=book.id,
-                series_id=series.id,
-                sequence=series_data.get("number"),
-            ))
+            session.add(
+                BookSeries(
+                    book_id=book.id,
+                    series_id=series.id,
+                    sequence=series_data.get("number"),
+                )
+            )
 
     # Genre: Booklore's "categories" maps to the genre field (e.g. "Science Fiction")
     categories = [c for c in (m.get("categories") or []) if c]
@@ -291,9 +300,7 @@ async def apply_sidecar_to_book(
     for tag_name in all_tags:
         tag = await get_or_create_tag(session, tag_name)
         existing_bt = await session.scalar(
-            select(BookTag).where(
-                BookTag.book_id == book.id, BookTag.tag_id == tag.id
-            )
+            select(BookTag).where(BookTag.book_id == book.id, BookTag.tag_id == tag.id)
         )
         if existing_bt is None:
             session.add(BookTag(book_id=book.id, tag_id=tag.id))
@@ -311,9 +318,7 @@ async def phase3_enrich(
     """
     print("\n── Phase 3: Enriching books from .metadata.json sidecars ──")
 
-    books_result = await session.execute(
-        select(Book).where(Book.shelf_id == shelf.id)
-    )
+    books_result = await session.execute(select(Book).where(Book.shelf_id == shelf.id))
     books = books_result.scalars().all()
 
     enriched = 0
@@ -349,9 +354,8 @@ async def phase3_enrich(
 # DB bootstrap
 # ---------------------------------------------------------------------------
 
-async def get_or_create_shelf(
-    session: AsyncSession, name: str, path: str
-) -> Shelf:
+
+async def get_or_create_shelf(session: AsyncSession, name: str, path: str) -> Shelf:
     shelf = await session.scalar(select(Shelf).where(Shelf.path == path))
     if shelf is None:
         shelf = Shelf(
@@ -371,6 +375,7 @@ async def get_or_create_shelf(
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 async def run(args: argparse.Namespace) -> None:
     source = Path(args.source).resolve()

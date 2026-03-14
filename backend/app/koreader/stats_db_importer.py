@@ -1,15 +1,15 @@
 """Import KOReader statistics.sqlite3 sessions into Shelfloom DB."""
+
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from pathlib import Path
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from datetime import timedelta
-
-from app.koreader.stats_db_reader import StatsBook, StatsSession, read_stats_db
+from app.koreader.stats_db_reader import StatsBook, read_stats_db
 from app.models.book import Book, BookHash
 from app.models.reading import ReadingProgress, ReadingSession
 
@@ -29,18 +29,16 @@ async def _find_book_for_stats(
     """
     if stats_book.md5:
         # Match current hash
-        result = await session.execute(
-            select(Book).where(Book.file_hash_md5 == stats_book.md5)
-        )
+        result = await session.execute(select(Book).where(Book.file_hash_md5 == stats_book.md5))
         book = result.scalar_one_or_none()
         if book:
             return book
 
         # Match historical hashes
         result = await session.execute(
-            select(Book).join(BookHash, Book.id == BookHash.book_id).where(
-                BookHash.hash_md5 == stats_book.md5
-            )
+            select(Book)
+            .join(BookHash, Book.id == BookHash.book_id)
+            .where(BookHash.hash_md5 == stats_book.md5)
         )
         book = result.scalar_one_or_none()
         if book:
@@ -111,9 +109,7 @@ async def import_stats_db(
         for sess in book_sessions:
             # Check if already imported (including dismissed)
             existing = await session.execute(
-                select(ReadingSession).where(
-                    ReadingSession.source_key == sess.source_key
-                )
+                select(ReadingSession).where(ReadingSession.source_key == sess.source_key)
             )
             if existing.scalar_one_or_none() is not None:
                 skipped += 1

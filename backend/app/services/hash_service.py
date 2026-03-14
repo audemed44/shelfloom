@@ -1,4 +1,5 @@
 """Compute SHA-256 and MD5 hashes for files."""
+
 from __future__ import annotations
 
 import hashlib

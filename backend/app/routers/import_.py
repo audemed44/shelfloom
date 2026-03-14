@@ -3,7 +3,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_session
-from app.schemas.import_ import BackfillCoversResponse, ScanProgressResponse, ScanStatusResponse
+from app.schemas.import_ import (
+    BackfillCoversResponse,
+    ScanProgressResponse,
+    ScanStatusResponse,
+)
 from app.services.scheduler import Scheduler
 
 router = APIRouter(prefix="/import", tags=["import"])

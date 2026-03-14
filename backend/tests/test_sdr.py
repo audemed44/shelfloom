@@ -1,10 +1,10 @@
 """Tests for .sdr data ingestion (step 2.2)."""
+
 from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
 
-import pytest
 from sqlalchemy import select
 
 from app.models.reading import Highlight, ReadingProgress, ReadingSession
@@ -42,9 +42,7 @@ def test_read_sdr_annotations(tmp_path):
 
     sdr_dir = tmp_path / "book.epub.sdr"
     sdr_dir.mkdir()
-    (sdr_dir / "metadata.epub.lua").write_bytes(
-        (FIXTURES / "metadata.epub.lua").read_bytes()
-    )
+    (sdr_dir / "metadata.epub.lua").write_bytes((FIXTURES / "metadata.epub.lua").read_bytes())
 
     data = read_sdr(sdr_dir)
     assert data is not None
@@ -70,9 +68,7 @@ def test_read_sdr_performance_in_pages(tmp_path):
 
     sdr_dir = tmp_path / "book.epub.sdr"
     sdr_dir.mkdir()
-    (sdr_dir / "metadata.epub.lua").write_bytes(
-        (FIXTURES / "metadata.epub.lua").read_bytes()
-    )
+    (sdr_dir / "metadata.epub.lua").write_bytes((FIXTURES / "metadata.epub.lua").read_bytes())
 
     data = read_sdr(sdr_dir)
     assert data is not None
@@ -177,7 +173,9 @@ def test_session_aggregation_empty():
 
 
 def test_session_aggregation_four_timestamps_two_sessions():
-    """Fixture data: timestamps 1705359000, 1705359060 close; 1705365600 gap; 1705451400 gap → 3 sessions."""
+    """Fixture data: timestamps 1705359000 and 1705359060 are close (same session);
+    1705365600 and 1705451400 are each separated by a gap → 3 sessions total.
+    """
     from app.koreader.sdr_importer import _aggregate_sessions
 
     perf = {
@@ -260,9 +258,7 @@ async def test_import_sdr_creates_highlights(db_session, book_factory, shelf_fac
     counts = await import_sdr(db_session, book, sdr_data)
     assert counts["highlights"] == 1
 
-    result = await db_session.execute(
-        select(Highlight).where(Highlight.book_id == book.id)
-    )
+    result = await db_session.execute(select(Highlight).where(Highlight.book_id == book.id))
     hl = result.scalar_one_or_none()
     assert hl is not None
     assert hl.text == "Life before death."
@@ -339,9 +335,7 @@ async def test_import_sdr_no_duplicates(db_session, book_factory, shelf_factory)
     )
     assert len(sess_result.scalars().all()) == 1
 
-    hl_result = await db_session.execute(
-        select(Highlight).where(Highlight.book_id == book.id)
-    )
+    hl_result = await db_session.execute(select(Highlight).where(Highlight.book_id == book.id))
     assert len(hl_result.scalars().all()) == 1
 
 
@@ -485,6 +479,7 @@ async def test_find_book_for_sdr_by_partial_md5(db_session, book_factory, shelf_
 
     # Use a non-existent sdr folder so path matching skips
     import pathlib
+
     sdr_folder = pathlib.Path("/tmp/nonexistent.epub.sdr")
 
     found = await find_book_for_sdr(db_session, sdr_data, sdr_folder)
@@ -516,6 +511,7 @@ async def test_find_book_for_sdr_unknown(db_session, book_factory, shelf_factory
     )
 
     import pathlib
+
     sdr_folder = pathlib.Path("/tmp/missing.epub.sdr")
     found = await find_book_for_sdr(db_session, sdr_data, sdr_folder)
     assert found is None

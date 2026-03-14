@@ -4,7 +4,9 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import func, inspect as sa_inspect, select as sa_select
+from sqlalchemy import func
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
@@ -35,8 +37,7 @@ router = APIRouter(prefix="/books", tags=["books"])
 def _book_response(book: "Book", reading_progress: float | None = None) -> BookResponse:  # type: ignore[name-defined]  # noqa: F821
     """Build BookResponse from ORM object without triggering lazy relationship loads."""
     col_data = {
-        attr.key: getattr(book, attr.key)
-        for attr in sa_inspect(type(book)).mapper.column_attrs
+        attr.key: getattr(book, attr.key) for attr in sa_inspect(type(book)).mapper.column_attrs
     }
     col_data["reading_progress"] = reading_progress
     return BookResponse.model_validate(col_data)
@@ -72,6 +73,7 @@ async def list_books_endpoint(
     progress_map: dict[str, float] = {}
     if books:
         from app.models.reading import ReadingProgress
+
         prog_rows = await session.execute(
             sa_select(ReadingProgress.book_id, func.max(ReadingProgress.progress))
             .where(ReadingProgress.book_id.in_([b.id for b in books]))
@@ -115,6 +117,7 @@ async def upload_book_endpoint(
 ):
     """Upload a book file and import it to the default shelf."""
     from sqlalchemy import select
+
     from app.models.shelf import Shelf
 
     suffix = Path(file.filename or "").suffix.lower()
@@ -134,8 +137,8 @@ async def upload_book_endpoint(
     dest.write_bytes(content)
 
     # Import
-    from app.services.import_service import _process_file
     from app.config import get_settings
+    from app.services.import_service import _process_file
 
     settings = get_settings()
     try:
@@ -146,6 +149,7 @@ async def upload_book_endpoint(
 
     # Find the created book
     from sqlalchemy import select as _select
+
     from app.models.book import Book
 
     rel_path = str(dest.relative_to(shelf.path))
@@ -197,6 +201,7 @@ async def get_cover_endpoint(book_id: str, session: AsyncSession = Depends(get_s
 @router.get("/{book_id}/download")
 async def download_book_endpoint(book_id: str, session: AsyncSession = Depends(get_session)):
     from sqlalchemy import select
+
     from app.models.shelf import Shelf
 
     try:

@@ -1,9 +1,9 @@
 """Map .sdr data to Shelfloom models and persist."""
+
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import select
@@ -38,7 +38,9 @@ def _aggregate_sessions(
     for ts in sorted_ts[1:]:
         prev_ts = current_group[-1]
         if ts - prev_ts > SESSION_GAP_SECONDS:
-            sessions.append(_build_session(current_group, performance_in_pages, partial_md5, doc_path))
+            sessions.append(
+                _build_session(current_group, performance_in_pages, partial_md5, doc_path)
+            )
             current_group = [ts]
         else:
             current_group.append(ts)
@@ -66,7 +68,7 @@ def _build_session(
         # Single timestamp — estimate 1 minute per page
         duration = max(60, pages_read * 60)
 
-    start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc).replace(tzinfo=None)
+    start_dt = datetime.fromtimestamp(start_ts, tz=UTC).replace(tzinfo=None)
 
     # Build source key
     if partial_md5:
@@ -190,16 +192,14 @@ async def find_book_for_sdr(
     Match an SdrReadingData to a Book in the database.
     Strategy:
     1. Match by file path: book file = sdr_folder.parent / sdr_folder.name.removesuffix('.sdr')
-    2. Match by partial MD5 (check books.file_hash_md5 and book_hashes.hash_md5 STARTS WITH partial_md5)
+    2. Match by partial MD5 (books.file_hash_md5 / book_hashes.hash_md5 STARTS WITH partial_md5)
     3. Match by title+author
     """
     # Strategy 1: Match by file path
     book_filename = sdr_folder.name.removesuffix(".sdr")
     book_file = sdr_folder.parent / book_filename
     if book_file.exists():
-        result = await session.execute(
-            select(Book).where(Book.file_path.endswith(book_filename))
-        )
+        result = await session.execute(select(Book).where(Book.file_path.endswith(book_filename)))
         book = result.scalar_one_or_none()
         if book:
             return book
@@ -208,17 +208,15 @@ async def find_book_for_sdr(
     if sdr_data.partial_md5:
         partial = sdr_data.partial_md5
         # Check current hash on books table
-        result = await session.execute(
-            select(Book).where(Book.file_hash_md5.startswith(partial))
-        )
+        result = await session.execute(select(Book).where(Book.file_hash_md5.startswith(partial)))
         book = result.scalar_one_or_none()
         if book:
             return book
         # Check historical hashes
         result = await session.execute(
-            select(Book).join(BookHash, Book.id == BookHash.book_id).where(
-                BookHash.hash_md5.startswith(partial)
-            )
+            select(Book)
+            .join(BookHash, Book.id == BookHash.book_id)
+            .where(BookHash.hash_md5.startswith(partial))
         )
         book = result.scalar_one_or_none()
         if book:

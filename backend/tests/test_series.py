@@ -2,13 +2,11 @@
 
 import uuid
 
-import pytest
 from sqlalchemy import select
 
 from app.models.book import Book
-from app.models.series import BookSeries, ReadingOrder, ReadingOrderEntry, Series
+from app.models.series import BookSeries, ReadingOrderEntry
 from app.models.shelf import Shelf
-
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -47,9 +45,7 @@ async def test_create_top_level_series(client):
 
 async def test_create_sub_series(client):
     parent = (await client.post("/api/series", json={"name": "Cosmere"})).json()
-    resp = await client.post(
-        "/api/series", json={"name": "Stormlight", "parent_id": parent["id"]}
-    )
+    resp = await client.post("/api/series", json={"name": "Stormlight", "parent_id": parent["id"]})
     assert resp.status_code == 201
     assert resp.json()["parent_id"] == parent["id"]
 
@@ -108,9 +104,7 @@ async def test_multi_level_series(client):
     """Cosmere → Stormlight → (books)"""
     cosmos = (await client.post("/api/series", json={"name": "Cosmere"})).json()
     storm = (
-        await client.post(
-            "/api/series", json={"name": "Stormlight", "parent_id": cosmos["id"]}
-        )
+        await client.post("/api/series", json={"name": "Stormlight", "parent_id": cosmos["id"]})
     ).json()
 
     resp = await client.get(f"/api/series/{storm['id']}")
@@ -149,9 +143,7 @@ async def test_book_in_multiple_series(client, db_session, tmp_path):
     await client.post(f"/api/series/{s1['id']}/books/{book.id}?sequence=1")
     await client.post(f"/api/series/{s2['id']}/books/{book.id}?sequence=3")
 
-    result = await db_session.execute(
-        select(BookSeries).where(BookSeries.book_id == book.id)
-    )
+    result = await db_session.execute(select(BookSeries).where(BookSeries.book_id == book.id))
     entries = result.scalars().all()
     assert len(entries) == 2
 
@@ -165,9 +157,7 @@ async def test_remove_book_from_series(client, db_session, tmp_path):
     resp = await client.delete(f"/api/series/{series['id']}/books/{book.id}")
     assert resp.status_code == 204
 
-    result = await db_session.execute(
-        select(BookSeries).where(BookSeries.book_id == book.id)
-    )
+    result = await db_session.execute(select(BookSeries).where(BookSeries.book_id == book.id))
     assert result.scalars().all() == []
 
 
@@ -202,11 +192,7 @@ async def test_delete_series_books_unlinked(client, db_session, tmp_path):
 
 async def test_series_tree(client):
     parent = (await client.post("/api/series", json={"name": "Parent"})).json()
-    (
-        await client.post(
-            "/api/series", json={"name": "Child", "parent_id": parent["id"]}
-        )
-    )
+    (await client.post("/api/series", json={"name": "Child", "parent_id": parent["id"]}))
 
     resp = await client.get("/api/series/tree")
     assert resp.status_code == 200
@@ -233,12 +219,8 @@ async def test_create_reading_order_prepopulates_entries(client, db_session, tmp
     book2 = await _create_book(db_session, shelf.id, "Book Two")
     series = (await client.post("/api/series", json={"name": "S"})).json()
     # add books to series with explicit sequence
-    await client.post(
-        f"/api/series/{series['id']}/books/{book1.id}", json={"sequence": 1}
-    )
-    await client.post(
-        f"/api/series/{series['id']}/books/{book2.id}", json={"sequence": 2}
-    )
+    await client.post(f"/api/series/{series['id']}/books/{book1.id}", json={"sequence": 1})
+    await client.post(f"/api/series/{series['id']}/books/{book2.id}", json={"sequence": 2})
     ro = (
         await client.post(
             "/api/reading-orders",
@@ -255,18 +237,14 @@ async def test_create_reading_order_prepopulates_entries(client, db_session, tmp
 
 
 async def test_create_reading_order_series_not_found(client):
-    resp = await client.post(
-        "/api/reading-orders", json={"name": "X", "series_id": 99999}
-    )
+    resp = await client.post("/api/reading-orders", json={"name": "X", "series_id": 99999})
     assert resp.status_code == 404
 
 
 async def test_get_reading_order(client):
     series = (await client.post("/api/series", json={"name": "S"})).json()
     ro = (
-        await client.post(
-            "/api/reading-orders", json={"name": "R", "series_id": series["id"]}
-        )
+        await client.post("/api/reading-orders", json={"name": "R", "series_id": series["id"]})
     ).json()
     resp = await client.get(f"/api/reading-orders/{ro['id']}")
     assert resp.status_code == 200
@@ -279,9 +257,7 @@ async def test_get_reading_order_not_found(client):
 async def test_delete_reading_order(client):
     series = (await client.post("/api/series", json={"name": "S"})).json()
     ro = (
-        await client.post(
-            "/api/reading-orders", json={"name": "R", "series_id": series["id"]}
-        )
+        await client.post("/api/reading-orders", json={"name": "R", "series_id": series["id"]})
     ).json()
     resp = await client.delete(f"/api/reading-orders/{ro['id']}")
     assert resp.status_code == 204
@@ -296,9 +272,7 @@ async def test_add_reading_order_entry(client, db_session, tmp_path):
     book = await _create_book(db_session, shelf.id, "Entry Book")
     series = (await client.post("/api/series", json={"name": "S"})).json()
     ro = (
-        await client.post(
-            "/api/reading-orders", json={"name": "R", "series_id": series["id"]}
-        )
+        await client.post("/api/reading-orders", json={"name": "R", "series_id": series["id"]})
     ).json()
 
     resp = await client.post(
@@ -321,9 +295,7 @@ async def test_add_entry_reading_order_not_found(client, db_session, tmp_path):
 async def test_add_entry_book_not_found(client):
     series = (await client.post("/api/series", json={"name": "S"})).json()
     ro = (
-        await client.post(
-            "/api/reading-orders", json={"name": "R", "series_id": series["id"]}
-        )
+        await client.post("/api/reading-orders", json={"name": "R", "series_id": series["id"]})
     ).json()
     resp = await client.post(
         f"/api/reading-orders/{ro['id']}/entries",
@@ -338,9 +310,7 @@ async def test_reorder_entries(client, db_session, tmp_path):
     book2 = await _create_book(db_session, shelf.id, "B2")
     series = (await client.post("/api/series", json={"name": "S"})).json()
     ro = (
-        await client.post(
-            "/api/reading-orders", json={"name": "R", "series_id": series["id"]}
-        )
+        await client.post("/api/reading-orders", json={"name": "R", "series_id": series["id"]})
     ).json()
 
     e1 = (
@@ -373,9 +343,7 @@ async def test_delete_reading_order_books_unaffected(client, db_session, tmp_pat
     book = await _create_book(db_session, shelf.id, "Safe")
     series = (await client.post("/api/series", json={"name": "S"})).json()
     ro = (
-        await client.post(
-            "/api/reading-orders", json={"name": "R", "series_id": series["id"]}
-        )
+        await client.post("/api/reading-orders", json={"name": "R", "series_id": series["id"]})
     ).json()
     await client.post(
         f"/api/reading-orders/{ro['id']}/entries",
@@ -405,7 +373,7 @@ async def test_purge_empty_series_removes_empty(client):
 async def test_purge_empty_series_cascades_to_parent(client):
     """Deleting empty child makes parent empty, which is then also deleted."""
     parent = (await client.post("/api/series", json={"name": "Cosmere"})).json()
-    child = (
+    _child = (
         await client.post(
             "/api/series",
             json={"name": "Stormlight Archive", "parent_id": parent["id"]},
@@ -441,9 +409,7 @@ async def test_purge_empty_series_keeps_parent_with_books(client, db_session, tm
             "/api/series", json={"name": "Child With Books", "parent_id": parent["id"]}
         )
     ).json()
-    await client.post(
-        "/api/series", json={"name": "Child Empty", "parent_id": parent["id"]}
-    )
+    await client.post("/api/series", json={"name": "Child Empty", "parent_id": parent["id"]})
     await client.post(f"/api/series/{child_with['id']}/books/{book.id}")
 
     resp = await client.delete("/api/series/empty")
@@ -512,9 +478,7 @@ async def test_get_reading_order_includes_entries(client, db_session, tmp_path):
     book2 = await _create_book(db_session, shelf.id, "Book B")
     series = (await client.post("/api/series", json={"name": "S"})).json()
     ro = (
-        await client.post(
-            "/api/reading-orders", json={"name": "R", "series_id": series["id"]}
-        )
+        await client.post("/api/reading-orders", json={"name": "R", "series_id": series["id"]})
     ).json()
     await client.post(
         f"/api/reading-orders/{ro['id']}/entries",
@@ -541,13 +505,9 @@ async def test_reading_order_entries_include_book_info(client, db_session, tmp_p
     shelf = await _create_shelf(db_session, tmp_path)
     book = await _create_book(db_session, shelf.id, "Embedded Title")
     series = (await client.post("/api/series", json={"name": "S"})).json()
-    await client.post(
-        f"/api/series/{series['id']}/books/{book.id}", json={"sequence": 1}
-    )
+    await client.post(f"/api/series/{series['id']}/books/{book.id}", json={"sequence": 1})
     ro = (
-        await client.post(
-            "/api/reading-orders", json={"name": "R", "series_id": series["id"]}
-        )
+        await client.post("/api/reading-orders", json={"name": "R", "series_id": series["id"]})
     ).json()
 
     # Detail endpoint
@@ -591,7 +551,8 @@ async def test_reading_order_prepopulates_from_parent_series(client, db_session,
     # Create reading order on the parent — should get all 4 books
     ro = (
         await client.post(
-            "/api/reading-orders", json={"name": "Full Cosmere", "series_id": parent["id"]}
+            "/api/reading-orders",
+            json={"name": "Full Cosmere", "series_id": parent["id"]},
         )
     ).json()
 
@@ -609,10 +570,14 @@ async def test_reading_order_prepopulates_from_parent_series(client, db_session,
     assert "Well of Ascension" in titles
     # Within each sub-series, sequence order is preserved
     mistborn_positions = {
-        e["title"]: e["position"] for e in entries if e["title"] in ("Final Empire", "Well of Ascension")
+        e["title"]: e["position"]
+        for e in entries
+        if e["title"] in ("Final Empire", "Well of Ascension")
     }
     assert mistborn_positions["Final Empire"] < mistborn_positions["Well of Ascension"]
     stormlight_positions = {
-        e["title"]: e["position"] for e in entries if e["title"] in ("Way of Kings", "Words of Radiance")
+        e["title"]: e["position"]
+        for e in entries
+        if e["title"] in ("Way of Kings", "Words of Radiance")
     }
     assert stormlight_positions["Way of Kings"] < stormlight_positions["Words of Radiance"]

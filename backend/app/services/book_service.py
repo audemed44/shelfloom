@@ -91,6 +91,7 @@ async def list_books(
         query = query.order_by(Book.author.nulls_last(), Book.title)
     elif sort == "last_read":
         from app.models.reading import ReadingSession as RS
+
         last_session_subq = (
             select(func.max(RS.start_time))
             .where(RS.book_id == Book.id, RS.dismissed == False)  # noqa: E712
@@ -143,20 +144,24 @@ async def get_book_series_memberships(session: AsyncSession, book_id: str) -> li
                 "series_id": series.id,
                 "series_name": series.name,
                 "sequence": bs.sequence,
-                "prev_book": {
-                    "id": prev_entry[1].id,
-                    "title": prev_entry[1].title,
-                    "sequence": prev_entry[0].sequence,
-                }
-                if prev_entry
-                else None,
-                "next_book": {
-                    "id": next_entry[1].id,
-                    "title": next_entry[1].title,
-                    "sequence": next_entry[0].sequence,
-                }
-                if next_entry
-                else None,
+                "prev_book": (
+                    {
+                        "id": prev_entry[1].id,
+                        "title": prev_entry[1].title,
+                        "sequence": prev_entry[0].sequence,
+                    }
+                    if prev_entry
+                    else None
+                ),
+                "next_book": (
+                    {
+                        "id": next_entry[1].id,
+                        "title": next_entry[1].title,
+                        "sequence": next_entry[0].sequence,
+                    }
+                    if next_entry
+                    else None
+                ),
             }
         )
     return result
@@ -231,7 +236,11 @@ async def upload_book_cover(
     image_data: bytes,
 ) -> Book:
     """Save an uploaded image as the book cover (max 1200 px), embed in EPUB if applicable."""
-    from app.services.metadata.cover import CoverExtractionError, _save_as_jpeg, embed_epub_cover
+    from app.services.metadata.cover import (
+        CoverExtractionError,
+        _save_as_jpeg,
+        embed_epub_cover,
+    )
 
     book = await get_book(session, book_id)
 
@@ -345,7 +354,11 @@ async def move_book(
 
     # Resolve destination path: apply template for auto-organize or sync-target shelves
     if dst_shelf.auto_organize or dst_shelf.is_sync_target:
-        from app.services.organizer import _get_series_info, _get_shelf_template, resolve_template
+        from app.services.organizer import (
+            _get_series_info,
+            _get_shelf_template,
+            resolve_template,
+        )
 
         template, seq_pad = await _get_shelf_template(session, target_shelf_id)
         series_name, series_path, sequence = await _get_series_info(session, book.id)

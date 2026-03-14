@@ -1,4 +1,5 @@
 """Tag CRUD and book-tag assignment."""
+
 from __future__ import annotations
 
 from sqlalchemy import select

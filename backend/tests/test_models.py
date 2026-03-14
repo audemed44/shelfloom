@@ -1,4 +1,5 @@
 """Tests for all ORM models — instantiation, relationships, constraints."""
+
 import uuid
 
 import pytest
@@ -12,10 +13,12 @@ from app.models.series import BookSeries, ReadingOrder, ReadingOrderEntry, Serie
 from app.models.shelf import Shelf, ShelfTemplate
 from app.models.tag import BookTag, Tag
 
-
 # ── helpers ──────────────────────────────────────────────────────────────────
 
-def make_shelf(name: str = "Library", path: str = "/shelves/lib", is_default: bool = False) -> Shelf:
+
+def make_shelf(
+    name: str = "Library", path: str = "/shelves/lib", is_default: bool = False
+) -> Shelf:
     return Shelf(name=name, path=path, is_default=is_default)
 
 
@@ -30,6 +33,7 @@ def make_book(shelf_id: int, title: str = "Test Book", fmt: str = "epub") -> Boo
 
 
 # ── shelf ─────────────────────────────────────────────────────────────────────
+
 
 async def test_shelf_create(db_session):
     shelf = make_shelf()
@@ -76,6 +80,7 @@ async def test_shelf_template_cascade_delete(db_session):
 
 
 # ── book ──────────────────────────────────────────────────────────────────────
+
 
 async def test_book_create(db_session):
     shelf = make_shelf()
@@ -150,6 +155,7 @@ async def test_cannot_delete_shelf_with_books(db_session):
 
 
 # ── series ────────────────────────────────────────────────────────────────────
+
 
 async def test_series_create_top_level(db_session):
     s = Series(name="Cosmere")
@@ -248,7 +254,8 @@ async def test_reading_order(db_session):
     db_session.add(entry)
     await db_session.commit()
     result = await db_session.execute(
-        select(ReadingOrder).where(ReadingOrder.id == ro.id)
+        select(ReadingOrder)
+        .where(ReadingOrder.id == ro.id)
         .options(selectinload(ReadingOrder.entries))
     )
     loaded = result.scalar_one()
@@ -282,6 +289,7 @@ async def test_delete_reading_order_removes_entries(db_session):
 
 # ── tags ──────────────────────────────────────────────────────────────────────
 
+
 async def test_tag_unique(db_session):
     db_session.add(Tag(name="sci-fi"))
     db_session.add(Tag(name="sci-fi"))
@@ -308,6 +316,7 @@ async def test_book_tag(db_session):
 
 
 # ── reading progress / sessions / highlights ──────────────────────────────────
+
 
 async def test_reading_progress(db_session):
     shelf = make_shelf()

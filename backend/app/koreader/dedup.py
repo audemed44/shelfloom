@@ -1,4 +1,5 @@
 """Cross-source reading session deduplication."""
+
 from __future__ import annotations
 
 import logging
@@ -50,8 +51,8 @@ async def deduplicate_sessions(
             time_diff = abs(sdr_sess.start_time - stats_sess.start_time)
             if time_diff <= tolerance:
                 log.debug(
-                    "Deduplicating sdr session %s (start=%s) against stats_db session %s (start=%s) "
-                    "for book %s — dismissing sdr",
+                    "Deduplicating sdr session %s (start=%s) against"
+                    " stats_db session %s (start=%s) for book %s — dismissing sdr",
                     sdr_sess.source_key,
                     sdr_sess.start_time,
                     stats_sess.source_key,

@@ -3,15 +3,12 @@
 import uuid
 from pathlib import Path
 
-import pytest
 from ebooklib import epub
-from sqlalchemy import select
 
 from app.models.book import Book
+from app.models.series import BookSeries, Series
 from app.models.shelf import Shelf
 from app.models.tag import BookTag, Tag
-from app.models.series import Series, BookSeries
-
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -44,9 +41,7 @@ async def _create_shelf(
     return shelf
 
 
-async def _create_book(
-    db_session, shelf_id: int, title: str = "Book", author: str = "A"
-) -> Book:
+async def _create_book(db_session, shelf_id: int, title: str = "Book", author: str = "A") -> Book:
     book = Book(
         id=str(uuid.uuid4()),
         title=title,
@@ -173,7 +168,7 @@ async def test_list_books_filter_tag(client, db_session, tmp_path):
 async def test_list_books_filter_series(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)
     book1 = await _create_book(db_session, shelf.id, "Book 1")
-    book2 = await _create_book(db_session, shelf.id, "Book 2")
+    _book2 = await _create_book(db_session, shelf.id, "Book 2")
     series = Series(name="My Series")
     db_session.add(series)
     await db_session.flush()
@@ -274,7 +269,7 @@ async def test_delete_book_with_file(client, db_session, tmp_path):
 
 
 async def test_upload_invalid_format(client, db_session, tmp_path):
-    shelf = await _create_shelf(db_session, tmp_path, is_default=True)
+    await _create_shelf(db_session, tmp_path, is_default=True)
     resp = await client.post(
         "/api/books",
         files={"file": ("notes.txt", b"hello", "text/plain")},
@@ -293,7 +288,7 @@ async def test_upload_no_default_shelf(client):
 async def test_upload_epub(client, db_session, tmp_path):
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
-    shelf = await _create_shelf(db_session, shelf_path, is_default=True)
+    await _create_shelf(db_session, shelf_path, is_default=True)
 
     epub_bytes = (FIXTURES / "test.epub").read_bytes()
     resp = await client.post(
@@ -467,9 +462,7 @@ async def test_move_book_sync_shelf_applies_template(client, db_session, tmp_pat
     await db_session.refresh(shelf2)
 
     # Set a simple template on the sync shelf
-    tmpl = ShelfTemplate(
-        shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2
-    )
+    tmpl = ShelfTemplate(shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2)
     db_session.add(tmpl)
     await db_session.commit()
 
@@ -494,9 +487,7 @@ async def test_move_book_sync_shelf_applies_template(client, db_session, tmp_pat
     assert not book_file.exists()
 
 
-async def test_move_book_auto_organize_shelf_applies_template(
-    client, db_session, tmp_path
-):
+async def test_move_book_auto_organize_shelf_applies_template(client, db_session, tmp_path):
     """Moving to an auto_organize shelf (not sync-target) also applies the template."""
     from app.models.shelf import ShelfTemplate
 
@@ -505,16 +496,12 @@ async def test_move_book_auto_organize_shelf_applies_template(
     src_path.mkdir()
     dst_path.mkdir()
     shelf1 = await _create_shelf(db_session, src_path, "Src2")
-    shelf2 = Shelf(
-        name="AutoOrg", path=str(dst_path), is_sync_target=False, auto_organize=True
-    )
+    shelf2 = Shelf(name="AutoOrg", path=str(dst_path), is_sync_target=False, auto_organize=True)
     db_session.add(shelf2)
     await db_session.commit()
     await db_session.refresh(shelf2)
 
-    tmpl = ShelfTemplate(
-        shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2
-    )
+    tmpl = ShelfTemplate(shelf_id=shelf2.id, template="{author}/{title}.{format}", seq_pad=2)
     db_session.add(tmpl)
     await db_session.commit()
 
@@ -578,9 +565,10 @@ async def test_refresh_cover_epub_no_cover_image(client, db_session, tmp_path):
 
 async def test_refresh_cover_epub_with_cover(client, db_session, tmp_path):
     """EPUB with a cover image extracts and sets cover_path."""
+    import io
+
     from ebooklib import epub
     from PIL import Image
-    import io
 
     shelf = await _create_shelf(db_session, tmp_path)
     book_file = tmp_path / "withcov.epub"

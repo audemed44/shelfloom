@@ -1,16 +1,16 @@
 """Tests for reading data API (step 2.7)."""
+
 from __future__ import annotations
 
 from datetime import datetime
 
-import pytest
-
 
 async def _create_book(client, db_session):
     """Helper to create a shelf + book via DB."""
-    from app.models.shelf import Shelf
-    from app.models.book import Book
     import uuid
+
+    from app.models.book import Book
+    from app.models.shelf import Shelf
 
     shelf = Shelf(name="Test Shelf", path="/shelves/test")
     db_session.add(shelf)
@@ -147,15 +147,17 @@ async def test_get_sessions_pagination(client, db_session):
     book = await _create_book(client, db_session)
 
     for i in range(5):
-        db_session.add(ReadingSession(
-            book_id=book.id,
-            start_time=datetime(2024, 1, i + 1, 10, 0),
-            duration=300,
-            pages_read=10,
-            source="sdr",
-            source_key=f"sdr:md5:sess{i}",
-            dismissed=False,
-        ))
+        db_session.add(
+            ReadingSession(
+                book_id=book.id,
+                start_time=datetime(2024, 1, i + 1, 10, 0),
+                duration=300,
+                pages_read=10,
+                source="sdr",
+                source_key=f"sdr:md5:sess{i}",
+                dismissed=False,
+            )
+        )
     await db_session.commit()
 
     resp = await client.get(f"/api/books/{book.id}/sessions?page=1&per_page=3")
@@ -227,7 +229,7 @@ async def test_reading_summary_empty(client, db_session):
 
 async def test_reading_summary_with_data(client, db_session):
     """Reading summary returns correct totals."""
-    from app.models.reading import ReadingSession, ReadingProgress
+    from app.models.reading import ReadingProgress, ReadingSession
 
     book = await _create_book(client, db_session)
 

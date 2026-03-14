@@ -1,4 +1,5 @@
 """KOSync protocol router."""
+
 from __future__ import annotations
 
 import base64
@@ -9,7 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.schemas.kosync import KoSyncProgressIn, KoSyncProgressOut, KoSyncUserCreate
-from app.services.kosync_service import authenticate_user, pull_progress, push_progress, register_user
+from app.services.kosync_service import (
+    authenticate_user,
+    pull_progress,
+    push_progress,
+    register_user,
+)
 
 router = APIRouter(prefix="/kosync", tags=["kosync"])
 

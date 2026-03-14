@@ -1,10 +1,11 @@
 """Read KOReader statistics.sqlite3 database."""
+
 from __future__ import annotations
 
 import logging
 import sqlite3
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 log = logging.getLogger(__name__)
@@ -15,6 +16,7 @@ SESSION_GAP_SECONDS = 600  # 10 minutes
 @dataclass
 class StatsBook:
     """A book entry from KOReader stats DB."""
+
     id: int
     title: str
     authors: str | None
@@ -30,9 +32,10 @@ class StatsBook:
 @dataclass
 class StatsSession:
     """An aggregated reading session."""
+
     book_id: int
     start_time: datetime
-    duration: int      # seconds
+    duration: int  # seconds
     pages_read: int
     source_key: str
 
@@ -74,7 +77,7 @@ def _build_stats_session(
     duration = sum(r[2] for r in group)
     pages_read = len(set(r[0] for r in group))
 
-    start_dt = datetime.fromtimestamp(start_ts, tz=timezone.utc).replace(tzinfo=None)
+    start_dt = datetime.fromtimestamp(start_ts, tz=UTC).replace(tzinfo=None)
 
     if book_md5:
         source_key = f"stats_db:{book_md5}:{start_ts}"
@@ -90,7 +93,9 @@ def _build_stats_session(
     )
 
 
-def read_stats_db(db_path: str | Path) -> tuple[list[StatsBook], dict[int, list[StatsSession]]]:
+def read_stats_db(
+    db_path: str | Path,
+) -> tuple[list[StatsBook], dict[int, list[StatsSession]]]:
     """
     Read KOReader statistics.sqlite3 synchronously.
     Returns (books, sessions_by_book_id).

@@ -1,21 +1,23 @@
 """Tests for shelf management API and service."""
+
 import uuid
 
-import pytest
 from httpx import AsyncClient
 
 from app.models.book import Book
-from app.models.shelf import Shelf
-
 
 # ── helper ────────────────────────────────────────────────────────────────────
 
-async def create_shelf(client: AsyncClient, name: str = "My Shelf", path: str = "/tmp", **kw) -> dict:
+
+async def create_shelf(
+    client: AsyncClient, name: str = "My Shelf", path: str = "/tmp", **kw
+) -> dict:
     resp = await client.post("/api/shelves", json={"name": name, "path": path, **kw})
     return resp
 
 
 # ── list ──────────────────────────────────────────────────────────────────────
+
 
 async def test_list_shelves_empty(client):
     resp = await client.get("/api/shelves")
@@ -34,6 +36,7 @@ async def test_list_shelves_with_data(client, tmp_path):
 
 
 # ── create ────────────────────────────────────────────────────────────────────
+
 
 async def test_create_shelf(client, tmp_path):
     resp = await client.post("/api/shelves", json={"name": "Library", "path": str(tmp_path)})
@@ -76,6 +79,7 @@ async def test_only_one_default_shelf(client, tmp_path):
 
 # ── get ───────────────────────────────────────────────────────────────────────
 
+
 async def test_get_shelf(client, tmp_path):
     created = (await client.post("/api/shelves", json={"name": "S", "path": str(tmp_path)})).json()
     resp = await client.get(f"/api/shelves/{created['id']}")
@@ -90,8 +94,11 @@ async def test_get_shelf_not_found(client):
 
 # ── update ────────────────────────────────────────────────────────────────────
 
+
 async def test_update_shelf_name(client, tmp_path):
-    created = (await client.post("/api/shelves", json={"name": "Old", "path": str(tmp_path)})).json()
+    created = (
+        await client.post("/api/shelves", json={"name": "Old", "path": str(tmp_path)})
+    ).json()
     resp = await client.patch(f"/api/shelves/{created['id']}", json={"name": "New"})
     assert resp.status_code == 200
     assert resp.json()["name"] == "New"
@@ -108,7 +115,12 @@ async def test_update_shelf_full(client, tmp_path):
     created = (await client.post("/api/shelves", json={"name": "Upd", "path": path})).json()
     resp = await client.patch(
         f"/api/shelves/{created['id']}",
-        json={"is_default": True, "is_sync_target": True, "device_name": "Kobo", "auto_organize": True},
+        json={
+            "is_default": True,
+            "is_sync_target": True,
+            "device_name": "Kobo",
+            "auto_organize": True,
+        },
     )
     assert resp.status_code == 200
     data = resp.json()
@@ -128,8 +140,11 @@ async def test_update_shelf_name_conflict(client, tmp_path):
 
 # ── delete ────────────────────────────────────────────────────────────────────
 
+
 async def test_delete_shelf(client, tmp_path):
-    created = (await client.post("/api/shelves", json={"name": "Del", "path": str(tmp_path)})).json()
+    created = (
+        await client.post("/api/shelves", json={"name": "Del", "path": str(tmp_path)})
+    ).json()
     resp = await client.delete(f"/api/shelves/{created['id']}")
     assert resp.status_code == 204
     # Verify gone
@@ -142,7 +157,9 @@ async def test_delete_shelf_not_found(client):
 
 
 async def test_cannot_delete_shelf_with_books(client, db_session, tmp_path):
-    created = (await client.post("/api/shelves", json={"name": "Full", "path": str(tmp_path)})).json()
+    created = (
+        await client.post("/api/shelves", json={"name": "Full", "path": str(tmp_path)})
+    ).json()
     # Add a book directly via DB
     book = Book(
         id=str(uuid.uuid4()),
@@ -161,16 +178,21 @@ async def test_cannot_delete_shelf_with_books(client, db_session, tmp_path):
 
 # ── book count ────────────────────────────────────────────────────────────────
 
+
 async def test_shelf_book_count(client, db_session, tmp_path):
-    created = (await client.post("/api/shelves", json={"name": "Cnt", "path": str(tmp_path)})).json()
+    created = (
+        await client.post("/api/shelves", json={"name": "Cnt", "path": str(tmp_path)})
+    ).json()
     for i in range(3):
-        db_session.add(Book(
-            id=str(uuid.uuid4()),
-            title=f"Book {i}",
-            format="epub",
-            file_path=f"book{i}.epub",
-            shelf_id=created["id"],
-        ))
+        db_session.add(
+            Book(
+                id=str(uuid.uuid4()),
+                title=f"Book {i}",
+                format="epub",
+                file_path=f"book{i}.epub",
+                shelf_id=created["id"],
+            )
+        )
     await db_session.commit()
 
     resp = await client.get(f"/api/shelves/{created['id']}")
@@ -179,6 +201,7 @@ async def test_shelf_book_count(client, db_session, tmp_path):
 
 
 # ── organize template ─────────────────────────────────────────────────────────
+
 
 async def test_create_shelf_with_organize_template(client, tmp_path):
     resp = await client.post(
@@ -206,7 +229,9 @@ async def test_create_shelf_without_template_returns_null(client, tmp_path):
 
 
 async def test_update_shelf_organize_template(client, tmp_path):
-    created = (await client.post("/api/shelves", json={"name": "UpdTmpl", "path": str(tmp_path)})).json()
+    created = (
+        await client.post("/api/shelves", json={"name": "UpdTmpl", "path": str(tmp_path)})
+    ).json()
     resp = await client.patch(
         f"/api/shelves/{created['id']}",
         json={"organize_template": "{author}/{title}.{format}", "seq_pad": 4},
@@ -218,10 +243,16 @@ async def test_update_shelf_organize_template(client, tmp_path):
 
 
 async def test_update_shelf_template_overwrites_existing(client, tmp_path):
-    created = (await client.post(
-        "/api/shelves",
-        json={"name": "Overwrite", "path": str(tmp_path), "organize_template": "{title}"},
-    )).json()
+    created = (
+        await client.post(
+            "/api/shelves",
+            json={
+                "name": "Overwrite",
+                "path": str(tmp_path),
+                "organize_template": "{title}",
+            },
+        )
+    ).json()
     assert created["organize_template"] == "{title}"
 
     resp = await client.patch(
@@ -233,6 +264,7 @@ async def test_update_shelf_template_overwrites_existing(client, tmp_path):
 
 
 # ── schema validation ─────────────────────────────────────────────────────────
+
 
 async def test_create_shelf_missing_name(client):
     resp = await client.post("/api/shelves", json={"path": "/tmp"})

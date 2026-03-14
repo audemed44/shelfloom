@@ -1,14 +1,15 @@
 """KOSync protocol service."""
+
 from __future__ import annotations
 
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.kosync import KoSyncUser, KoSyncProgress
+from app.models.kosync import KoSyncProgress, KoSyncUser
 
 log = logging.getLogger(__name__)
 
@@ -27,9 +28,7 @@ async def register_user(
     Register a new KOSync user.
     Returns None if username already exists.
     """
-    existing = await session.execute(
-        select(KoSyncUser).where(KoSyncUser.username == username)
-    )
+    existing = await session.execute(select(KoSyncUser).where(KoSyncUser.username == username))
     if existing.scalar_one_or_none() is not None:
         return None
 
@@ -48,9 +47,7 @@ async def authenticate_user(
     Authenticate a KOSync user.
     Returns user if credentials are correct, None otherwise.
     """
-    result = await session.execute(
-        select(KoSyncUser).where(KoSyncUser.username == username)
-    )
+    result = await session.execute(select(KoSyncUser).where(KoSyncUser.username == username))
     user = result.scalar_one_or_none()
     if user is None:
         return None
@@ -71,7 +68,7 @@ async def push_progress(
     Store or update reading progress from KOReader.
     Returns the stored progress data.
     """
-    now_ts = int(datetime.now(tz=timezone.utc).timestamp())
+    now_ts = int(datetime.now(tz=UTC).timestamp())
 
     # Upsert KoSyncProgress for this user/document/device
     result = await session.execute(
@@ -116,10 +113,12 @@ async def pull_progress(
     Returns None if no progress found.
     """
     result = await session.execute(
-        select(KoSyncProgress).where(
+        select(KoSyncProgress)
+        .where(
             KoSyncProgress.username == username,
             KoSyncProgress.document == document,
-        ).order_by(KoSyncProgress.percentage.desc())
+        )
+        .order_by(KoSyncProgress.percentage.desc())
     )
     record = result.scalars().first()
 

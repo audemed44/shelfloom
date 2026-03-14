@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.database import get_engine, Base
+from app.database import Base, get_engine
 
 # Frontend build output — repo_root/frontend/dist
 _FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
@@ -22,8 +22,8 @@ async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
         await conn.run_sync(Base.metadata.create_all)
 
     # Start background scan scheduler
-    from app.services.scheduler import Scheduler
     from app.database import get_session_factory
+    from app.services.scheduler import Scheduler
 
     settings = get_settings()
     scheduler = Scheduler()
@@ -47,17 +47,17 @@ def create_app() -> FastAPI:
     )
 
     from app.routers import (
-        health,
-        shelves,
         books,
-        series,
-        organizer,
-        tags,
+        fs,
+        health,
         import_,
         kosync,
+        organizer,
         reading,
-        fs,
+        series,
+        shelves,
         stats,
+        tags,
     )
 
     application.include_router(health.router, prefix="/api")

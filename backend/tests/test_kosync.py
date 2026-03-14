@@ -1,9 +1,8 @@
 """Tests for KOSync protocol (step 2.6)."""
+
 from __future__ import annotations
 
 import base64
-
-import pytest
 
 
 def _basic_auth(username: str, password: str) -> str:
@@ -181,7 +180,9 @@ async def test_push_progress_duplicate_update(client):
     # Push again with updated percentage
     payload["progress"] = "0.6"
     payload["percentage"] = 60.0
-    resp = await client.put("/api/kosync/syncs/progress", json=payload, headers={"Authorization": auth})
+    resp = await client.put(
+        "/api/kosync/syncs/progress", json=payload, headers={"Authorization": auth}
+    )
     assert resp.status_code == 200
 
     # Pull should return the latest
@@ -193,11 +194,7 @@ async def test_push_progress_duplicate_update(client):
     assert pull.json()["percentage"] == 60.0
 
     # Ensure no duplicates in DB
-    from sqlalchemy import select
-    from app.models.kosync import KoSyncProgress
-    session = client.app.dependency_overrides[
-        __import__("app.database", fromlist=["get_session"]).get_session
-    ]
+
     # Just verify via pull — single result means no duplicates
     assert pull.json()["percentage"] == 60.0
 

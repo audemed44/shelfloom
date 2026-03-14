@@ -1,4 +1,5 @@
 """Fallback metadata extraction from filename patterns."""
+
 from __future__ import annotations
 
 import re
