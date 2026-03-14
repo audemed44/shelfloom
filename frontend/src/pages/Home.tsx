@@ -191,6 +191,11 @@ function ActivityFeed({ sessions }: { sessions: RecentSession[] }) {
               )}
             </div>
             <div className="flex items-center gap-4 shrink-0 ml-4">
+              {s.pages_read != null && s.pages_read > 0 && (
+                <span className="text-[10px] text-white/30 font-bold">
+                  {s.pages_read}p
+                </span>
+              )}
               <span className="text-xs font-black text-white/60">
                 {fmtDuration(s.duration)}
               </span>

@@ -49,3 +49,4 @@ Thumbs.db
 .claude/
 dev.ps1
 dev.sh
+.npmrc

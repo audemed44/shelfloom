@@ -921,8 +921,8 @@ export default function BookDetailPage() {
               </div>
             )}
             <div className="flex flex-col gap-1">
-              <span className="text-white/30">Added</span>
-              <span className="normal-case">{fmtDate(book.created_at)}</span>
+              <span className="text-white/30">Last Read</span>
+              <span className="normal-case">{fmtDate(book.last_read)}</span>
             </div>
           </div>
         </footer>

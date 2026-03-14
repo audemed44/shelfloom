@@ -34,12 +34,17 @@ from app.services.book_service import (
 router = APIRouter(prefix="/books", tags=["books"])
 
 
-def _book_response(book: "Book", reading_progress: float | None = None) -> BookResponse:  # type: ignore[name-defined]  # noqa: F821
+def _book_response(
+    book: "Book",  # noqa: F821
+    reading_progress: float | None = None,
+    last_read: "datetime | None" = None,  # type: ignore[name-defined]  # noqa: F821
+) -> BookResponse:
     """Build BookResponse from ORM object without triggering lazy relationship loads."""
     col_data = {
         attr.key: getattr(book, attr.key) for attr in sa_inspect(type(book)).mapper.column_attrs
     }
     col_data["reading_progress"] = reading_progress
+    col_data["last_read"] = last_read
     return BookResponse.model_validate(col_data)
 
 
@@ -103,11 +108,27 @@ async def get_book_series_endpoint(book_id: str, session: AsyncSession = Depends
 
 @router.get("/{book_id}", response_model=BookResponse)
 async def get_book_endpoint(book_id: str, session: AsyncSession = Depends(get_session)):
+    from app.models.reading import ReadingProgress, ReadingSession
+
     try:
         book = await get_book(session, book_id)
     except BookNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return _book_response(book)
+
+    prog_row = await session.execute(
+        sa_select(func.max(ReadingProgress.progress)).where(ReadingProgress.book_id == book_id)
+    )
+    reading_progress = prog_row.scalar()
+
+    last_read_row = await session.execute(
+        sa_select(func.max(ReadingSession.start_time)).where(
+            ReadingSession.book_id == book_id,
+            ReadingSession.dismissed.is_(False),
+        )
+    )
+    last_read = last_read_row.scalar()
+
+    return _book_response(book, reading_progress=reading_progress, last_read=last_read)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=BookResponse)

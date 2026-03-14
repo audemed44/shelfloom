@@ -99,6 +99,7 @@ export interface Book {
   created_at: string
   updated_at: string
   reading_progress: number | null // 0–100, null = unread
+  last_read: string | null
 }
 
 export interface BookDetail extends Book {

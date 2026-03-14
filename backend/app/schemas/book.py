@@ -24,6 +24,7 @@ class BookResponse(BaseModel):
     date_published: str | None
     genre: str | None
     reading_progress: float | None = None  # 0–100, max across all devices
+    last_read: datetime | None = None
 
 
 class BookUpdate(BaseModel):
