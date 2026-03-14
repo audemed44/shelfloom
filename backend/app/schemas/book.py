@@ -46,3 +46,17 @@ class BookListResponse(BaseModel):
 
 class BookMoveRequest(BaseModel):
     shelf_id: int
+
+
+class BookSeriesNeighbour(BaseModel):
+    id: str
+    title: str
+    sequence: float | None
+
+
+class BookSeriesMembership(BaseModel):
+    series_id: int
+    series_name: str
+    sequence: float | None
+    prev_book: BookSeriesNeighbour | None
+    next_book: BookSeriesNeighbour | None

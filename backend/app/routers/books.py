@@ -7,13 +7,14 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.schemas.book import BookListResponse, BookMoveRequest, BookResponse, BookUpdate
+from app.schemas.book import BookListResponse, BookMoveRequest, BookResponse, BookSeriesMembership, BookUpdate
 from app.services.book_service import (
     BookNotFound,
     FileOperationError,
     ShelfNotFound,
     delete_book,
     get_book,
+    get_book_series_memberships,
     list_books,
     move_book,
     update_book,
@@ -50,6 +51,15 @@ async def list_books_endpoint(
         per_page=per_page,
         pages=max(1, math.ceil(total / per_page)),
     )
+
+
+@router.get("/{book_id}/series", response_model=list[BookSeriesMembership])
+async def get_book_series_endpoint(book_id: str, session: AsyncSession = Depends(get_session)):
+    try:
+        await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return await get_book_series_memberships(session, book_id)
 
 
 @router.get("/{book_id}", response_model=BookResponse)

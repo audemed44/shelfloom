@@ -78,6 +78,40 @@ async def get_book(session: AsyncSession, book_id: str) -> Book:
     return book
 
 
+async def get_book_series_memberships(session: AsyncSession, book_id: str) -> list[dict]:
+    """Return series memberships for a book with prev/next navigation."""
+    from app.models.series import BookSeries, Series
+
+    rows = await session.execute(
+        select(BookSeries, Series)
+        .join(Series, BookSeries.series_id == Series.id)
+        .where(BookSeries.book_id == book_id)
+    )
+    memberships = rows.all()
+
+    result = []
+    for bs, series in memberships:
+        # All books in this series ordered by sequence (nulls last), then title
+        sibs = await session.execute(
+            select(BookSeries, Book)
+            .join(Book, BookSeries.book_id == Book.id)
+            .where(BookSeries.series_id == series.id)
+            .order_by(BookSeries.sequence.nulls_last(), Book.title)
+        )
+        all_books = [(b, bk) for b, bk in sibs.all()]
+        idx = next((i for i, (b, _) in enumerate(all_books) if b.book_id == book_id), None)
+        prev_entry = all_books[idx - 1] if idx is not None and idx > 0 else None
+        next_entry = all_books[idx + 1] if idx is not None and idx < len(all_books) - 1 else None
+        result.append({
+            "series_id": series.id,
+            "series_name": series.name,
+            "sequence": bs.sequence,
+            "prev_book": {"id": prev_entry[1].id, "title": prev_entry[1].title, "sequence": prev_entry[0].sequence} if prev_entry else None,
+            "next_book": {"id": next_entry[1].id, "title": next_entry[1].title, "sequence": next_entry[0].sequence} if next_entry else None,
+        })
+    return result
+
+
 async def update_book(session: AsyncSession, book_id: str, data: BookUpdate) -> Book:
     book = await get_book(session, book_id)
     for field, value in data.model_dump(exclude_none=True).items():
