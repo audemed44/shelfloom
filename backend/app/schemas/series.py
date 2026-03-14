@@ -72,3 +72,4 @@ class SeriesBookItem(BaseModel):
     title: str
     author: str | None = None
     format: str | None = None
+    cover_path: str | None = None

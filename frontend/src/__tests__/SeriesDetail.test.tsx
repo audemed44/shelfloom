@@ -20,6 +20,7 @@ const SERIES_BOOKS = [
     title: 'The Way of Kings',
     author: 'Brandon Sanderson',
     format: 'epub',
+    cover_path: null,
   },
   {
     book_id: 'uuid2',
@@ -27,6 +28,7 @@ const SERIES_BOOKS = [
     title: 'Words of Radiance',
     author: 'Brandon Sanderson',
     format: 'epub',
+    cover_path: null,
   },
 ]
 
@@ -212,7 +214,7 @@ describe('SeriesDetail', () => {
   it('edit series button opens modal', async () => {
     renderDetail()
     await waitFor(() => screen.getByTestId('series-title'))
-    const editBtn = screen.getByRole('button', { name: /edit series/i })
+    const editBtn = screen.getByRole('button', { name: /series settings/i })
     await userEvent.click(editBtn)
     expect(screen.getByTestId('series-modal')).toBeInTheDocument()
   })
@@ -261,7 +263,7 @@ describe('SeriesDetail', () => {
     await userEvent.click(screen.getByTestId('reading-order-tab-11'))
     // After switching, the active order tab-11 should be active
     expect(screen.getByTestId('reading-order-tab-11').className).toContain(
-      'border-primary'
+      'text-primary'
     )
   })
 })

@@ -74,12 +74,12 @@ function CreateSeriesModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="w-full max-w-md bg-black border border-white/10 shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md bg-black border border-white/10 shadow-2xl flex flex-col max-h-[calc(100vh-2rem)] my-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">
@@ -99,7 +99,7 @@ function CreateSeriesModal({
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
           <div>
             <p className="text-white/70 text-sm normal-case leading-relaxed">
               Organize books into nested hierarchies — group sub-series under a
@@ -476,7 +476,7 @@ export default function EditBookModal({
                   value={form.author}
                   onChange={handleChange}
                 />
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field
                     label="Publisher"
                     name="publisher"
@@ -490,7 +490,7 @@ export default function EditBookModal({
                     onChange={handleChange}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field
                     label="ISBN"
                     name="isbn"

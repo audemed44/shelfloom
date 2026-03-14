@@ -1,4 +1,5 @@
 """Series and reading order management."""
+
 from __future__ import annotations
 
 from sqlalchemy import func, select
@@ -30,6 +31,7 @@ class ReadingOrderNotFound(Exception):
 
 # ── series ────────────────────────────────────────────────────────────────────
 
+
 async def list_series(session: AsyncSession) -> list[Series]:
     result = await session.execute(select(Series).order_by(Series.parent_id, Series.sort_order))
     return result.scalars().all()  # type: ignore[return-value]
@@ -37,7 +39,8 @@ async def list_series(session: AsyncSession) -> list[Series]:
 
 async def get_series(session: AsyncSession, series_id: int) -> Series:
     result = await session.execute(
-        select(Series).where(Series.id == series_id)
+        select(Series)
+        .where(Series.id == series_id)
         .options(selectinload(Series.children), selectinload(Series.book_entries))
     )
     series = result.scalar_one_or_none()
@@ -103,9 +106,7 @@ async def add_book_to_series_by_id(
 
     # Upsert
     existing = await session.execute(
-        select(BookSeries).where(
-            BookSeries.book_id == book_id, BookSeries.series_id == series_id
-        )
+        select(BookSeries).where(BookSeries.book_id == book_id, BookSeries.series_id == series_id)
     )
     bs = existing.scalar_one_or_none()
     if bs is None:
@@ -117,13 +118,9 @@ async def add_book_to_series_by_id(
     return bs
 
 
-async def remove_book_from_series(
-    session: AsyncSession, series_id: int, book_id: str
-) -> None:
+async def remove_book_from_series(session: AsyncSession, series_id: int, book_id: str) -> None:
     result = await session.execute(
-        select(BookSeries).where(
-            BookSeries.book_id == book_id, BookSeries.series_id == series_id
-        )
+        select(BookSeries).where(BookSeries.book_id == book_id, BookSeries.series_id == series_id)
     )
     bs = result.scalar_one_or_none()
     if bs is not None:
@@ -139,10 +136,7 @@ async def get_series_tree(session: AsyncSession) -> list[dict]:
         .group_by(Series.id)
         .order_by(Series.parent_id, Series.sort_order)
     )
-    return [
-        {"series": row.Series, "book_count": row.book_count}
-        for row in result
-    ]
+    return [{"series": row.Series, "book_count": row.book_count} for row in result]
 
 
 async def purge_empty_series(session: AsyncSession) -> list[str]:
@@ -178,6 +172,7 @@ async def purge_empty_series(session: AsyncSession) -> list[str]:
 
 # ── reading orders ────────────────────────────────────────────────────────────
 
+
 async def create_reading_order(session: AsyncSession, data: ReadingOrderCreate) -> ReadingOrder:
     await get_series(session, data.series_id)
     ro = ReadingOrder(name=data.name, series_id=data.series_id)
@@ -189,7 +184,8 @@ async def create_reading_order(session: AsyncSession, data: ReadingOrderCreate) 
 
 async def get_reading_order(session: AsyncSession, order_id: int) -> ReadingOrder:
     result = await session.execute(
-        select(ReadingOrder).where(ReadingOrder.id == order_id)
+        select(ReadingOrder)
+        .where(ReadingOrder.id == order_id)
         .options(selectinload(ReadingOrder.entries))
     )
     ro = result.scalar_one_or_none()
@@ -236,11 +232,10 @@ async def list_reading_orders_for_series(
     return result.scalars().all()  # type: ignore[return-value]
 
 
-async def list_books_in_series(
-    session: AsyncSession, series_id: int
-) -> list[dict]:
+async def list_books_in_series(session: AsyncSession, series_id: int) -> list[dict]:
     await get_series(session, series_id)  # raises SeriesNotFound if missing
     from sqlalchemy import nullsfirst
+
     result = await session.execute(
         select(BookSeries, Book)
         .join(Book, Book.id == BookSeries.book_id)
@@ -254,6 +249,7 @@ async def list_books_in_series(
             "title": book.title,
             "author": book.author,
             "format": book.format,
+            "cover_path": book.cover_path,
         }
         for bs, book in result
     ]

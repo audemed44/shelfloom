@@ -717,7 +717,7 @@ export default function BookDetailPage() {
           </div>
 
           {/* Metadata grid */}
-          <div className="grid grid-cols-3 gap-6 py-8 border-y border-white/10 mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 py-8 border-y border-white/10 mb-10">
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
                 Series

@@ -82,14 +82,14 @@ export default function AssignSeriesModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
       data-testid="assign-series-modal"
     >
-      <div className="w-full max-w-md bg-black border border-white/10 rounded-lg shadow-xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+      <div className="w-full max-w-md bg-black border border-white/10 rounded-lg shadow-xl flex flex-col max-h-[calc(100vh-2rem)] my-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
           <h2 className="text-xs font-black tracking-widest uppercase text-white">
             Assign to Series
           </h2>
@@ -101,7 +101,7 @@ export default function AssignSeriesModal({
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="px-6 py-5 space-y-5 overflow-y-auto">
           {error && <p className="text-xs text-red-400 normal-case">{error}</p>}
 
           {/* Current memberships */}

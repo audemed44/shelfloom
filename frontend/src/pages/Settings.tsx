@@ -425,9 +425,14 @@ export default function Settings() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-12">
-      <h1 className="text-xs font-black tracking-widest uppercase text-white">
-        Settings
-      </h1>
+      <header className="mb-4">
+        <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
+          Settings
+        </h2>
+        <p className="text-white/40 text-base sm:text-lg font-medium mt-2 normal-case">
+          Shelves, file organisation, and scan preferences.
+        </p>
+      </header>
 
       {/* ── 01 Shelves ── */}
       <section>

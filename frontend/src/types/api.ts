@@ -148,6 +148,7 @@ export interface SeriesBook {
   title: string
   author: string | null
   format: string | null
+  cover_path: string | null
 }
 
 export interface BackfillCoversResponse {

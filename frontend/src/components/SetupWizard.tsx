@@ -632,10 +632,10 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black p-4 overflow-y-auto"
       data-testid="setup-wizard"
     >
-      <div className="w-full max-w-lg">
+      <div className="w-full max-w-lg my-auto">
         {/* Branding */}
         <div className="mb-8">
           <p className="text-[10px] font-black tracking-[0.3em] uppercase text-white/20 mb-1">

@@ -88,13 +88,13 @@ export default function ShelfModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
       data-testid="shelf-modal"
     >
-      <div className="w-full max-w-lg bg-black border border-white/10 shadow-2xl flex flex-col max-h-[calc(100vh-2rem)]">
+      <div className="w-full max-w-lg bg-black border border-white/10 shadow-2xl flex flex-col max-h-[calc(100vh-2rem)] my-auto">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <div className="flex items-center gap-3">

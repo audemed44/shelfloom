@@ -138,35 +138,44 @@ export default function SeriesList() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="p-4 sm:p-6 lg:p-12">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xs font-black tracking-widest uppercase text-white">
-          Series
-        </h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handlePurge}
-            data-testid="purge-btn"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 transition-colors"
-          >
-            Purge Empty
-          </button>
-          <button
-            onClick={() => setShowCreate(true)}
-            data-testid="new-series-btn"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 transition-colors"
-          >
-            <PlusCircle size={12} />
-            New Series
-          </button>
+      <header className="mb-6 sm:mb-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
+              Series
+            </h1>
+            <p className="text-white/40 text-base sm:text-lg font-medium mt-2 normal-case">
+              {allSeries.length > 0
+                ? `${allSeries.length} series in your library`
+                : 'Organize books into series'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0 mt-2">
+            <button
+              onClick={handlePurge}
+              data-testid="purge-btn"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold border border-white/20 text-white/60 hover:text-white hover:border-white/40 rounded-lg transition-colors normal-case"
+            >
+              Purge Empty
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              data-testid="new-series-btn"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-primary text-white hover:bg-primary/80 rounded-lg transition-colors normal-case"
+            >
+              <PlusCircle size={16} />
+              New Series
+            </button>
+          </div>
         </div>
-      </div>
+      </header>
 
       {/* Purge result banner */}
       {purgeResult && (
         <div
-          className="px-4 py-3 border border-white/10 bg-white/5 rounded text-xs text-white/70 normal-case"
+          className="px-4 py-3 mb-6 border border-white/10 bg-white/5 rounded-lg text-sm text-white/70 normal-case"
           data-testid="purge-result"
         >
           {purgeResult}
@@ -175,11 +184,11 @@ export default function SeriesList() {
 
       {/* Series tree */}
       <div
-        className="border border-white/10 rounded bg-black"
+        className="border border-white/10 rounded-lg bg-black max-w-5xl"
         data-testid="series-list"
       >
         {tree.length === 0 ? (
-          <p className="text-xs text-white/30 tracking-widest uppercase text-center py-8">
+          <p className="text-sm text-white/30 text-center py-12 normal-case">
             No series yet
           </p>
         ) : (
