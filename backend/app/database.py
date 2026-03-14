@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -14,7 +15,16 @@ def make_engine(db_path: str | None = None):  # pragma: no cover
     settings = get_settings()
     path = db_path or settings.db_path
     url = f"sqlite+aiosqlite:///{path}"
-    return create_async_engine(url, echo=False)
+    engine = create_async_engine(url, echo=False)
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def set_sqlite_pragma(dbapi_conn, _connection_record):
+        if engine.dialect.name == "sqlite":
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys = ON")
+            cursor.close()
+
+    return engine
 
 
 def make_session_factory(engine=None):  # pragma: no cover

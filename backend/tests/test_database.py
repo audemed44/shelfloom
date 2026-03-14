@@ -1,6 +1,19 @@
 import pytest
 from sqlalchemy import text
 
+from app.database import make_engine
+
+
+@pytest.mark.asyncio
+async def test_foreign_keys_pragma_enabled():
+    """make_engine must enable PRAGMA foreign_keys = ON for every connection."""
+    engine = make_engine(":memory:")
+    async with engine.connect() as conn:
+        result = await conn.execute(text("PRAGMA foreign_keys"))
+        value = result.scalar()
+    await engine.dispose()
+    assert value == 1
+
 
 @pytest.mark.asyncio
 async def test_db_session_executes_raw_sql(db_session):
