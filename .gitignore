@@ -44,3 +44,8 @@ Thumbs.db
 # Root-level markdown files (project notes, plans) — except README
 /*.md
 !/README.md
+
+# IDE/assistant local files
+.claude/
+dev.ps1
+dev.sh
