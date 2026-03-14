@@ -177,8 +177,28 @@ async def create_reading_order(session: AsyncSession, data: ReadingOrderCreate) 
     await get_series(session, data.series_id)
     ro = ReadingOrder(name=data.name, series_id=data.series_id)
     session.add(ro)
+    await session.flush()  # assign ro.id so entries can reference it
+
+    # Pre-populate with all books in the series, ordered by sequence
+    from sqlalchemy import nullslast
+
+    result = await session.execute(
+        select(BookSeries)
+        .where(BookSeries.series_id == data.series_id)
+        .order_by(nullslast(BookSeries.sequence), BookSeries.book_id)
+    )
+    book_entries = result.scalars().all()
+    for position, bs in enumerate(book_entries, start=1):
+        session.add(
+            ReadingOrderEntry(
+                reading_order_id=ro.id,
+                book_id=bs.book_id,
+                position=position,
+            )
+        )
+
     await session.commit()
-    await session.refresh(ro)
+    await session.refresh(ro, attribute_names=["entries"])
     return ro
 
 
