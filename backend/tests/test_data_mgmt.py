@@ -532,3 +532,74 @@ async def test_reimport_does_not_resurrect_dismissed(
     # The existing dismissed session blocks any re-import (same source_key)
     assert existing is not None
     assert existing.dismissed is True
+
+
+# ---------------------------------------------------------------------------
+# Sessions Log
+# ---------------------------------------------------------------------------
+
+
+async def test_sessions_log_basic(client: AsyncClient, db_session: AsyncSession, shelf_factory):
+    """Sessions log returns sessions with book metadata."""
+    shelf = await shelf_factory()
+    book = await _make_book(db_session, shelf.id, title="Log Book", author="Log Author")
+    await _make_session(db_session, book.id, source="stats_db")
+
+    resp = await client.get("/api/data-mgmt/sessions-log")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] >= 1
+    entry = next(e for e in data["items"] if e["book_id"] == book.id)
+    assert entry["book_title"] == "Log Book"
+    assert entry["book_author"] == "Log Author"
+    assert entry["source"] == "stats_db"
+    assert "created_at" in entry
+
+
+async def test_sessions_log_search(client: AsyncClient, db_session: AsyncSession, shelf_factory):
+    """Search filters by book title and author."""
+    shelf = await shelf_factory()
+    book_a = await _make_book(db_session, shelf.id, title="Alpha Book", author="Writer X")
+    book_b = await _make_book(db_session, shelf.id, title="Beta Book", author="Writer Y")
+    await _make_session(db_session, book_a.id)
+    await _make_session(db_session, book_b.id)
+
+    resp = await client.get("/api/data-mgmt/sessions-log?search=Alpha")
+    assert resp.status_code == 200
+    data = resp.json()
+    ids = [e["book_id"] for e in data["items"]]
+    assert book_a.id in ids
+    assert book_b.id not in ids
+
+
+async def test_sessions_log_source_filter(
+    client: AsyncClient, db_session: AsyncSession, shelf_factory
+):
+    """Source filter restricts results to matching source."""
+    shelf = await shelf_factory()
+    book = await _make_book(db_session, shelf.id)
+    await _make_session(db_session, book.id, source="sdr", source_key="sdr:k1")
+    await _make_session(db_session, book.id, source="stats_db", source_key="stats:k1")
+
+    resp = await client.get("/api/data-mgmt/sessions-log?source=sdr")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert all(e["source"] == "sdr" for e in data["items"])
+
+
+async def test_sessions_log_pagination(
+    client: AsyncClient, db_session: AsyncSession, shelf_factory
+):
+    """Limit/offset pagination works correctly."""
+    shelf = await shelf_factory()
+    book = await _make_book(db_session, shelf.id)
+    for i in range(5):
+        await _make_session(
+            db_session, book.id, source_key=f"key:{i}", start_time=datetime(2024, 1, i + 1)
+        )
+
+    resp = await client.get("/api/data-mgmt/sessions-log?limit=2&offset=0")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data["items"]) == 2
+    assert data["total"] == 5

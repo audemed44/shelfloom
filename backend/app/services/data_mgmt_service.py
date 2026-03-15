@@ -338,3 +338,51 @@ async def get_import_log(
         for bh, book in rows
     ]
     return {"items": entries, "total": total, "limit": limit, "offset": offset}
+
+
+# ---------------------------------------------------------------------------
+# Sessions Log
+# ---------------------------------------------------------------------------
+
+
+async def get_session_log(
+    session: AsyncSession,
+    limit: int = 50,
+    offset: int = 0,
+    search: str | None = None,
+    source: str | None = None,
+) -> dict:
+    """Return all reading sessions with book metadata for the sessions log."""
+    base_query = select(ReadingSession, Book).join(Book, ReadingSession.book_id == Book.id)
+    if search:
+        pattern = f"%{search}%"
+        base_query = base_query.where(Book.title.ilike(pattern) | Book.author.ilike(pattern))
+    if source:
+        base_query = base_query.where(ReadingSession.source == source)
+
+    total_result = await session.execute(base_query)
+    total = len(total_result.all())
+
+    result = await session.execute(
+        base_query.order_by(ReadingSession.start_time.desc(), ReadingSession.id.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    rows = result.all()
+    entries = [
+        {
+            "id": rs.id,
+            "book_id": book.id,
+            "book_title": book.title,
+            "book_author": book.author,
+            "source": rs.source,
+            "start_time": rs.start_time.isoformat() if rs.start_time else None,
+            "duration": rs.duration,
+            "pages_read": rs.pages_read,
+            "device": rs.device,
+            "dismissed": rs.dismissed,
+            "created_at": rs.created_at.isoformat() if rs.created_at else None,
+        }
+        for rs, book in rows
+    ]
+    return {"items": entries, "total": total, "limit": limit, "offset": offset}

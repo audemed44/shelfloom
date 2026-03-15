@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   Copy,
   History,
+  BookOpen,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
@@ -20,6 +21,7 @@ import type {
   UnmatchedEntry,
   DuplicateBookGroup,
   ImportLogResponse,
+  SessionLogResponse,
   Book,
 } from '../types/api'
 
@@ -799,9 +801,189 @@ function ImportLogTab() {
   )
 }
 
+// ── Sessions Log Tab ──────────────────────────────────────────────────────────
+
+function SourceBadge({ src }: { src: string }) {
+  if (src === 'stats_db')
+    return (
+      <span className="text-[9px] font-black tracking-widest uppercase text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.5 shrink-0">
+        stats db
+      </span>
+    )
+  if (src === 'sdr')
+    return (
+      <span className="text-[9px] font-black tracking-widest uppercase text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 px-1.5 py-0.5 shrink-0">
+        sdr
+      </span>
+    )
+  return (
+    <span className="text-[9px] font-black tracking-widest uppercase text-white/40 bg-white/5 border border-white/10 px-1.5 py-0.5 shrink-0">
+      {src}
+    </span>
+  )
+}
+
+function SessionsLogTab() {
+  const [offset, setOffset] = useState(0)
+  const [search, setSearch] = useState('')
+  const [source, setSource] = useState('')
+  const limit = 50
+  const debouncedSearch = useDebounce(search, 300)
+
+  const path =
+    `/api/data-mgmt/sessions-log?limit=${limit}&offset=${offset}` +
+    (debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : '') +
+    (source ? `&source=${source}` : '')
+  const { data, loading } = useApi<SessionLogResponse>(path)
+
+  const items = data?.items ?? []
+  const total = data?.total ?? 0
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap">
+        <p className="text-xs text-white/40 normal-case flex-1">
+          All reading sessions across every book — sourced from KOReader .sdr
+          files, statistics database, or manual entry.
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
+          <input
+            type="text"
+            placeholder="Search title or author..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setOffset(0)
+            }}
+            className="bg-white/5 border border-white/10 pl-3 pr-4 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-primary/60 normal-case w-48"
+            data-testid="sessions-log-search"
+          />
+          <select
+            value={source}
+            onChange={(e) => {
+              setSource(e.target.value)
+              setOffset(0)
+            }}
+            className="bg-black border border-white/10 px-3 py-2 text-xs text-white focus:outline-none focus:border-primary/60 normal-case"
+            data-testid="sessions-log-source-filter"
+          >
+            <option value="">All sources</option>
+            <option value="sdr">SDR</option>
+            <option value="stats_db">Stats DB</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={20} className="animate-spin text-white/30" />
+        </div>
+      ) : items.length === 0 ? (
+        <div
+          className="flex flex-col items-center justify-center py-16 border border-white/10"
+          data-testid="no-sessions-log"
+        >
+          <BookOpen size={24} className="text-white/20 mb-3" />
+          <p className="text-xs font-black tracking-widest uppercase text-white/30">
+            No sessions found
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="border border-white/10 divide-y divide-white/5">
+            {items.map((entry) => (
+              <div
+                key={entry.id}
+                className={`px-4 py-3 flex items-start gap-4 ${entry.dismissed ? 'opacity-40' : ''}`}
+                data-testid={`session-log-${entry.id}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                    <p
+                      className={`text-sm font-medium text-white truncate ${entry.dismissed ? 'line-through' : ''}`}
+                    >
+                      {entry.book_title}
+                    </p>
+                    <SourceBadge src={entry.source} />
+                    {entry.dismissed && (
+                      <span className="text-[9px] font-black tracking-widest uppercase text-white/30 bg-white/5 border border-white/10 px-1.5 py-0.5 shrink-0">
+                        dismissed
+                      </span>
+                    )}
+                  </div>
+                  {entry.book_author && (
+                    <p className="text-[11px] text-white/40 normal-case mt-0.5">
+                      {entry.book_author}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    {entry.duration != null && (
+                      <span className="text-[10px] text-white/30 normal-case">
+                        {fmtDuration(entry.duration)}
+                      </span>
+                    )}
+                    {entry.pages_read != null && (
+                      <span className="text-[10px] text-white/30 normal-case">
+                        {entry.pages_read} pages
+                      </span>
+                    )}
+                    {entry.device && (
+                      <span className="text-[10px] text-white/25 normal-case">
+                        {entry.device}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right shrink-0 space-y-1">
+                  <p className="text-[10px] text-white/30 normal-case">
+                    {fmtDate(entry.start_time)}
+                  </p>
+                  <p className="text-[9px] text-white/20 normal-case">
+                    imported {fmtDate(entry.created_at)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {total > limit && (
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] text-white/30 normal-case">
+                {offset + 1}–{Math.min(offset + limit, total)} of {total}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setOffset(Math.max(0, offset - limit))}
+                  disabled={offset === 0}
+                  className="px-3 py-1.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/50 hover:text-white disabled:opacity-30 transition-colors"
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={() => setOffset(offset + limit)}
+                  disabled={offset + limit >= total}
+                  className="px-3 py-1.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/50 hover:text-white disabled:opacity-30 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
-type Tab = 'duplicate-sessions' | 'unmatched' | 'duplicate-books' | 'import-log'
+type Tab =
+  | 'duplicate-sessions'
+  | 'unmatched'
+  | 'duplicate-books'
+  | 'import-log'
+  | 'sessions-log'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -816,6 +998,11 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     icon: <Copy size={12} />,
   },
   { id: 'import-log', label: 'Import Log', icon: <History size={12} /> },
+  {
+    id: 'sessions-log',
+    label: 'Reading Sessions',
+    icon: <BookOpen size={12} />,
+  },
 ]
 
 export default function DataManagement() {
@@ -840,6 +1027,7 @@ export default function DataManagement() {
     unmatched: unmatched?.length,
     'duplicate-books': dupBooks?.reduce((acc, g) => acc + g.books.length, 0),
     'import-log': undefined,
+    'sessions-log': undefined,
   }
 
   return (
@@ -885,6 +1073,7 @@ export default function DataManagement() {
         {activeTab === 'unmatched' && <UnmatchedDataTab />}
         {activeTab === 'duplicate-books' && <DuplicateBooksTab />}
         {activeTab === 'import-log' && <ImportLogTab />}
+        {activeTab === 'sessions-log' && <SessionsLogTab />}
       </div>
     </div>
   )
