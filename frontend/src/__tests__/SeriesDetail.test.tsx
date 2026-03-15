@@ -206,7 +206,9 @@ describe('SeriesDetail', () => {
     await waitFor(
       () => {
         expect(screen.getByTestId('progress-indicator')).toBeInTheDocument()
-        expect(screen.getByTestId('progress-indicator')).toHaveTextContent('1 of 2')
+        expect(screen.getByTestId('progress-indicator')).toHaveTextContent(
+          '1 of 2'
+        )
       },
       { timeout: 3000 }
     )
