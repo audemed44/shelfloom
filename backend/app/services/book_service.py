@@ -7,14 +7,14 @@ import os
 import shutil
 from pathlib import Path
 
-log = logging.getLogger(__name__)
-
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.book import Book
 from app.models.shelf import Shelf
 from app.schemas.book import BookUpdate
+
+log = logging.getLogger(__name__)
 
 
 class BookNotFound(Exception):
