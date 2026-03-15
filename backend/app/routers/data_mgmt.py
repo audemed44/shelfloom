@@ -132,8 +132,9 @@ async def merge_books(
 async def get_import_log(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
+    search: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
 ) -> ImportLogResponse:
     """Return recent book hash history (import activity log)."""
-    data = await svc.get_import_log(session, limit=limit, offset=offset)
+    data = await svc.get_import_log(session, limit=limit, offset=offset, search=search or None)
     return ImportLogResponse(**data)
