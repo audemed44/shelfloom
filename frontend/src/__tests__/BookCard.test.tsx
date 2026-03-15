@@ -24,6 +24,9 @@ const BOOK: Book = {
   genre: null,
   reading_progress: null,
   last_read: null,
+  series_id: null,
+  series_name: null,
+  series_sequence: null,
 }
 
 function renderCard(book: Book = BOOK) {

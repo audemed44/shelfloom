@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   BookOpen,
+  Layers,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
@@ -93,6 +94,8 @@ interface ControlsProps {
   onSort: (v: string) => void
   view: string
   onView: (v: string) => void
+  groupBySeries: boolean
+  onGroupBySeries: (v: boolean) => void
 }
 
 function Controls({
@@ -102,6 +105,8 @@ function Controls({
   onSort,
   view,
   onView,
+  groupBySeries,
+  onGroupBySeries,
 }: ControlsProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -135,6 +140,20 @@ function Controls({
             </option>
           ))}
         </select>
+
+        {/* Group by series toggle */}
+        <button
+          onClick={() => onGroupBySeries(!groupBySeries)}
+          className={`p-2.5 border transition-colors ${
+            groupBySeries
+              ? 'bg-primary text-white border-primary'
+              : 'text-white/40 border-white/10 hover:text-white hover:bg-white/5'
+          }`}
+          aria-label="Group by series"
+          data-testid="group-by-series-toggle"
+        >
+          <Layers size={16} />
+        </button>
 
         {/* View toggle */}
         <div className="flex border border-white/10" data-testid="view-toggle">
@@ -246,6 +265,9 @@ export default function Library() {
   const [selectedShelfId, setSelectedShelfId] = useState<number | null>(null)
   const [sort, setSort] = useState('last_read')
   const [status, setStatus] = useState<string | null>(null)
+  const [groupBySeries, setGroupBySeries] = useState(
+    () => localStorage.getItem('shelfloom:groupBySeries') === 'true'
+  )
   const [page, setPage] = useState(1)
   const [rev, setRev] = useState(0)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
@@ -257,6 +279,12 @@ export default function Library() {
 
   const handleUploadSuccess = useCallback(() => {
     setRev((r) => r + 1)
+  }, [])
+
+  const handleGroupBySeries = useCallback((on: boolean) => {
+    setGroupBySeries(on)
+    localStorage.setItem('shelfloom:groupBySeries', String(on))
+    resetPage()
   }, [])
 
   // Page-level drag detection to highlight the upload zone
@@ -277,24 +305,57 @@ export default function Library() {
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
 
   // Books — re-fetches whenever any filter/sort/page/rev changes
+  const effectiveSort = groupBySeries ? 'series' : sort
   const booksPath = useMemo(() => {
     const params = new URLSearchParams({
       page: String(page),
       per_page: String(PER_PAGE),
-      sort,
+      sort: effectiveSort,
     })
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (selectedShelfId) params.set('shelf_id', String(selectedShelfId))
     if (status) params.set('status', status)
     if (rev > 0) params.set('_rev', String(rev))
     return `/api/books?${params}`
-  }, [page, debouncedSearch, selectedShelfId, sort, status, rev])
+  }, [page, debouncedSearch, selectedShelfId, effectiveSort, status, rev])
 
   const { data: booksData, loading } =
     useApi<PaginatedResponse<Book>>(booksPath)
   const books = booksData?.items ?? []
   const total = booksData?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
+
+  interface BookGroup {
+    seriesId: number | null
+    seriesName: string
+    books: Book[]
+  }
+
+  const bookGroups = useMemo<BookGroup[]>(() => {
+    if (!groupBySeries) return [{ seriesId: null, seriesName: '', books }]
+    const groups: BookGroup[] = []
+    const ungrouped: Book[] = []
+    for (const book of books) {
+      if (book.series_id != null && book.series_name) {
+        const last = groups[groups.length - 1]
+        if (last && last.seriesId === book.series_id) {
+          last.books.push(book)
+        } else {
+          groups.push({
+            seriesId: book.series_id,
+            seriesName: book.series_name,
+            books: [book],
+          })
+        }
+      } else {
+        ungrouped.push(book)
+      }
+    }
+    if (ungrouped.length > 0) {
+      groups.push({ seriesId: null, seriesName: 'Ungrouped', books: ungrouped })
+    }
+    return groups
+  }, [books, groupBySeries])
 
   return (
     <div
@@ -370,6 +431,8 @@ export default function Library() {
         }}
         view={view}
         onView={setView}
+        groupBySeries={groupBySeries}
+        onGroupBySeries={handleGroupBySeries}
       />
 
       {/* Content */}
@@ -392,19 +455,40 @@ export default function Library() {
         )
       ) : books.length === 0 ? (
         <EmptyState search={debouncedSearch} />
-      ) : view === 'grid' ? (
-        <div
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4"
-          data-testid="book-grid"
-        >
-          {books.map((book) => (
-            <BookCard key={book.id} book={book} />
-          ))}
-        </div>
       ) : (
-        <div className="space-y-px" data-testid="book-list">
-          {books.map((book) => (
-            <BookRow key={book.id} book={book} />
+        <div>
+          {bookGroups.map((group) => (
+            <div key={group.seriesId ?? 'ungrouped'}>
+              {groupBySeries && (
+                <div
+                  className="flex items-center gap-3 border-b border-white/10 pb-2 mb-4 mt-8 first:mt-0"
+                  data-testid="series-group-header"
+                >
+                  <span className="text-[10px] font-black tracking-widest uppercase text-white/40">
+                    {group.seriesName}
+                  </span>
+                  <span className="text-[10px] font-bold tracking-wider text-white/20">
+                    {group.books.length}
+                  </span>
+                </div>
+              )}
+              {view === 'grid' ? (
+                <div
+                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4"
+                  data-testid="book-grid"
+                >
+                  {group.books.map((book) => (
+                    <BookCard key={book.id} book={book} />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-px" data-testid="book-list">
+                  {group.books.map((book) => (
+                    <BookRow key={book.id} book={book} />
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
