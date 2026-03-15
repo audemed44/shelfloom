@@ -9,7 +9,7 @@ git clone https://github.com/your-user/shelfloom.git
 cd shelfloom
 
 # Create local directories for persistent data
-mkdir -p data books
+mkdir -p .data/books .data/covers
 
 # Start the container
 docker compose up -d --build
@@ -19,12 +19,23 @@ Open **http://localhost:8000** — the setup wizard will guide you through creat
 
 ### Volumes
 
-| Mount   | Purpose                                    |
-|---------|--------------------------------------------|
-| `./data`  | Database, cover images                   |
-| `./books` | Your book files — organize sub-folders however you like (e.g. `books/fiction`, `books/nonfiction`) |
+The default `docker-compose.yml` uses a `.data/` directory in the repo root:
 
-Place your `.epub` and `.pdf` files inside `./books/` (in any sub-folder structure you prefer), then use the shelf management UI to point shelves at the paths inside the container under `/books`.
+| Host path       | Container path | Purpose                  |
+|-----------------|---------------|--------------------------|
+| `./.data`       | `/data`       | Database and cover images |
+| `./.data/books` | `/books`      | Book files (your shelf)  |
+
+To mount an external source directory for importing (e.g. from Booklore), add it as an extra read-only volume:
+
+```yaml
+volumes:
+  - ./.data:/data
+  - ./.data/books:/books
+  - /path/to/your/source/books:/source:ro
+```
+
+Then follow the import instructions below.
 
 ### KOReader Sync
 
@@ -38,23 +49,57 @@ If you have a KOReader `statistics.sqlite3` file, mount it into the container an
 
 ## Importing from Booklore
 
-Shelfloom includes a migration script for [Booklore](https://github.com/adamsuk/booklore) libraries. Run it inside the container:
+Shelfloom includes a migration script for [Booklore](https://github.com/adamsuk/booklore) libraries.
+
+**1. Add your source directory to `docker-compose.yml`** (if not already):
+
+```yaml
+volumes:
+  - ./.data:/data
+  - ./.data/books:/books
+  - /path/to/booklore/books:/source:ro
+```
+
+**2. Restart the container** to pick up the new volume:
 
 ```bash
-# Copy your Booklore export into the books volume first, then:
-docker compose exec shelfloom python scripts/import_booklore.py \
-    --source /books/booklore-export \
-    --in-place \
+docker compose up -d
+```
+
+**3. Run the import script:**
+
+```bash
+docker compose exec -T shelfloom python scripts/import_booklore.py \
+    --source /source \
+    --shelf-path /books \
     --shelf-name "Library" \
     --db-path /data/shelfloom.db \
-    --covers-dir /data/covers
+    --covers-dir /data/covers \
+    -v
+```
+
+To also import reading sessions from a KOReader `statistics.sqlite3`, mount it and add `--stats-db`:
+
+```yaml
+# in docker-compose.yml volumes:
+- /path/to/koreader/statistics.sqlite3:/koreader/statistics.sqlite3:ro
+```
+
+```bash
+docker compose exec -T shelfloom python scripts/import_booklore.py \
+    --source /source \
+    --shelf-path /books \
+    --shelf-name "Library" \
+    --db-path /data/shelfloom.db \
+    --covers-dir /data/covers \
+    --stats-db /koreader/statistics.sqlite3 \
+    -v
 ```
 
 Options:
 - `--source` — path to the Booklore books directory (inside the container)
-- `--in-place` — use the source directory as the shelf (no file copying)
-- `--shelf-path <path>` — copy files to a different shelf directory (required if not using `--in-place`)
-- `--stats-db <path>` — path to a KOReader `statistics.sqlite3` to import reading sessions
+- `--shelf-path` — destination shelf directory where files will be copied
+- `--stats-db` — path to a KOReader `statistics.sqlite3` to import reading sessions
 - `--dry-run` — preview metadata enrichment without writing changes
 - `-v` — verbose logging
 

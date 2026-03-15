@@ -4,6 +4,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/data
-      - ./books:/books
+      - ./.data:/data
+      - ./.data/books:/books
+      - /path/to/booklore/books:/source:ro
     restart: unless-stopped

@@ -107,16 +107,17 @@ function renderStats() {
 // ---------------------------------------------------------------------------
 
 describe('Stats', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>
+  let fetchSpy: ReturnType<typeof vi.fn>
+  let originalFetch: typeof globalThis.fetch
 
   beforeEach(() => {
-    fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockImplementation((url) => mockFetch(String(url)))
+    originalFetch = globalThis.fetch
+    fetchSpy = vi.fn((url: unknown) => mockFetch(String(url)))
+    globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch
   })
 
   afterEach(() => {
-    fetchSpy.mockRestore()
+    globalThis.fetch = originalFetch
   })
 
   it('renders heading and all tab buttons', () => {

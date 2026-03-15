@@ -115,7 +115,7 @@ function mockFetch(overrides: Record<string, unknown> = {}) {
       status: 200,
       json: async () => data,
     } as Response
-  })
+  }) as unknown as typeof globalThis.fetch
 }
 
 function renderPage() {
@@ -181,7 +181,7 @@ describe('DataManagement page', () => {
           } as Response
         }
         return { ok: true, status: 200, json: async () => [] } as Response
-      })
+      }) as unknown as typeof globalThis.fetch
 
       renderPage()
       await waitFor(() => screen.getByText('Restore dismissed'))
@@ -243,7 +243,7 @@ describe('DataManagement page', () => {
           } as Response
         }
         return { ok: true, status: 200, json: async () => [] } as Response
-      })
+      }) as unknown as typeof globalThis.fetch
 
       const user = userEvent.setup()
       renderPage()
