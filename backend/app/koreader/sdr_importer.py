@@ -99,6 +99,12 @@ async def import_sdr(
     """
     counts = {"sessions": 0, "highlights": 0, "progress": 0}
 
+    # The SDR's partial_md5_checksum is the authoritative KOReader hash of the
+    # original (pre-modification) file — store it so stats DB matching works even
+    # when the EPUB has since been modified by Shelfloom or Booklore.
+    if sdr_data.partial_md5 and book.file_hash_md5_ko != sdr_data.partial_md5:
+        book.file_hash_md5_ko = sdr_data.partial_md5
+
     # Upsert reading progress
     result = await session.execute(
         select(ReadingProgress).where(
