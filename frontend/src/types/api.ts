@@ -100,6 +100,9 @@ export interface Book {
   updated_at: string
   reading_progress: number | null // 0–100, null = unread
   last_read: string | null
+  series_id: number | null
+  series_name: string | null
+  series_sequence: number | null
 }
 
 export interface BookDetail extends Omit<Book, 'reading_progress'> {

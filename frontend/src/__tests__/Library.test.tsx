@@ -39,6 +39,11 @@ const MOCK_BOOKS = [
     description: null,
     created_at: '',
     updated_at: '',
+    reading_progress: null,
+    last_read: null,
+    series_id: null,
+    series_name: null,
+    series_sequence: null,
   },
   {
     id: 2,
@@ -57,6 +62,11 @@ const MOCK_BOOKS = [
     description: null,
     created_at: '',
     updated_at: '',
+    reading_progress: null,
+    last_read: null,
+    series_id: null,
+    series_name: null,
+    series_sequence: null,
   },
   {
     id: 3,
@@ -75,11 +85,16 @@ const MOCK_BOOKS = [
     description: null,
     created_at: '',
     updated_at: '',
+    reading_progress: null,
+    last_read: null,
+    series_id: null,
+    series_name: null,
+    series_sequence: null,
   },
 ]
 
 interface MockFetchOptions {
-  books?: typeof MOCK_BOOKS
+  books?: Record<string, unknown>[]
   total?: number
   shelves?: typeof MOCK_SHELVES
   uploadResponse?: (typeof MOCK_BOOKS)[0] | null
@@ -268,6 +283,72 @@ describe('Library', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('Next page')).toBeInTheDocument()
     )
+  })
+
+  it('renders group-by-series toggle button', async () => {
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+    expect(screen.getByTestId('group-by-series-toggle')).toBeInTheDocument()
+  })
+
+  it('sends sort=series when group-by-series is toggled on', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+
+    await user.click(screen.getByTestId('group-by-series-toggle'))
+
+    await waitFor(() => {
+      const booksCall = fetchSpy.mock.calls.find(
+        ([url]: [string]) =>
+          url.includes('/api/books') && url.includes('sort=series')
+      )
+      expect(booksCall).toBeTruthy()
+    })
+  })
+
+  it('shows series group headers when grouping is on', async () => {
+    const seriesBooks = [
+      {
+        ...MOCK_BOOKS[0],
+        series_id: 1,
+        series_name: 'Dune Saga',
+        series_sequence: 1,
+      },
+      {
+        ...MOCK_BOOKS[1],
+        series_id: 2,
+        series_name: 'Foundation Series',
+        series_sequence: 1,
+      },
+      {
+        ...MOCK_BOOKS[2],
+      },
+    ]
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({ books: seriesBooks, total: 3 })
+    localStorage.setItem('shelfloom:groupBySeries', 'true')
+    renderLibrary()
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('series-group-header')).toHaveLength(3)
+    })
+    expect(screen.getByText('Dune Saga')).toBeInTheDocument()
+    expect(screen.getByText('Foundation Series')).toBeInTheDocument()
+    expect(screen.getByText('Ungrouped')).toBeInTheDocument()
+    localStorage.removeItem('shelfloom:groupBySeries')
+  })
+
+  it('persists group-by-series preference in localStorage', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+
+    await user.click(screen.getByTestId('group-by-series-toggle'))
+    expect(localStorage.getItem('shelfloom:groupBySeries')).toBe('true')
+
+    await user.click(screen.getByTestId('group-by-series-toggle'))
+    expect(localStorage.getItem('shelfloom:groupBySeries')).toBe('false')
   })
 })
 

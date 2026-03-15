@@ -38,6 +38,9 @@ def _book_response(
     book: "Book",  # noqa: F821
     reading_progress: float | None = None,
     last_read: "datetime | None" = None,  # type: ignore[name-defined]  # noqa: F821
+    series_id: int | None = None,
+    series_name: str | None = None,
+    series_sequence: float | None = None,
 ) -> BookResponse:
     """Build BookResponse from ORM object without triggering lazy relationship loads."""
     col_data = {
@@ -45,6 +48,9 @@ def _book_response(
     }
     col_data["reading_progress"] = reading_progress
     col_data["last_read"] = last_read
+    col_data["series_id"] = series_id
+    col_data["series_name"] = series_name
+    col_data["series_sequence"] = series_sequence
     return BookResponse.model_validate(col_data)
 
 
@@ -76,17 +82,38 @@ async def list_books_endpoint(
 
     # Batch-fetch max reading progress per book (single query)
     progress_map: dict[str, float] = {}
+    series_map: dict[str, tuple[int, str, float | None]] = {}
     if books:
         from app.models.reading import ReadingProgress
+        from app.models.series import BookSeries, Series
+
+        book_ids = [b.id for b in books]
 
         prog_rows = await session.execute(
             sa_select(ReadingProgress.book_id, func.max(ReadingProgress.progress))
-            .where(ReadingProgress.book_id.in_([b.id for b in books]))
+            .where(ReadingProgress.book_id.in_(book_ids))
             .group_by(ReadingProgress.book_id)
         )
         progress_map = {row[0]: row[1] for row in prog_rows.all()}
 
-    items = [_book_response(b, progress_map.get(b.id)) for b in books]
+        series_rows = await session.execute(
+            sa_select(BookSeries.book_id, Series.id, Series.name, BookSeries.sequence)
+            .join(Series, BookSeries.series_id == Series.id)
+            .where(BookSeries.book_id.in_(book_ids))
+        )
+        for row in series_rows.all():
+            series_map[row[0]] = (row[1], row[2], row[3])
+
+    items = [
+        _book_response(
+            b,
+            progress_map.get(b.id),
+            series_id=series_map[b.id][0] if b.id in series_map else None,
+            series_name=series_map[b.id][1] if b.id in series_map else None,
+            series_sequence=series_map[b.id][2] if b.id in series_map else None,
+        )
+        for b in books
+    ]
 
     return BookListResponse(
         items=items,

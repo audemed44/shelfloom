@@ -181,6 +181,49 @@ async def test_list_books_filter_series(client, db_session, tmp_path):
     assert resp.json()["items"][0]["title"] == "Book 1"
 
 
+async def test_list_books_returns_series_info(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "Book In Series")
+    await _create_book(db_session, shelf.id, "Book Without Series")
+    series = Series(name="Test Series")
+    db_session.add(series)
+    await db_session.flush()
+    db_session.add(BookSeries(book_id=book1.id, series_id=series.id, sequence=2.0))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?sort=title")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    in_series = next(i for i in items if i["title"] == "Book In Series")
+    no_series = next(i for i in items if i["title"] == "Book Without Series")
+    assert in_series["series_id"] == series.id
+    assert in_series["series_name"] == "Test Series"
+    assert in_series["series_sequence"] == 2.0
+    assert no_series["series_id"] is None
+    assert no_series["series_name"] is None
+    assert no_series["series_sequence"] is None
+
+
+async def test_list_books_sort_series(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book_a = await _create_book(db_session, shelf.id, "Zeta Book")
+    book_b = await _create_book(db_session, shelf.id, "Alpha Book")
+    await _create_book(db_session, shelf.id, "No Series Book")
+    series = Series(name="A Series")
+    db_session.add(series)
+    await db_session.flush()
+    db_session.add(BookSeries(book_id=book_a.id, series_id=series.id, sequence=2))
+    db_session.add(BookSeries(book_id=book_b.id, series_id=series.id, sequence=1))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?sort=series")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    titles = [i["title"] for i in items]
+    # Series books first (sorted by sequence), then no-series book
+    assert titles == ["Alpha Book", "Zeta Book", "No Series Book"]
+
+
 # ── get ───────────────────────────────────────────────────────────────────────
 
 

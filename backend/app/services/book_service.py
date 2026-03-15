@@ -92,6 +92,12 @@ async def list_books(
         query = query.order_by(Book.title)
     elif sort == "author":
         query = query.order_by(Book.author.nulls_last(), Book.title)
+    elif sort == "series":
+        from app.models.series import BookSeries as BS
+        from app.models.series import Series as S
+
+        query = query.outerjoin(BS, Book.id == BS.book_id).outerjoin(S, BS.series_id == S.id)
+        query = query.order_by(S.name.nulls_last(), BS.sequence.nulls_last(), Book.title)
     elif sort == "last_read":
         from app.models.reading import ReadingSession as RS
 
