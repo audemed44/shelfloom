@@ -21,10 +21,12 @@ def koreader_partial_md5(file_path: str | Path) -> str | None:
     """
     Replicate KOReader's util.partialMD5() from frontend/util.lua.
 
-    Reads up to 12 chunks of 1024 bytes at geometrically increasing offsets
-    (256, 1024, 4096, ..., up to 1 GB) and returns their combined MD5 as a
-    lowercase hex string.  Matches the value stored in .sdr
-    partial_md5_checksum and in statistics.sqlite3 book.md5.
+    Reads up to 12 chunks of 1024 bytes at offsets computed by LuaJIT's
+    bit.lshift(1024, 2*i) for i in -1..10.  LuaJIT bit ops are 32-bit and
+    mask the shift count to 5 bits ((2*i) & 31), so i=-1 gives shift=30 and
+    (1024 << 30) & 0xFFFFFFFF = 0 (offset 0, i.e. start of file).
+    Returns a lowercase hex string matching .sdr partial_md5_checksum and
+    statistics.sqlite3 book.md5.
     """
     try:
         f = open(file_path, "rb")  # noqa: WPS515
@@ -37,11 +39,9 @@ def koreader_partial_md5(file_path: str | Path) -> str | None:
 
     with f:
         for i in range(-1, 11):  # i = -1 .. 10
-            shift = 2 * i
-            if shift >= 0:
-                offset = (step << shift) & 0xFFFFFFFF
-            else:
-                offset = (step >> (-shift)) & 0xFFFFFFFF
+            # LuaJIT bit.lshift masks shift count to 5 bits before shifting
+            shift = (2 * i) & 31
+            offset = (step << shift) & 0xFFFFFFFF
             f.seek(offset)
             chunk = f.read(size)
             if not chunk:
