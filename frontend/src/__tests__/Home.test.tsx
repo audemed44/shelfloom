@@ -180,8 +180,8 @@ describe('Home', () => {
       expect(screen.getAllByText('This Week').length).toBeGreaterThan(0)
     )
     // 5400 seconds = 1h 30m
-    expect(screen.getByText('1h 30m')).toBeInTheDocument()
+    expect(await screen.findByText('1h 30m')).toBeInTheDocument()
     // 120 pages
-    expect(screen.getByText('120')).toBeInTheDocument()
+    expect(await screen.findByText('120')).toBeInTheDocument()
   })
 })

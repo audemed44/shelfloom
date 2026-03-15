@@ -134,8 +134,8 @@ describe('SeriesDetail', () => {
         'Stormlight Archive'
       )
     )
-    expect(screen.getByText('The Way of Kings')).toBeInTheDocument()
-    expect(screen.getByText('Words of Radiance')).toBeInTheDocument()
+    expect(await screen.findByText('The Way of Kings')).toBeInTheDocument()
+    expect(await screen.findByText('Words of Radiance')).toBeInTheDocument()
   })
 
   it('shows reading order tabs', async () => {
