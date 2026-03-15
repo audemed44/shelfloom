@@ -284,7 +284,6 @@ export default function Library() {
   const handleGroupBySeries = useCallback((on: boolean) => {
     setGroupBySeries(on)
     localStorage.setItem('shelfloom:groupBySeries', String(on))
-    resetPage()
   }, [])
 
   // Page-level drag detection to highlight the upload zone
@@ -305,19 +304,18 @@ export default function Library() {
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
 
   // Books — re-fetches whenever any filter/sort/page/rev changes
-  const effectiveSort = groupBySeries ? 'series' : sort
   const booksPath = useMemo(() => {
     const params = new URLSearchParams({
       page: String(page),
       per_page: String(PER_PAGE),
-      sort: effectiveSort,
+      sort,
     })
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (selectedShelfId) params.set('shelf_id', String(selectedShelfId))
     if (status) params.set('status', status)
     if (rev > 0) params.set('_rev', String(rev))
     return `/api/books?${params}`
-  }, [page, debouncedSearch, selectedShelfId, effectiveSort, status, rev])
+  }, [page, debouncedSearch, selectedShelfId, sort, status, rev])
 
   const { data: booksData, loading } =
     useApi<PaginatedResponse<Book>>(booksPath)
@@ -327,34 +325,41 @@ export default function Library() {
 
   interface BookGroup {
     seriesId: number | null
-    seriesName: string
+    seriesName: string | null
     books: Book[]
   }
 
   const bookGroups = useMemo<BookGroup[]>(() => {
-    if (!groupBySeries) return [{ seriesId: null, seriesName: '', books }]
-    const groups: BookGroup[] = []
-    const ungrouped: Book[] = []
+    if (!groupBySeries) return [{ seriesId: null, seriesName: null, books }]
+    const entries: BookGroup[] = []
+    const seriesIndexMap = new Map<number, number>()
     for (const book of books) {
       if (book.series_id != null && book.series_name) {
-        const last = groups[groups.length - 1]
-        if (last && last.seriesId === book.series_id) {
-          last.books.push(book)
+        const existingIdx = seriesIndexMap.get(book.series_id)
+        if (existingIdx != null) {
+          // Add to existing group, keep sorted by sequence
+          const group = entries[existingIdx]
+          group.books.push(book)
+          group.books.sort((a, b) => {
+            const sa = a.series_sequence ?? Infinity
+            const sb = b.series_sequence ?? Infinity
+            return sa - sb
+          })
         } else {
-          groups.push({
+          // First time seeing this series — create group at this position
+          seriesIndexMap.set(book.series_id, entries.length)
+          entries.push({
             seriesId: book.series_id,
             seriesName: book.series_name,
             books: [book],
           })
         }
       } else {
-        ungrouped.push(book)
+        // Standalone book — no header needed
+        entries.push({ seriesId: null, seriesName: null, books: [book] })
       }
     }
-    if (ungrouped.length > 0) {
-      groups.push({ seriesId: null, seriesName: 'Ungrouped', books: ungrouped })
-    }
-    return groups
+    return entries
   }, [books, groupBySeries])
 
   return (
@@ -457,9 +462,15 @@ export default function Library() {
         <EmptyState search={debouncedSearch} />
       ) : (
         <div>
-          {bookGroups.map((group) => (
-            <div key={group.seriesId ?? 'ungrouped'}>
-              {groupBySeries && (
+          {bookGroups.map((group, gi) => (
+            <div
+              key={
+                group.seriesId != null
+                  ? `series-${group.seriesId}`
+                  : `book-${gi}`
+              }
+            >
+              {groupBySeries && group.seriesId != null && (
                 <div
                   className="flex items-center gap-3 border-b border-white/10 pb-2 mb-4 mt-8 first:mt-0"
                   data-testid="series-group-header"

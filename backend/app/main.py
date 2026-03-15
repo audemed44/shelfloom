@@ -160,7 +160,10 @@ def create_app() -> FastAPI:
             file_path = _FRONTEND_DIST / full_path
             if file_path.is_file():
                 return FileResponse(str(file_path))
-            return FileResponse(str(_FRONTEND_DIST / "index.html"))
+            return FileResponse(
+                str(_FRONTEND_DIST / "index.html"),
+                headers={"Cache-Control": "no-cache"},
+            )
 
     return application
 
