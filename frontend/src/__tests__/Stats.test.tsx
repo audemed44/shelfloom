@@ -132,15 +132,15 @@ describe('Stats', () => {
 
   it('shows metric cards when overview data loads', async () => {
     renderStats()
-    await waitFor(() =>
+    await waitFor(() => {
       expect(
         screen.getAllByTestId('metric-card').length
       ).toBeGreaterThanOrEqual(4)
-    )
-    // books_owned = 42
-    expect(screen.getByText('42')).toBeInTheDocument()
-    // books_read = 18
-    expect(screen.getByText('18 completed')).toBeInTheDocument()
+      // books_owned = 42
+      expect(screen.getByText('42')).toBeInTheDocument()
+      // books_read = 18
+      expect(screen.getByText('18 completed')).toBeInTheDocument()
+    })
   })
 
   it('renders empty states when no data is returned', async () => {
@@ -247,11 +247,11 @@ describe('Stats', () => {
 
     await user.click(screen.getByTestId('tab-books-authors'))
 
-    await waitFor(() =>
+    await waitFor(() => {
       expect(
         screen.getAllByText('Brandon Sanderson').length
       ).toBeGreaterThanOrEqual(1)
-    )
-    expect(screen.getAllByText('Ted Chiang').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('Ted Chiang').length).toBeGreaterThanOrEqual(1)
+    })
   })
 })

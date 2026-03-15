@@ -118,12 +118,12 @@ describe('Home', () => {
 
   it('shows currently reading card when book is in progress', async () => {
     renderHome()
-    await waitFor(() =>
+    await waitFor(() => {
       expect(screen.getByTestId('currently-reading-card')).toBeInTheDocument()
-    )
-    expect(screen.getAllByText('The Way of Kings').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Brandon Sanderson').length).toBeGreaterThan(0)
-    expect(screen.getByText('42% Complete')).toBeInTheDocument()
+      expect(screen.getAllByText('The Way of Kings').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Brandon Sanderson').length).toBeGreaterThan(0)
+      expect(screen.getByText('42% Complete')).toBeInTheDocument()
+    })
   })
 
   it('shows empty state when no books in progress', async () => {
@@ -160,18 +160,18 @@ describe('Home', () => {
 
   it('shows library totals in status row', async () => {
     renderHome()
-    await waitFor(() =>
+    await waitFor(() => {
       expect(screen.getByText('25 books in library')).toBeInTheDocument()
-    )
-    expect(screen.getByText('8 completed')).toBeInTheDocument()
+      expect(screen.getByText('8 completed')).toBeInTheDocument()
+    })
   })
 
   it('shows recent activity feed', async () => {
     renderHome()
-    await waitFor(() =>
+    await waitFor(() => {
       expect(screen.getAllByTestId('activity-item').length).toBeGreaterThan(0)
-    )
-    expect(screen.getByText('Mistborn')).toBeInTheDocument()
+      expect(screen.getByText('Mistborn')).toBeInTheDocument()
+    })
   })
 
   it('shows this week stat cards', async () => {

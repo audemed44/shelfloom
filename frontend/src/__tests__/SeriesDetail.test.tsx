@@ -140,12 +140,12 @@ describe('SeriesDetail', () => {
 
   it('shows reading order tabs', async () => {
     renderDetail()
-    await waitFor(() =>
+    await waitFor(() => {
       expect(screen.getByTestId('reading-order-tab-10')).toBeInTheDocument()
-    )
-    expect(screen.getByTestId('reading-order-tab-10')).toHaveTextContent(
-      'Publication Order'
-    )
+      expect(screen.getByTestId('reading-order-tab-10')).toHaveTextContent(
+        'Publication Order'
+      )
+    })
   })
 
   it('progress indicator shows when summaries loaded', async () => {
@@ -204,11 +204,12 @@ describe('SeriesDetail', () => {
 
     renderDetail()
     await waitFor(
-      () =>
-        expect(screen.getByTestId('progress-indicator')).toBeInTheDocument(),
+      () => {
+        expect(screen.getByTestId('progress-indicator')).toBeInTheDocument()
+        expect(screen.getByTestId('progress-indicator')).toHaveTextContent('1 of 2')
+      },
       { timeout: 3000 }
     )
-    expect(screen.getByTestId('progress-indicator')).toHaveTextContent('1 of 2')
   })
 
   it('edit series button opens modal', async () => {
@@ -254,10 +255,10 @@ describe('SeriesDetail', () => {
     fetchSpy = mockFetch({ readingOrders: twoOrders })
 
     renderDetail()
-    await waitFor(() =>
+    await waitFor(() => {
       expect(screen.getByTestId('reading-order-tab-10')).toBeInTheDocument()
-    )
-    expect(screen.getByTestId('reading-order-tab-11')).toBeInTheDocument()
+      expect(screen.getByTestId('reading-order-tab-11')).toBeInTheDocument()
+    })
 
     // Tab 10 is active by default (first tab), click tab 11
     await userEvent.click(screen.getByTestId('reading-order-tab-11'))
