@@ -10,9 +10,10 @@ from pathlib import Path
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.book import Book
+from app.models.book import Book, BookHash
 from app.models.shelf import Shelf
 from app.schemas.book import BookUpdate
+from app.services.hash_service import compute_hashes, koreader_partial_md5
 
 log = logging.getLogger(__name__)
 
@@ -27,6 +28,60 @@ class ShelfNotFound(Exception):
 
 class FileOperationError(Exception):
     pass
+
+
+async def _save_hash_record(
+    session: AsyncSession,
+    book: Book,
+    sha: str,
+    md5: str,
+    md5_ko: str | None,
+) -> None:
+    """Persist a hash snapshot to book_hashes, deduplicating by SHA-256."""
+    existing = await session.execute(
+        select(BookHash).where(BookHash.book_id == book.id, BookHash.hash_sha == sha)
+    )
+    if existing.scalar_one_or_none() is None:
+        session.add(
+            BookHash(
+                book_id=book.id,
+                hash_sha=sha,
+                hash_md5=md5,
+                hash_md5_ko=md5_ko,
+                page_count=book.page_count,
+            )
+        )
+
+
+async def refresh_book_hashes(
+    session: AsyncSession,
+    book: Book,
+    file_path: Path,
+) -> bool:
+    """
+    Recompute all hashes for a book file after it has been modified and update
+    the book record.  The previous hashes are saved to book_hashes first so
+    that historical KOReader MD5 matching continues to work.
+
+    Returns True if the file hash changed (i.e. the file was actually modified),
+    False if it was unchanged.
+    """
+    new_sha, new_md5 = compute_hashes(file_path)
+    if new_sha == book.file_hash:
+        return False
+
+    new_ko_md5 = koreader_partial_md5(file_path)
+
+    # Preserve current hashes in history before overwriting
+    if book.file_hash and book.file_hash_md5:
+        await _save_hash_record(
+            session, book, book.file_hash, book.file_hash_md5, book.file_hash_md5_ko
+        )
+
+    book.file_hash = new_sha
+    book.file_hash_md5 = new_md5
+    book.file_hash_md5_ko = new_ko_md5
+    return True
 
 
 async def list_books(
@@ -269,6 +324,7 @@ async def upload_book_cover(
             if full_path.exists():
                 try:
                     embed_epub_cover(full_path, output)
+                    await refresh_book_hashes(session, book, full_path)
                 except CoverExtractionError as e:
                     log.warning("Could not embed cover into EPUB %s: %s", full_path.name, e)
 
