@@ -684,30 +684,43 @@ function DuplicateBooksTab() {
 
 function ImportLogTab() {
   const [offset, setOffset] = useState(0)
+  const [search, setSearch] = useState('')
   const limit = 50
-  const { data, loading } = useApi<ImportLogResponse>(
-    `/api/data-mgmt/import-log?limit=${limit}&offset=${offset}`
-  )
+  const debouncedSearch = useDebounce(search, 300)
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 size={20} className="animate-spin text-white/30" />
-      </div>
-    )
-  }
+  const path = `/api/data-mgmt/import-log?limit=${limit}&offset=${offset}${debouncedSearch ? `&search=${encodeURIComponent(debouncedSearch)}` : ''}`
+  const { data, loading } = useApi<ImportLogResponse>(path)
 
   const items = data?.items ?? []
   const total = data?.total ?? 0
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-white/40 normal-case">
-        Hash history for imported books — each entry records a file scan that
-        detected a new or changed book.
-      </p>
+      <div className="flex items-center gap-3">
+        <p className="text-xs text-white/40 normal-case flex-1">
+          Hash history for imported books — each entry records a file scan that
+          detected a new or changed book.
+        </p>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search title or author..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setOffset(0)
+            }}
+            className="bg-white/5 border border-white/10 pl-3 pr-4 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-primary/60 normal-case w-56"
+            data-testid="import-log-search"
+          />
+        </div>
+      </div>
 
-      {items.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={20} className="animate-spin text-white/30" />
+        </div>
+      ) : items.length === 0 ? (
         <div
           className="flex flex-col items-center justify-center py-16 border border-white/10"
           data-testid="no-import-log"

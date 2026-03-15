@@ -308,17 +308,20 @@ async def merge_books(session: AsyncSession, keep_id: str, discard_id: str) -> b
 # ---------------------------------------------------------------------------
 
 
-async def get_import_log(session: AsyncSession, limit: int = 100, offset: int = 0) -> dict:
+async def get_import_log(
+    session: AsyncSession, limit: int = 100, offset: int = 0, search: str | None = None
+) -> dict:
     """Return recent book hash history entries (proxy for import activity)."""
-    total_result = await session.execute(select(BookHash).join(Book, BookHash.book_id == Book.id))
+    base_query = select(BookHash, Book).join(Book, BookHash.book_id == Book.id)
+    if search:
+        pattern = f"%{search}%"
+        base_query = base_query.where(Book.title.ilike(pattern) | Book.author.ilike(pattern))
+
+    total_result = await session.execute(base_query)
     total = len(total_result.all())
 
     result = await session.execute(
-        select(BookHash, Book)
-        .join(Book, BookHash.book_id == Book.id)
-        .order_by(BookHash.recorded_at.desc())
-        .offset(offset)
-        .limit(limit)
+        base_query.order_by(BookHash.recorded_at.desc()).offset(offset).limit(limit)
     )
     rows = result.all()
     entries = [
