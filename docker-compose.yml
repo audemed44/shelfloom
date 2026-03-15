@@ -2,7 +2,7 @@ services:
   shelfloom:
     build: .
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - ./.data:/data
       - ./.data/books:/books

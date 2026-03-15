@@ -47,9 +47,6 @@ export default function Sidebar() {
           <h1 className="text-primary text-2xl font-black tracking-tighter leading-none">
             Shelfloom
           </h1>
-          <p className="text-white/40 text-[10px] font-bold tracking-[0.2em] mt-1">
-            OLED Edition
-          </p>
         </div>
       </div>
 

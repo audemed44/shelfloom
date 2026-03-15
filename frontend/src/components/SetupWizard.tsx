@@ -644,9 +644,6 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           <h1 className="text-3xl font-black tracking-tighter uppercase text-white">
             Shelfloom
           </h1>
-          <p className="text-[10px] font-black tracking-widest uppercase text-primary mt-1">
-            OLED Edition
-          </p>
         </div>
 
         <StepIndicator current={step} />
