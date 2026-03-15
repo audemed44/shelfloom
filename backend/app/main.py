@@ -1,11 +1,15 @@
+import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
+
+log = logging.getLogger(__name__)
 
 # Frontend build output — check common locations
 _FRONTEND_DIST = Path(
@@ -58,6 +62,14 @@ def _run_migrations() -> None:  # pragma: no cover
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
+    settings = get_settings()
+    logging.basicConfig(
+        level=settings.log_level.upper(),
+        format="%(asctime)s %(levelname)-8s %(name)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+    log.info("Shelfloom started (log_level=%s)", settings.log_level.upper())
+
     # Import all models so Alembic and SQLAlchemy see them
     import app.models  # noqa: F401
 
@@ -68,7 +80,6 @@ async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
     from app.database import get_session_factory
     from app.services.scheduler import Scheduler
 
-    settings = get_settings()
     scheduler = Scheduler()
     fastapi_app.state.scheduler = scheduler
     await scheduler.start(get_session_factory(), settings, settings.covers_dir)
@@ -90,6 +101,21 @@ def create_app() -> FastAPI:
         debug=settings.debug,
         lifespan=lifespan,
     )
+
+    @application.middleware("http")
+    async def log_requests(request: Request, call_next):
+        start = time.monotonic()
+        response = await call_next(request)
+        if request.url.path.startswith("/api"):
+            elapsed_ms = (time.monotonic() - start) * 1000
+            log.info(
+                "%s %s %s %.0fms",
+                request.method,
+                request.url.path,
+                response.status_code,
+                elapsed_ms,
+            )
+        return response
 
     from app.routers import (
         books,

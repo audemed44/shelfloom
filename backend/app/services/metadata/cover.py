@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import io
+import logging
 import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 try:
     from PIL import Image
@@ -132,7 +135,8 @@ def _epub2_opf_cover(file_path: str, book: object) -> bytes | None:
                         return zf.read(img_path)
                     except KeyError:
                         return None
-    except Exception:
+    except Exception as e:
+        log.debug("EPUB2 OPF cover extraction failed: %s", e)
         return None
     return None
 

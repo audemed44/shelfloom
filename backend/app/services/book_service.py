@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -260,8 +263,8 @@ async def upload_book_cover(
             if full_path.exists():
                 try:
                     embed_epub_cover(full_path, output)
-                except CoverExtractionError:
-                    pass  # Cover image saved; embedding failed non-fatally
+                except CoverExtractionError as e:
+                    log.warning("Could not embed cover into EPUB %s: %s", full_path.name, e)
 
     await session.commit()
     await session.refresh(book)
@@ -276,10 +279,6 @@ async def backfill_covers(
     Re-extract covers for all books that have no cover or a missing cover file.
     Returns {'refreshed': n, 'failed': n, 'skipped': n}.
     """
-    import logging
-
-    log = logging.getLogger(__name__)
-
     result = await session.execute(select(Book))
     books = result.scalars().all()
 
@@ -317,7 +316,7 @@ async def backfill_covers(
             book.cover_path = str(output) if success else None
             refreshed += 1
         except Exception as e:
-            log.warning("Cover backfill failed for %s: %s", book.id, e)
+            log.warning("Cover backfill failed for %s: %s", book.id, e, exc_info=True)
             failed += 1
 
     await session.commit()
