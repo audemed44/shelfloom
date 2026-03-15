@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Flame, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
@@ -219,6 +219,7 @@ function BarChart({
   height = 192,
   'data-testid': testId,
 }: BarChartProps) {
+  const [hovered, setHovered] = useState<number | null>(null)
   const limited = useMemo(() => limitSeries(data, 60), [data])
   const max = useMemo(
     () => Math.max(...limited.map((d) => d.value), 1),
@@ -238,35 +239,73 @@ function BarChart({
     )
   }
 
+  const yTicks = [1, 0.67, 0.33, 0].map((t) => max * t)
+
   return (
-    <div data-testid={testId}>
-      <div className="flex items-end justify-between gap-px" style={{ height }}>
-        {limited.map((d, i) => {
-          const pct = (d.value / max) * 100
-          return (
-            <div
-              key={i}
-              className="flex-1 relative group cursor-default"
-              style={{ height: '100%' }}
-              title={`${fmtBucket(d.date, granularity)}: ${valueFormatter(d.value)}`}
-            >
-              <div
-                className="absolute bottom-0 w-full bg-primary/30 group-hover:bg-primary transition-colors"
-                style={{ height: `${Math.max(pct, 1)}%` }}
-              />
-            </div>
-          )
-        })}
-      </div>
-      <div className="flex justify-between mt-3 overflow-hidden">
-        {limited.map((d, i) => (
+    <div data-testid={testId} className="flex gap-3">
+      {/* Y-axis */}
+      <div
+        className="flex flex-col justify-between shrink-0 pb-8"
+        style={{ height: height + 8 }}
+      >
+        {yTicks.map((v, i) => (
           <span
             key={i}
-            className="text-[9px] text-white/25 font-bold flex-1 text-center truncate"
+            className="text-[8px] text-white/25 font-bold text-right leading-none"
+            style={{ width: 36 }}
           >
-            {i % showEvery === 0 ? fmtBucket(d.date, granularity) : ''}
+            {valueFormatter(v)}
           </span>
         ))}
+      </div>
+      {/* Chart body */}
+      <div className="flex-1 min-w-0">
+        <div className="h-6 mb-1 flex items-center">
+          {hovered !== null && limited[hovered] && (
+            <span className="text-[10px] font-bold">
+              <span className="text-white/40">
+                {fmtBucket(limited[hovered].date, granularity)}
+              </span>
+              {' — '}
+              <span className="text-primary">
+                {valueFormatter(limited[hovered].value)}
+              </span>
+            </span>
+          )}
+        </div>
+        <div
+          className="flex items-end gap-px border-l border-b border-white/10"
+          style={{ height }}
+        >
+          {limited.map((d, i) => {
+            const pct = (d.value / max) * 100
+            const isHov = hovered === i
+            return (
+              <div
+                key={i}
+                className="flex-1 relative cursor-default"
+                style={{ height: '100%' }}
+                onMouseEnter={() => setHovered(i)}
+                onMouseLeave={() => setHovered(null)}
+              >
+                <div
+                  className={`absolute bottom-0 w-full transition-colors ${isHov ? 'bg-primary' : 'bg-primary/30 hover:bg-primary/60'}`}
+                  style={{ height: `${Math.max(pct, 1)}%` }}
+                />
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex justify-between mt-1 pt-1 border-t border-white/5">
+          {limited.map((d, i) => (
+            <span
+              key={i}
+              className={`text-[9px] font-bold flex-1 text-center truncate transition-colors ${hovered === i ? 'text-white/60' : 'text-white/20'}`}
+            >
+              {i % showEvery === 0 ? fmtBucket(d.date, granularity) : ''}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -287,6 +326,8 @@ function LineChart({
   cumulative?: boolean
   'data-testid'?: string
 }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null)
+
   const processed = useMemo(() => {
     const limited = limitSeries(data, 60)
     if (!cumulative) return limited
@@ -309,15 +350,13 @@ function LineChart({
   const W = 400
   const H = 80
 
-  const pts = processed
-    .map((d, i) => {
-      const x = processed.length > 1 ? (i / (processed.length - 1)) * W : W / 2
-      const y = H - (d.value / maxVal) * H * 0.88
-      return `${x.toFixed(1)},${y.toFixed(1)}`
-    })
-    .join(' ')
-
-  const areaD = `M ${pts.replace(/ /g, ' L ')} L ${W},${H} L 0,${H} Z`
+  const pts = processed.map((d, i) => ({
+    x: processed.length > 1 ? (i / (processed.length - 1)) * W : W / 2,
+    y: H - (d.value / maxVal) * H * 0.88,
+    d,
+  }))
+  const ptStr = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const areaD = `M ${ptStr.replace(/ /g, ' L ')} L ${W},${H} L 0,${H} Z`
 
   const indices = [
     0,
@@ -326,46 +365,109 @@ function LineChart({
     processed.length - 1,
   ].filter((i) => i >= 0 && i < processed.length)
 
+  const hovPt = hoverIdx !== null ? pts[hoverIdx] : null
+  const hovData = hoverIdx !== null ? processed[hoverIdx] : null
+  const yTicks = [1, 0.5, 0].map((t) => maxVal * t)
+
   return (
-    <div className="relative" data-testid={testId}>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
-        style={{ height: 128 }}
-        preserveAspectRatio="none"
+    <div className="flex gap-3" data-testid={testId}>
+      {/* Y-axis */}
+      <div
+        className="flex flex-col justify-between shrink-0 pb-6"
+        style={{ height: 128 + 8 }}
       >
-        <defs>
-          <linearGradient id="line-fill-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#258cf4" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#258cf4" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {processed.length > 1 && (
-          <>
-            <path d={areaD} fill="url(#line-fill-grad)" />
-            <polyline
-              points={pts}
-              fill="none"
-              stroke="#258cf4"
-              strokeWidth="2.5"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          </>
-        )}
-        {processed.length === 1 && (
-          <circle cx={W / 2} cy={H / 2} r="4" fill="#258cf4" />
-        )}
-      </svg>
-      <div className="flex justify-between mt-2">
-        {indices.map((i) => (
+        {yTicks.map((v, i) => (
           <span
             key={i}
-            className="text-[9px] text-white/30 font-bold uppercase"
+            className="text-[8px] text-white/25 font-bold text-right leading-none"
+            style={{ width: 36 }}
           >
-            {fmtBucket(processed[i].date, granularity)}
+            {fmtSec(v)}
           </span>
         ))}
+      </div>
+      {/* Chart area */}
+      <div className="flex-1 min-w-0">
+        <div className="h-5 mb-1 flex items-center">
+          {hovData && (
+            <span className="text-[10px] font-bold">
+              <span className="text-white/40">
+                {fmtBucket(hovData.date, granularity)}
+              </span>
+              {' — '}
+              <span className="text-primary">{fmtSec(hovData.value)}</span>
+            </span>
+          )}
+        </div>
+        <div className="border-l border-b border-white/10">
+          <svg
+            viewBox={`0 0 ${W} ${H}`}
+            className="w-full"
+            style={{ height: 128, display: 'block' }}
+            preserveAspectRatio="none"
+            onMouseMove={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              const frac = (e.clientX - rect.left) / rect.width
+              const idx = Math.round(frac * (processed.length - 1))
+              setHoverIdx(Math.max(0, Math.min(processed.length - 1, idx)))
+            }}
+            onMouseLeave={() => setHoverIdx(null)}
+          >
+            <defs>
+              <linearGradient id="line-fill-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#258cf4" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#258cf4" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {processed.length > 1 && (
+              <>
+                <path d={areaD} fill="url(#line-fill-grad)" />
+                <polyline
+                  points={ptStr}
+                  fill="none"
+                  stroke="#258cf4"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </>
+            )}
+            {processed.length === 1 && (
+              <circle cx={W / 2} cy={H / 2} r="4" fill="#258cf4" />
+            )}
+            {hovPt && (
+              <>
+                <line
+                  x1={hovPt.x.toFixed(1)}
+                  y1="0"
+                  x2={hovPt.x.toFixed(1)}
+                  y2={H}
+                  stroke="rgba(255,255,255,0.15)"
+                  strokeWidth="1"
+                  strokeDasharray="3,3"
+                />
+                <circle
+                  cx={hovPt.x.toFixed(1)}
+                  cy={hovPt.y.toFixed(1)}
+                  r="4"
+                  fill="#258cf4"
+                  stroke="#000"
+                  strokeWidth="2"
+                />
+              </>
+            )}
+          </svg>
+        </div>
+        <div className="flex justify-between mt-1 pt-1">
+          {indices.map((i) => (
+            <span
+              key={i}
+              className={`text-[9px] font-bold uppercase transition-colors ${hoverIdx === i ? 'text-white/60' : 'text-white/25'}`}
+            >
+              {fmtBucket(processed[i].date, granularity)}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -862,6 +964,12 @@ function SunburstChart({ monthlyData }: { monthlyData: TimeSeriesEntry[] }) {
 // ===========================================================================
 
 function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
+  const [tip, setTip] = useState<{
+    x: number
+    y: number
+    text: string
+  } | null>(null)
+
   if (byAuthor.length === 0) {
     return (
       <div className="h-40 flex items-center justify-center text-white/20 text-xs normal-case">
@@ -904,78 +1012,112 @@ function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
   })
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 220 }}>
-      <rect
-        x={srcX}
-        y={srcY.toFixed(1)}
-        width={nodeW}
-        height={srcH.toFixed(1)}
-        fill="#258cf4"
-        fillOpacity="0.7"
-        rx="2"
-      />
-      <text
-        x={srcX + nodeW + 5}
-        y={(srcY + srcH / 2).toFixed(1)}
-        fontSize="7"
-        fill="rgba(255,255,255,0.45)"
-        fontFamily="sans-serif"
-        fontWeight="bold"
-        dominantBaseline="middle"
-      >
-        ALL
-      </text>
-      {flowSlices.map((f, i) => {
-        const rn = rightNodes[i]
-        const d = `M ${srcX + nodeW},${f.srcY.toFixed(1)} C ${mx},${f.srcY.toFixed(1)} ${mx},${rn.y.toFixed(1)} ${dstX},${rn.y.toFixed(1)} L ${dstX},${(rn.y + rn.h).toFixed(1)} C ${mx},${(rn.y + rn.h).toFixed(1)} ${mx},${(f.srcY + f.srcH).toFixed(1)} ${srcX + nodeW},${(f.srcY + f.srcH).toFixed(1)} Z`
-        return (
-          <path
-            key={i}
-            d={d}
-            fill="#258cf4"
-            fillOpacity={0.06 + (rn.h / srcH) * 0.22}
-          />
-        )
-      })}
-      {rightNodes.map((n, i) => (
-        <g key={i}>
-          <rect
-            x={dstX}
-            y={n.y.toFixed(1)}
-            width={nodeW}
-            height={n.h.toFixed(1)}
-            fill="#258cf4"
-            fillOpacity={0.4 + (n.total_seconds / total) * 0.5}
-            rx="2"
-          >
-            <title>
-              {n.author}: {fmtSec(n.total_seconds)}
-            </title>
-          </rect>
-          <text
-            x={dstX + nodeW + 5}
-            y={(n.y + n.h * 0.38).toFixed(1)}
-            fontSize="7.5"
-            fill="rgba(255,255,255,0.65)"
-            fontFamily="sans-serif"
-            fontWeight="bold"
-            dominantBaseline="middle"
-          >
-            {n.author.length > 26 ? n.author.slice(0, 26) + '…' : n.author}
-          </text>
-          <text
-            x={dstX + nodeW + 5}
-            y={(n.y + n.h * 0.38 + 10).toFixed(1)}
-            fontSize="6.5"
-            fill="rgba(255,255,255,0.3)"
-            fontFamily="sans-serif"
-            dominantBaseline="middle"
-          >
-            {fmtSec(n.total_seconds)}
-          </text>
-        </g>
-      ))}
-    </svg>
+    <div className="relative">
+      {tip && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1.5 bg-black border border-white/20 text-[10px] font-bold text-white/90 whitespace-nowrap"
+          style={{ left: tip.x + 12, top: tip.y - 8 }}
+        >
+          {tip.text}
+        </div>
+      )}
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 220 }}>
+        <rect
+          x={srcX}
+          y={srcY.toFixed(1)}
+          width={nodeW}
+          height={srcH.toFixed(1)}
+          fill="#258cf4"
+          fillOpacity="0.7"
+          rx="2"
+          style={{ cursor: 'default' }}
+          onMouseMove={(e) =>
+            setTip({
+              x: e.clientX,
+              y: e.clientY,
+              text: `Total: ${fmtSec(total)} across ${top.length} authors`,
+            })
+          }
+          onMouseLeave={() => setTip(null)}
+        />
+        <text
+          x={srcX + nodeW + 5}
+          y={(srcY + srcH / 2).toFixed(1)}
+          fontSize="7"
+          fill="rgba(255,255,255,0.45)"
+          fontFamily="sans-serif"
+          fontWeight="bold"
+          dominantBaseline="middle"
+        >
+          ALL
+        </text>
+        {flowSlices.map((f, i) => {
+          const rn = rightNodes[i]
+          const d = `M ${srcX + nodeW},${f.srcY.toFixed(1)} C ${mx},${f.srcY.toFixed(1)} ${mx},${rn.y.toFixed(1)} ${dstX},${rn.y.toFixed(1)} L ${dstX},${(rn.y + rn.h).toFixed(1)} C ${mx},${(rn.y + rn.h).toFixed(1)} ${mx},${(f.srcY + f.srcH).toFixed(1)} ${srcX + nodeW},${(f.srcY + f.srcH).toFixed(1)} Z`
+          const pct = Math.round((rn.total_seconds / total) * 100)
+          return (
+            <path
+              key={i}
+              d={d}
+              fill="#258cf4"
+              fillOpacity={0.06 + (rn.h / srcH) * 0.22}
+              style={{ cursor: 'default' }}
+              onMouseMove={(e) =>
+                setTip({
+                  x: e.clientX,
+                  y: e.clientY,
+                  text: `${rn.author} · ${fmtSec(rn.total_seconds)} · ${pct}% of total`,
+                })
+              }
+              onMouseLeave={() => setTip(null)}
+            />
+          )
+        })}
+        {rightNodes.map((n, i) => (
+          <g key={i}>
+            <rect
+              x={dstX}
+              y={n.y.toFixed(1)}
+              width={nodeW}
+              height={n.h.toFixed(1)}
+              fill="#258cf4"
+              fillOpacity={0.4 + (n.total_seconds / total) * 0.5}
+              rx="2"
+              style={{ cursor: 'default' }}
+              onMouseMove={(e) =>
+                setTip({
+                  x: e.clientX,
+                  y: e.clientY,
+                  text: `${n.author} · ${fmtSec(n.total_seconds)} · ${n.session_count} sessions`,
+                })
+              }
+              onMouseLeave={() => setTip(null)}
+            />
+            <text
+              x={dstX + nodeW + 5}
+              y={(n.y + n.h * 0.38).toFixed(1)}
+              fontSize="7.5"
+              fill="rgba(255,255,255,0.65)"
+              fontFamily="sans-serif"
+              fontWeight="bold"
+              dominantBaseline="middle"
+            >
+              {n.author.length > 26 ? n.author.slice(0, 26) + '…' : n.author}
+            </text>
+            <text
+              x={dstX + nodeW + 5}
+              y={(n.y + n.h * 0.38 + 10).toFixed(1)}
+              fontSize="6.5"
+              fill="rgba(255,255,255,0.3)"
+              fontFamily="sans-serif"
+              dominantBaseline="middle"
+            >
+              {fmtSec(n.total_seconds)}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
   )
 }
 
@@ -984,6 +1126,12 @@ function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
 // ===========================================================================
 
 function ScatterChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
+  const [tip, setTip] = useState<{
+    x: number
+    y: number
+    text: string
+  } | null>(null)
+
   if (byAuthor.length === 0) {
     return (
       <div className="h-48 flex items-center justify-center text-white/20 text-xs normal-case">
@@ -1007,90 +1155,131 @@ function ScatterChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
     ph = H - pad.t - pad.b
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 180 }}>
-      {[0.25, 0.5, 0.75, 1].map((t) => (
-        <line
-          key={`h${t}`}
-          x1={pad.l}
-          y1={(pad.t + ph * (1 - t)).toFixed(1)}
-          x2={pad.l + pw}
-          y2={(pad.t + ph * (1 - t)).toFixed(1)}
-          stroke="rgba(255,255,255,0.05)"
-          strokeWidth="1"
-        />
-      ))}
-      {[0.25, 0.5, 0.75, 1].map((t) => (
-        <line
-          key={`v${t}`}
-          x1={(pad.l + pw * t).toFixed(1)}
-          y1={pad.t}
-          x2={(pad.l + pw * t).toFixed(1)}
-          y2={pad.t + ph}
-          stroke="rgba(255,255,255,0.05)"
-          strokeWidth="1"
-        />
-      ))}
-      {points.map((p, i) => {
-        const bx = pad.l + (p.x / maxX) * pw
-        const by = pad.t + ph - (p.y / maxY) * ph
-        const br = 4 + (p.r / maxR) * 14
-        return (
-          <g key={i}>
-            <circle
-              cx={bx.toFixed(1)}
-              cy={by.toFixed(1)}
-              r={br.toFixed(1)}
-              fill="#258cf4"
-              fillOpacity={0.12 + (p.r / maxR) * 0.45}
-              stroke="#258cf4"
-              strokeWidth="1"
-              strokeOpacity="0.35"
-            >
-              <title>
-                {p.author} · {p.x} sessions · avg {fmtSec(Math.round(p.y))} ·{' '}
-                {fmtSec(p.r)} total
-              </title>
-            </circle>
-            {p.r / maxR > 0.15 && (
-              <text
-                x={bx.toFixed(1)}
-                y={(by - br - 2).toFixed(1)}
-                textAnchor="middle"
-                fontSize="5.5"
-                fill="rgba(255,255,255,0.4)"
-                fontFamily="sans-serif"
-                fontWeight="bold"
-              >
-                {p.author.split(' ').slice(-1)[0]}
-              </text>
-            )}
-          </g>
-        )
-      })}
-      <text
-        x={pad.l + pw / 2}
-        y={H - 5}
-        textAnchor="middle"
-        fontSize="7"
-        fill="rgba(255,255,255,0.25)"
-        fontFamily="sans-serif"
-        fontWeight="bold"
-      >
-        SESSIONS
-      </text>
-      <text
-        x={9}
-        y={pad.t + ph / 2}
-        textAnchor="middle"
-        fontSize="7"
-        fill="rgba(255,255,255,0.25)"
-        fontFamily="sans-serif"
-        fontWeight="bold"
-        transform={`rotate(-90,9,${pad.t + ph / 2})`}
-      >
-        AVG SESSION
-      </text>
-    </svg>
+    <div className="relative">
+      {tip && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1.5 bg-black border border-white/20 text-[10px] font-bold text-white/90 whitespace-nowrap"
+          style={{ left: tip.x + 12, top: tip.y - 8 }}
+        >
+          {tip.text}
+        </div>
+      )}
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 180 }}>
+        {[0.25, 0.5, 0.75, 1].map((t) => (
+          <line
+            key={`h${t}`}
+            x1={pad.l}
+            y1={(pad.t + ph * (1 - t)).toFixed(1)}
+            x2={pad.l + pw}
+            y2={(pad.t + ph * (1 - t)).toFixed(1)}
+            stroke="rgba(255,255,255,0.05)"
+            strokeWidth="1"
+          />
+        ))}
+        {[0.25, 0.5, 0.75, 1].map((t) => (
+          <line
+            key={`v${t}`}
+            x1={(pad.l + pw * t).toFixed(1)}
+            y1={pad.t}
+            x2={(pad.l + pw * t).toFixed(1)}
+            y2={pad.t + ph}
+            stroke="rgba(255,255,255,0.05)"
+            strokeWidth="1"
+          />
+        ))}
+        {[0, 0.5, 1].map((t) => (
+          <text
+            key={t}
+            x={pad.l - 3}
+            y={(pad.t + ph * (1 - t)).toFixed(1)}
+            textAnchor="end"
+            fontSize="6"
+            fill="rgba(255,255,255,0.25)"
+            fontFamily="sans-serif"
+            dominantBaseline="middle"
+          >
+            {fmtSec(Math.round(maxY * t))}
+          </text>
+        ))}
+        {[0, 0.5, 1].map((t) => (
+          <text
+            key={t}
+            x={(pad.l + pw * t).toFixed(1)}
+            y={pad.t + ph + 10}
+            textAnchor="middle"
+            fontSize="6"
+            fill="rgba(255,255,255,0.25)"
+            fontFamily="sans-serif"
+          >
+            {Math.round(maxX * t)}
+          </text>
+        ))}
+        {points.map((p, i) => {
+          const bx = pad.l + (p.x / maxX) * pw
+          const by = pad.t + ph - (p.y / maxY) * ph
+          const br = 4 + (p.r / maxR) * 14
+          return (
+            <g key={i}>
+              <circle
+                cx={bx.toFixed(1)}
+                cy={by.toFixed(1)}
+                r={br.toFixed(1)}
+                fill="#258cf4"
+                fillOpacity={0.12 + (p.r / maxR) * 0.45}
+                stroke="#258cf4"
+                strokeWidth="1"
+                strokeOpacity="0.35"
+                style={{ cursor: 'default' }}
+                onMouseMove={(e) =>
+                  setTip({
+                    x: e.clientX,
+                    y: e.clientY,
+                    text: `${p.author} · ${p.x} sessions · avg ${fmtSec(Math.round(p.y))} · ${fmtSec(p.r)} total`,
+                  })
+                }
+                onMouseLeave={() => setTip(null)}
+              />
+              {p.r / maxR > 0.15 && (
+                <text
+                  x={bx.toFixed(1)}
+                  y={(by - br - 2).toFixed(1)}
+                  textAnchor="middle"
+                  fontSize="5.5"
+                  fill="rgba(255,255,255,0.4)"
+                  fontFamily="sans-serif"
+                  fontWeight="bold"
+                >
+                  {p.author.split(' ').slice(-1)[0]}
+                </text>
+              )}
+            </g>
+          )
+        })}
+        <text
+          x={pad.l + pw / 2}
+          y={H - 2}
+          textAnchor="middle"
+          fontSize="7"
+          fill="rgba(255,255,255,0.25)"
+          fontFamily="sans-serif"
+          fontWeight="bold"
+        >
+          SESSIONS
+        </text>
+        <text
+          x={9}
+          y={pad.t + ph / 2}
+          textAnchor="middle"
+          fontSize="7"
+          fill="rgba(255,255,255,0.25)"
+          fontFamily="sans-serif"
+          fontWeight="bold"
+          transform={`rotate(-90,9,${pad.t + ph / 2})`}
+        >
+          AVG SESSION
+        </text>
+      </svg>
+    </div>
   )
 }
 
@@ -1234,6 +1423,81 @@ function MonthCalendar({
           Books read today shown as pills
         </span>
       </div>
+    </div>
+  )
+}
+
+// ===========================================================================
+// CompletedBooksCarousel
+// ===========================================================================
+
+function fmtCompletedDate(val: string): string {
+  // Handle both "2026-03-01T..." and "2026-03-01 ..." (SQLite space-separated)
+  const iso = val.replace(' ', 'T')
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+}
+
+function CompletedBooksCarousel({ books }: { books: CompletedBook[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const scroll = (dir: number) => {
+    scrollRef.current?.scrollBy({ left: dir * 320, behavior: 'smooth' })
+  }
+  if (books.length === 0) return null
+  return (
+    <div className="relative">
+      <button
+        onClick={() => scroll(-1)}
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-black border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors"
+        aria-label="Scroll left"
+      >
+        <ChevronLeft size={14} />
+      </button>
+      <div
+        ref={scrollRef}
+        className="flex gap-4 overflow-x-auto pb-2 px-9"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {books.map((book) => (
+          <Link
+            key={book.book_id}
+            to={`/books/${book.book_id}`}
+            className="min-w-[100px] group shrink-0"
+          >
+            <div className="aspect-[2/3] bg-white/5 mb-2 border border-white/10 group-hover:border-primary transition-colors overflow-hidden">
+              <img
+                src={`/api/books/${book.book_id}/cover`}
+                alt={book.title}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            </div>
+            <p className="text-[9px] font-black uppercase tracking-tight leading-tight truncate">
+              {book.title}
+            </p>
+            {book.author && (
+              <p className="text-[9px] text-white/40 normal-case truncate">
+                {book.author}
+              </p>
+            )}
+            {book.completed_at && (
+              <p className="text-[9px] text-white/30 normal-case mt-0.5">
+                {fmtCompletedDate(book.completed_at)}
+              </p>
+            )}
+          </Link>
+        ))}
+      </div>
+      <button
+        onClick={() => scroll(1)}
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-black border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors"
+        aria-label="Scroll right"
+      >
+        <ChevronRight size={14} />
+      </button>
     </div>
   )
 }
@@ -1404,37 +1668,7 @@ function OverviewTab({
           <h3 className="text-sm font-black uppercase tracking-widest mb-6">
             Books Completed
           </h3>
-          <div
-            className="flex gap-4 overflow-x-auto pb-2"
-            style={{ scrollbarWidth: 'none' }}
-          >
-            {completed.map((book) => (
-              <Link
-                key={book.book_id}
-                to={`/books/${book.book_id}`}
-                className="min-w-[110px] group"
-              >
-                <div className="aspect-[2/3] bg-white/5 mb-2 border border-white/10 group-hover:border-primary transition-colors overflow-hidden">
-                  <img
-                    src={`/api/books/${book.book_id}/cover`}
-                    alt={book.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none'
-                    }}
-                  />
-                </div>
-                <p className="text-[9px] font-black uppercase tracking-tight leading-tight truncate">
-                  {book.title}
-                </p>
-                {book.author && (
-                  <p className="text-[9px] text-white/40 normal-case truncate">
-                    {book.author}
-                  </p>
-                )}
-              </Link>
-            ))}
-          </div>
+          <CompletedBooksCarousel books={completed} />
         </div>
       )}
 
@@ -1648,7 +1882,7 @@ function CalendarTab({
           Books read each day of the month
         </p>
       </div>
-      <div className="bg-black p-6 max-w-3xl">
+      <div className="bg-black p-6">
         <MonthCalendar
           year={calYear}
           month={calMonth}
@@ -1721,7 +1955,7 @@ function BooksAuthorsTab({
       </div>
 
       {/* Alluvial / Sankey */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
         <h3 className="text-sm font-black uppercase tracking-widest mb-2">
           Time Flow by Author
         </h3>
@@ -1758,42 +1992,83 @@ function BooksAuthorsTab({
           <h3 className="text-sm font-black uppercase tracking-widest mb-6">
             Completed Books — Timeline
           </h3>
-          <div
-            className="flex gap-5 overflow-x-auto pb-2"
-            style={{ scrollbarWidth: 'none' }}
-          >
-            {completed.map((book) => (
-              <Link
-                key={book.book_id}
-                to={`/books/${book.book_id}`}
-                className="min-w-[100px] group"
-              >
-                <div className="aspect-[2/3] bg-white/5 mb-2 border border-white/10 group-hover:border-primary transition-colors overflow-hidden">
-                  <img
-                    src={`/api/books/${book.book_id}/cover`}
-                    alt={book.title}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.style.display = 'none'
-                    }}
-                  />
-                </div>
-                <p className="text-[9px] font-black uppercase tracking-tight leading-tight truncate">
-                  {book.title}
-                </p>
-                {book.completed_at && (
-                  <p className="text-[9px] text-white/30 normal-case mt-0.5">
-                    {new Date(book.completed_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </p>
-                )}
-              </Link>
-            ))}
-          </div>
+          <CompletedBooksCarousel books={completed} />
         </div>
       )}
+    </div>
+  )
+}
+
+// ===========================================================================
+// StreakHistoryBadges — paginated 2-row grid
+// ===========================================================================
+
+function StreakHistoryBadges({
+  history,
+  longest,
+}: {
+  history: { start: string; end: string; days: number }[]
+  longest: number
+}) {
+  const [page, setPage] = useState(0)
+  const PER_PAGE = 14
+  const sorted = useMemo(
+    () => [...history].sort((a, b) => b.days - a.days),
+    [history]
+  )
+  const totalPages = Math.ceil(sorted.length / PER_PAGE)
+  const items = sorted.slice(page * PER_PAGE, (page + 1) * PER_PAGE)
+
+  const fmtRunDate = (s: string) =>
+    new Date(s + 'T00:00:00').toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })
+
+  return (
+    <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-black uppercase tracking-widest">
+          Streak History
+        </h3>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1 text-[10px] font-bold text-white/40">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="p-1 hover:text-white disabled:opacity-20 transition-colors"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span>
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="p-1 hover:text-white disabled:opacity-20 transition-colors"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="grid grid-cols-7 gap-2">
+        {items.map((run, i) => {
+          const isMax = run.days === longest
+          return (
+            <div
+              key={i}
+              className={`px-3 py-2 border ${isMax ? 'border-primary text-primary' : 'border-white/10 text-white/50'}`}
+            >
+              <p className="text-sm font-black">{run.days}d</p>
+              <p className="text-[9px] font-bold text-white/30 normal-case">
+                {fmtRunDate(run.start)} – {fmtRunDate(run.end)}
+              </p>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -1917,46 +2192,12 @@ function StreaksTab({
         )}
       </div>
 
-      {/* Streak history badges */}
+      {/* Streak history badges — paginated */}
       {streaks && streaks.history.length > 0 && (
-        <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
-          <h3 className="text-sm font-black uppercase tracking-widest mb-4">
-            Streak History
-          </h3>
-          <div className="flex gap-2 flex-wrap">
-            {[...streaks.history]
-              .sort((a, b) => b.days - a.days)
-              .slice(0, 24)
-              .map((run, i) => {
-                const isMax = run.days === streaks.longest
-                return (
-                  <div
-                    key={i}
-                    className={`px-3 py-2 border ${isMax ? 'border-primary text-primary' : 'border-white/10 text-white/50'}`}
-                  >
-                    <p className="text-sm font-black">{run.days}d</p>
-                    <p className="text-[9px] font-bold text-white/30 normal-case">
-                      {new Date(run.start + 'T00:00:00').toLocaleDateString(
-                        'en-US',
-                        {
-                          month: 'short',
-                          day: 'numeric',
-                        }
-                      )}
-                      {' – '}
-                      {new Date(run.end + 'T00:00:00').toLocaleDateString(
-                        'en-US',
-                        {
-                          month: 'short',
-                          day: 'numeric',
-                        }
-                      )}
-                    </p>
-                  </div>
-                )
-              })}
-          </div>
-        </div>
+        <StreakHistoryBadges
+          history={streaks.history}
+          longest={streaks.longest}
+        />
       )}
     </div>
   )
