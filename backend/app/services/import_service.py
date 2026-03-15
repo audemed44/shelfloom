@@ -88,7 +88,7 @@ async def import_shelf(
                 await _ingest_sdr(session, shelf, book_path, sdr_folder, progress)
 
         except Exception as e:
-            log.error("Failed to import %s: %s", book_path, e)
+            log.error("Failed to import %s: %s", book_path, e, exc_info=True)
             progress.errors.append(f"{book_path.name}: {e}")
 
         progress.processed += 1
@@ -132,7 +132,7 @@ async def _ingest_sdr(
         counts = await import_sdr(session, book, sdr_data)
         progress.sdr_imported += counts.get("sessions", 0)
     except Exception as e:
-        log.error("Failed to import .sdr %s: %s", sdr_folder, e)
+        log.error("Failed to import .sdr %s: %s", sdr_folder, e, exc_info=True)
         progress.sdr_errors.append(f"{sdr_folder.name}: {e}")
 
 
@@ -148,7 +148,7 @@ async def _ingest_stats_db(
         result = await import_stats_db(session, stats_db_path)
         progress.sdr_imported += result.get("imported", 0)
     except Exception as e:
-        log.error("Failed to import stats DB %s: %s", stats_db_path, e)
+        log.error("Failed to import stats DB %s: %s", stats_db_path, e, exc_info=True)
         progress.sdr_errors.append(f"stats_db: {e}")
 
 
@@ -263,8 +263,8 @@ async def _find_by_shelfloom_id(session: AsyncSession, book_path: Path) -> Book 
         if meta.shelfloom_id:
             result = await session.execute(select(Book).where(Book.id == meta.shelfloom_id))
             return result.scalar_one_or_none()
-    except Exception:
-        pass
+    except Exception as e:
+        log.debug("Could not read Shelfloom ID from %s: %s", book_path.name, e)
     return None
 
 

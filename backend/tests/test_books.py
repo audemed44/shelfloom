@@ -563,12 +563,16 @@ async def test_refresh_cover_epub_no_cover_image(client, db_session, tmp_path):
     assert data["cover_path"] is None
 
 
-async def test_refresh_cover_epub_with_cover(client, db_session, tmp_path):
+async def test_refresh_cover_epub_with_cover(client, db_session, tmp_path, monkeypatch):
     """EPUB with a cover image extracts and sets cover_path."""
     import io
 
     from ebooklib import epub
     from PIL import Image
+
+    from app.config import Settings
+
+    monkeypatch.setattr("app.config.get_settings", lambda: Settings(covers_dir=str(tmp_path)))
 
     shelf = await _create_shelf(db_session, tmp_path)
     book_file = tmp_path / "withcov.epub"

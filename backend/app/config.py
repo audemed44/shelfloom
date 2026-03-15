@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     koreader_path: str = "/koreader"
     scan_interval: int = 300  # seconds
     debug: bool = False
+    log_level: str = "INFO"
 
 
 def get_settings() -> Settings:
