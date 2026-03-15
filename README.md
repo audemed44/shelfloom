@@ -1,6 +1,6 @@
 # Shelfloom
 
-Self-hosted book library manager with deep KOReader integration and rich reading statistics.
+Self-hosted book library manager with deep KOReader integration and rich reading statistics. Only meant for my own personal use and it is perpetually in development.
 
 ## Quick Start (Docker)
 
@@ -53,10 +53,10 @@ Open **http://localhost:8000** — the setup wizard will guide you through creat
 
 The default `docker-compose.yml` uses a `.data/` directory in the repo root:
 
-| Host path       | Container path | Purpose                  |
-|-----------------|---------------|--------------------------|
-| `./.data`       | `/data`       | Database and cover images |
-| `./.data/books` | `/books`      | Book files (your shelf)  |
+| Host path       | Container path | Purpose                   |
+| --------------- | -------------- | ------------------------- |
+| `./.data`       | `/data`        | Database and cover images |
+| `./.data/books` | `/books`       | Book files (your shelf)   |
 
 To mount an external source directory for importing (e.g. from Booklore), add it as an extra read-only volume:
 
@@ -129,6 +129,7 @@ docker compose exec -T shelfloom python scripts/import_booklore.py \
 ```
 
 Options:
+
 - `--source` — path to the Booklore books directory (inside the container)
 - `--shelf-path` — destination shelf directory where files will be copied
 - `--stats-db` — path to a KOReader `statistics.sqlite3` to import reading sessions
