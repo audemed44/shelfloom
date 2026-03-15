@@ -9,7 +9,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.book import Book, BookHash
-from app.models.reading import ReadingSession, UnmatchedKOReaderEntry
+from app.models.reading import ReadingSession, UnmatchedKOReaderEntry, UnmatchedSession
 
 # ---------------------------------------------------------------------------
 # Helpers / factories
@@ -253,6 +253,56 @@ async def test_link_unmatched_to_book(
     await db_session.refresh(entry)
     assert entry.dismissed is True
     assert entry.linked_book_id == book.id
+
+
+async def test_link_unmatched_transfers_sessions(
+    client: AsyncClient, db_session: AsyncSession, shelf_factory, book_factory
+):
+    """Linking an unmatched entry creates ReadingSession rows from stored UnmatchedSession rows."""
+    from sqlalchemy import select
+
+    await shelf_factory()
+    book = await book_factory()
+    entry = UnmatchedKOReaderEntry(
+        title="KO Book With Sessions",
+        author=None,
+        source="stats_db",
+        session_count=2,
+        total_duration_seconds=3600,
+    )
+    db_session.add(entry)
+    await db_session.flush()
+
+    sess1 = UnmatchedSession(
+        unmatched_entry_id=entry.id,
+        start_time=datetime(2024, 1, 10, 9, 0),
+        duration=1800,
+        pages_read=20,
+        source_key="stats_db:abc123:1704877200",
+    )
+    sess2 = UnmatchedSession(
+        unmatched_entry_id=entry.id,
+        start_time=datetime(2024, 1, 11, 9, 0),
+        duration=1800,
+        pages_read=25,
+        source_key="stats_db:abc123:1704963600",
+    )
+    db_session.add(sess1)
+    db_session.add(sess2)
+    await db_session.commit()
+    await db_session.refresh(entry)
+
+    resp = await client.post(f"/api/data-mgmt/unmatched/{entry.id}/link", json={"book_id": book.id})
+    assert resp.status_code == 200
+
+    # ReadingSession rows should now exist for the book
+    result = await db_session.execute(
+        select(ReadingSession).where(ReadingSession.book_id == book.id)
+    )
+    sessions = result.scalars().all()
+    assert len(sessions) == 2
+    source_keys = {s.source_key for s in sessions}
+    assert source_keys == {"stats_db:abc123:1704877200", "stats_db:abc123:1704963600"}
 
 
 async def test_link_unmatched_book_not_found(client: AsyncClient, db_session: AsyncSession):

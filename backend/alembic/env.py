@@ -1,3 +1,4 @@
+import os
 from logging.config import fileConfig
 
 from sqlalchemy import create_engine
@@ -16,8 +17,16 @@ from app.database import Base  # noqa: E402
 target_metadata = Base.metadata
 
 
+def _get_url() -> str:
+    """Return DB URL, overriding with SHELFLOOM_DB_PATH env var if set."""
+    db_path = os.environ.get("SHELFLOOM_DB_PATH")
+    if db_path:
+        return f"sqlite+aiosqlite:///{db_path}"
+    return config.get_main_option("sqlalchemy.url")
+
+
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    url = _get_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -35,7 +44,7 @@ def run_migrations_online() -> None:
     (e.g., FastAPI lifespan). The async aiosqlite URL is converted to a
     plain sqlite URL for the migration runner only.
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = _get_url()
     # Strip async driver — Alembic uses the sync path only
     sync_url = url.replace("+aiosqlite", "")
     connectable = create_engine(sync_url)
