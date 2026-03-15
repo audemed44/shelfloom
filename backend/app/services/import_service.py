@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.book import Book, BookHash
 from app.models.shelf import Shelf
-from app.services.hash_service import compute_hashes
+from app.services.hash_service import compute_hashes, koreader_partial_md5
 from app.services.scanner import discover_books, find_sdr_folder
 
 log = logging.getLogger(__name__)
@@ -164,8 +164,9 @@ async def _process_file(
     if fmt not in ("epub", "pdf"):
         return "skipped"
 
-    # Compute pre-embed hashes
+    # Compute pre-embed hashes (before Shelfloom ID is embedded)
     pre_sha, pre_md5 = compute_hashes(book_path)
+    pre_ko_md5 = koreader_partial_md5(book_path)
 
     # Check by Shelfloom ID (EPUB only)
     if fmt == "epub":
@@ -184,9 +185,10 @@ async def _process_file(
         if book.file_hash == pre_sha:
             return "skipped"
         # Content changed — update hashes
-        await _record_hash(session, book, pre_sha, pre_md5, None)
+        await _record_hash(session, book, pre_sha, pre_md5, None, pre_ko_md5)
         book.file_hash = pre_sha
         book.file_hash_md5 = pre_md5
+        book.file_hash_md5_ko = pre_ko_md5
         book.file_path = str(book_path.relative_to(shelf.path))
         await session.commit()
         return "updated"
@@ -221,10 +223,13 @@ async def _process_file(
         except Exception as e:
             log.warning("Could not embed Shelfloom ID into %s: %s", book_path.name, e)
 
+    # Compute post-embed KOReader partial MD5 (for books opened by KOReader after embedding)
+    post_ko_md5 = koreader_partial_md5(book_path) if fmt == "epub" else pre_ko_md5
+
     # Extract cover
     cover_path = _extract_cover(book_path, fmt, book_uuid, covers_dir)
 
-    # Create book record
+    # Create book record — store post-embed KOReader MD5 as the canonical value
     book = Book(
         id=book_uuid,
         title=title,
@@ -239,6 +244,7 @@ async def _process_file(
         shelf_id=shelf.id,
         file_hash=post_sha,
         file_hash_md5=post_md5,
+        file_hash_md5_ko=post_ko_md5,
         file_size=book_path.stat().st_size,
         cover_path=cover_path,
         metadata_raw=json.dumps(metadata_raw),
@@ -247,9 +253,9 @@ async def _process_file(
     await session.flush()  # get book.id
 
     # Record pre-embed hash (if different from post-embed)
-    await _record_hash(session, book, pre_sha, pre_md5, page_count)
+    await _record_hash(session, book, pre_sha, pre_md5, page_count, pre_ko_md5)
     if pre_sha != post_sha:
-        await _record_hash(session, book, post_sha, post_md5, page_count)
+        await _record_hash(session, book, post_sha, post_md5, page_count, post_ko_md5)
 
     try:
         await session.commit()
@@ -298,14 +304,27 @@ async def _find_by_path(
 
 
 async def _record_hash(
-    session: AsyncSession, book: Book, sha: str, md5: str, page_count: int | None
+    session: AsyncSession,
+    book: Book,
+    sha: str,
+    md5: str,
+    page_count: int | None,
+    md5_ko: str | None = None,
 ) -> None:
     # Avoid duplicate hash records
     existing = await session.execute(
         select(BookHash).where(BookHash.book_id == book.id, BookHash.hash_sha == sha)
     )
     if existing.scalar_one_or_none() is None:
-        session.add(BookHash(book_id=book.id, hash_sha=sha, hash_md5=md5, page_count=page_count))
+        session.add(
+            BookHash(
+                book_id=book.id,
+                hash_sha=sha,
+                hash_md5=md5,
+                hash_md5_ko=md5_ko,
+                page_count=page_count,
+            )
+        )
 
 
 def _extract_metadata(
