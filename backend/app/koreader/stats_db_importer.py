@@ -137,13 +137,15 @@ async def import_stats_db(
 
         book_sessions = sessions_by_book.get(stats_book.id, [])
 
-        # Upsert ReadingProgress with real last-read timestamp
-        if book_sessions and stats_book.ko_total_pages:
+        # Upsert ReadingProgress with real last-read timestamp.
+        # Use max_page_reached / ko_total_pages as the progress metric — this is the
+        # furthest page reached, matching what KOReader's own stats plugin displays.
+        # total_read_pages counts unique pages with logged time and is not equivalent
+        # to reading position (e.g. a fresh device only knows its own sessions).
+        if book_sessions and stats_book.ko_total_pages and stats_book.max_page_reached:
             last_sess = max(book_sessions, key=lambda s: s.start_time)
             last_end = last_sess.start_time + timedelta(seconds=last_sess.duration)
-            progress_pct = round(
-                (stats_book.total_read_pages or 0) / stats_book.ko_total_pages * 100, 2
-            )
+            progress_pct = round(stats_book.max_page_reached / stats_book.ko_total_pages * 100, 2)
             prog_result = await session.execute(
                 select(ReadingProgress).where(
                     ReadingProgress.book_id == shelfloom_book.id,
