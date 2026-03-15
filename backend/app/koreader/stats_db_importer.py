@@ -11,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.koreader.stats_db_reader import StatsBook, read_stats_db
 from app.models.book import Book, BookHash
-from app.models.reading import ReadingProgress, ReadingSession, UnmatchedKOReaderEntry
+from app.models.reading import (
+    ReadingProgress,
+    ReadingSession,
+    UnmatchedKOReaderEntry,
+    UnmatchedSession,
+)
 
 log = logging.getLogger(__name__)
 
@@ -88,16 +93,26 @@ async def import_stats_db(
             )
             if existing_unmatched.scalar_one_or_none() is None:
                 book_sessions = sessions_by_book.get(stats_book.id, [])
-                session.add(
-                    UnmatchedKOReaderEntry(
-                        title=stats_book.title,
-                        author=stats_book.authors,
-                        source="stats_db",
-                        source_path=str(db_path),
-                        session_count=len(book_sessions),
-                        total_duration_seconds=sum(s.duration for s in book_sessions),
-                    )
+                entry = UnmatchedKOReaderEntry(
+                    title=stats_book.title,
+                    author=stats_book.authors,
+                    source="stats_db",
+                    source_path=str(db_path),
+                    session_count=len(book_sessions),
+                    total_duration_seconds=sum(s.duration for s in book_sessions),
                 )
+                session.add(entry)
+                await session.flush()  # get entry.id
+                for sess in book_sessions:
+                    session.add(
+                        UnmatchedSession(
+                            unmatched_entry_id=entry.id,
+                            start_time=sess.start_time,
+                            duration=sess.duration,
+                            pages_read=sess.pages_read,
+                            source_key=sess.source_key,
+                        )
+                    )
             continue
 
         book_sessions = sessions_by_book.get(stats_book.id, [])
