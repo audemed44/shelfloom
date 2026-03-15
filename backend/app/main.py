@@ -7,8 +7,22 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 
-# Frontend build output — repo_root/frontend/dist
-_FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
+# Frontend build output — check common locations
+_FRONTEND_DIST = Path(
+    # In Docker: /app/frontend/dist (adjacent to backend)
+    # In dev: repo_root/frontend/dist (two levels up from backend/app/)
+    next(
+        (
+            str(p)
+            for p in [
+                Path(__file__).parent.parent / "frontend" / "dist",  # /app/frontend/dist
+                Path(__file__).parent.parent.parent / "frontend" / "dist",  # repo/frontend/dist
+            ]
+            if p.exists()
+        ),
+        str(Path(__file__).parent.parent.parent / "frontend" / "dist"),
+    )
+)
 _ALEMBIC_INI = Path(__file__).parent.parent / "alembic.ini"
 
 
