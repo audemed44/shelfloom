@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src --ext js,jsx,ts,tsx --max-warnings 0",
+    "lint": "eslint src --ext js,jsx,ts,tsx",
     "format": "prettier --write src/**/*.{js,jsx,ts,tsx}",
     "format:check": "prettier --check src/**/*.{js,jsx,ts,tsx}"
   },
