@@ -319,7 +319,7 @@ export default function Library() {
 
   const { data: booksData, loading } =
     useApi<PaginatedResponse<Book>>(booksPath)
-  const books = booksData?.items ?? []
+  const books = useMemo(() => booksData?.items ?? [], [booksData])
   const total = booksData?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
 
