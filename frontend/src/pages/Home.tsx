@@ -349,10 +349,6 @@ export default function Home() {
                 {overview ? `${overview.books_read} completed` : ''}
               </span>
             </div>
-            <div className="text-[10px] font-black tracking-widest text-primary flex items-center gap-2">
-              <span className="block w-2 h-2 rounded-full bg-primary animate-pulse" />
-              Live Analytics
-            </div>
           </div>
         </section>
       </div>
