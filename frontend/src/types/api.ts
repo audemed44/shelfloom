@@ -102,7 +102,7 @@ export interface Book {
   last_read: string | null
 }
 
-export interface BookDetail extends Book {
+export interface BookDetail extends Omit<Book, 'reading_progress'> {
   series: BookSeries[]
   reading_sessions: ReadingSession[]
   highlights: Highlight[]

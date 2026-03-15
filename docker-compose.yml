@@ -4,6 +4,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/data
-      - ./books:/books
+      - ./.data:/data
+      - ./.data/books:/books
+      - /home/aakash1496/homelab/main-stack/booklore/books:/source:ro
     restart: unless-stopped

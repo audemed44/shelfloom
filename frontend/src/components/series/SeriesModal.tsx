@@ -114,6 +114,7 @@ export default function SeriesModal({
         savedId = series.id
       } else {
         const created = await api.post<{ id: number }>('/api/series', payload)
+        if (!created) throw new Error('Failed to create series')
         savedId = created.id
       }
 
