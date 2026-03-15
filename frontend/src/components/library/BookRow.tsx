@@ -16,11 +16,11 @@ export default function BookRow({ book }: BookRowProps) {
       data-testid="book-row"
     >
       {/* Small cover */}
-      <div className="w-10 h-14 bg-white/10 shrink-0 overflow-hidden">
+      <div className="w-10 h-14 bg-white/10 border border-white/10 group-hover:border-primary transition-colors shrink-0 overflow-hidden">
         <img
           src={coverSrc}
           alt=""
-          className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-300"
+          className="w-full h-full object-cover"
           onError={(e) => {
             e.currentTarget.style.display = 'none'
           }}
