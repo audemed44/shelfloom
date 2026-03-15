@@ -1,7 +1,7 @@
 repos:
   # Python formatting + linting (ruff replaces black, isort, flake8)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.10
+    rev: v0.15.6
     hooks:
       - id: ruff
         args: [--fix]
