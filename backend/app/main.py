@@ -38,10 +38,10 @@ def _run_migrations() -> None:  # pragma: no cover
     SQLAlchemy's create_all with no alembic_version table), we stamp them at
     head first so upgrade becomes a no-op.
     """
-    from alembic.config import Config
     from sqlalchemy import create_engine, inspect
 
     from alembic import command as alembic_command
+    from alembic.config import Config
 
     settings = get_settings()
     cfg = Config(str(_ALEMBIC_INI))
