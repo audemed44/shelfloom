@@ -108,7 +108,8 @@ def read_stats_db(
     uri = db_path.as_uri() + "?mode=ro&immutable=1"
     try:
         conn = sqlite3.connect(uri, uri=True)
-    except Exception:
+    except Exception as e:
+        log.debug("Could not open stats DB read-only (%s), falling back", e)
         # Fallback: open normally (requires write access to directory)
         conn = sqlite3.connect(str(db_path))
 
