@@ -91,8 +91,9 @@ async def import_stats_db(
                     UnmatchedKOReaderEntry.source == "stats_db",
                 )
             )
-            if existing_unmatched.scalar_one_or_none() is None:
-                book_sessions = sessions_by_book.get(stats_book.id, [])
+            book_sessions = sessions_by_book.get(stats_book.id, [])
+            existing_entry = existing_unmatched.scalar_one_or_none()
+            if existing_entry is None:
                 entry = UnmatchedKOReaderEntry(
                     title=stats_book.title,
                     author=stats_book.authors,
@@ -113,6 +114,25 @@ async def import_stats_db(
                             source_key=sess.source_key,
                         )
                     )
+            else:
+                # Backfill any sessions not yet stored (handles entries created before this feature)
+                existing_keys_result = await session.execute(
+                    select(UnmatchedSession.source_key).where(
+                        UnmatchedSession.unmatched_entry_id == existing_entry.id
+                    )
+                )
+                existing_keys = {row[0] for row in existing_keys_result.all()}
+                for sess in book_sessions:
+                    if sess.source_key not in existing_keys:
+                        session.add(
+                            UnmatchedSession(
+                                unmatched_entry_id=existing_entry.id,
+                                start_time=sess.start_time,
+                                duration=sess.duration,
+                                pages_read=sess.pages_read,
+                                source_key=sess.source_key,
+                            )
+                        )
             continue
 
         book_sessions = sessions_by_book.get(stats_book.id, [])
