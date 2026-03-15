@@ -247,8 +247,10 @@ describe('Stats', () => {
     await user.click(screen.getByTestId('tab-books-authors'))
 
     await waitFor(() =>
-      expect(screen.getByText('Brandon Sanderson')).toBeInTheDocument()
+      expect(
+        screen.getAllByText('Brandon Sanderson').length
+      ).toBeGreaterThanOrEqual(1)
     )
-    expect(screen.getByText('Ted Chiang')).toBeInTheDocument()
+    expect(screen.getAllByText('Ted Chiang').length).toBeGreaterThanOrEqual(1)
   })
 })

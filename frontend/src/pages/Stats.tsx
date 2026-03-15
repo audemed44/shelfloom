@@ -610,6 +610,491 @@ function RadialClock({ data }: { data: { hour: number; seconds: number }[] }) {
 }
 
 // ===========================================================================
+// RadarChart — reading profile (5 axes)
+// ===========================================================================
+
+function RadarChart({
+  speed,
+  consistency,
+  volume,
+  completion,
+  diversity,
+}: {
+  speed: number
+  consistency: number
+  volume: number
+  completion: number
+  diversity: number
+}) {
+  const cx = 110,
+    cy = 110,
+    R = 72
+  const axes = [
+    { label: 'Speed', value: Math.min(speed, 100) },
+    { label: 'Consistency', value: Math.min(consistency, 100) },
+    { label: 'Volume', value: Math.min(volume, 100) },
+    { label: 'Completion', value: Math.min(completion, 100) },
+    { label: 'Diversity', value: Math.min(diversity, 100) },
+  ]
+  const n = axes.length
+  const toXY = (idx: number, r: number) => {
+    const a = (idx * 2 * Math.PI) / n - Math.PI / 2
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }
+  }
+  const gridLevels = [0.25, 0.5, 0.75, 1]
+  const dataPoints = axes.map((a, i) => toXY(i, (a.value / 100) * R))
+  const dataPoly = dataPoints
+    .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(' ')
+  return (
+    <svg viewBox="0 0 220 220" className="w-full max-w-xs mx-auto">
+      {gridLevels.map((l) => {
+        const pts = axes
+          .map((_, i) => {
+            const p = toXY(i, R * l)
+            return `${p.x.toFixed(1)},${p.y.toFixed(1)}`
+          })
+          .join(' ')
+        return (
+          <polygon
+            key={l}
+            points={pts}
+            fill="none"
+            stroke="rgba(255,255,255,0.07)"
+            strokeWidth="1"
+          />
+        )
+      })}
+      {axes.map((_, i) => {
+        const p = toXY(i, R)
+        return (
+          <line
+            key={i}
+            x1={cx}
+            y1={cy}
+            x2={p.x.toFixed(1)}
+            y2={p.y.toFixed(1)}
+            stroke="rgba(255,255,255,0.07)"
+            strokeWidth="1"
+          />
+        )
+      })}
+      <polygon
+        points={dataPoly}
+        fill="#258cf4"
+        fillOpacity="0.15"
+        stroke="#258cf4"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      {dataPoints.map((p, i) => (
+        <circle
+          key={i}
+          cx={p.x.toFixed(1)}
+          cy={p.y.toFixed(1)}
+          r="3"
+          fill="#258cf4"
+        />
+      ))}
+      {axes.map((a, i) => {
+        const p = toXY(i, R + 18)
+        return (
+          <text
+            key={i}
+            x={p.x.toFixed(1)}
+            y={p.y.toFixed(1)}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="7.5"
+            fill="rgba(255,255,255,0.45)"
+            fontFamily="sans-serif"
+            fontWeight="bold"
+          >
+            {a.label.toUpperCase()}
+          </text>
+        )
+      })}
+    </svg>
+  )
+}
+
+// ===========================================================================
+// SunburstChart — reading time by quarter (inner) → month (outer)
+// ===========================================================================
+
+function SunburstChart({ monthlyData }: { monthlyData: TimeSeriesEntry[] }) {
+  const monthTotals = Array.from({ length: 12 }, () => 0)
+  for (const d of monthlyData) {
+    const parts = d.date.split('-')
+    const m = parseInt(parts[1] ?? '0', 10) - 1
+    if (m >= 0 && m < 12) monthTotals[m] += d.value
+  }
+  const total = monthTotals.reduce((a, b) => a + b, 0)
+  if (!total) {
+    return (
+      <div className="h-40 flex items-center justify-center text-white/20 text-xs normal-case">
+        No data for this period
+      </div>
+    )
+  }
+  const quarterTotals = [0, 1, 2, 3].map((q) =>
+    monthTotals.slice(q * 3, q * 3 + 3).reduce((a, b) => a + b, 0)
+  )
+  const cx = 100,
+    cy = 100
+  const innerR = 28,
+    midR = 52,
+    outerR = 76
+  const QCOLORS = ['#258cf4', '#1e7ae0', '#1668c7', '#0e58b0']
+
+  const arcPath = (
+    r1: number,
+    r2: number,
+    startDeg: number,
+    endDeg: number
+  ) => {
+    const toRad = (d: number) => ((d - 90) * Math.PI) / 180
+    const s = toRad(startDeg),
+      e = toRad(endDeg)
+    const large = endDeg - startDeg > 180 ? 1 : 0
+    const x1 = cx + r1 * Math.cos(s),
+      y1 = cy + r1 * Math.sin(s)
+    const x2 = cx + r2 * Math.cos(s),
+      y2 = cy + r2 * Math.sin(s)
+    const x3 = cx + r2 * Math.cos(e),
+      y3 = cy + r2 * Math.sin(e)
+    const x4 = cx + r1 * Math.cos(e),
+      y4 = cy + r1 * Math.sin(e)
+    return `M ${x1.toFixed(2)},${y1.toFixed(2)} L ${x2.toFixed(2)},${y2.toFixed(2)} A ${r2} ${r2} 0 ${large} 1 ${x3.toFixed(2)},${y3.toFixed(2)} L ${x4.toFixed(2)},${y4.toFixed(2)} A ${r1} ${r1} 0 ${large} 0 ${x1.toFixed(2)},${y1.toFixed(2)} Z`
+  }
+
+  let qAngle = 0
+  const quarterArcs = quarterTotals
+    .map((v, i) => {
+      const sweep = (v / total) * 360
+      const arc = { start: qAngle, end: qAngle + sweep, value: v, q: i }
+      qAngle += sweep
+      return arc
+    })
+    .filter((a) => a.value > 0)
+
+  let mAngle = 0
+  const monthArcs = monthTotals
+    .map((v, i) => {
+      const sweep = (v / total) * 360
+      const arc = { start: mAngle, end: mAngle + sweep, value: v, m: i }
+      mAngle += sweep
+      return arc
+    })
+    .filter((a) => a.value > 0)
+
+  const maxMonthVal = Math.max(...monthTotals, 1)
+
+  return (
+    <svg viewBox="0 0 200 200" className="w-full max-w-[200px] mx-auto">
+      {quarterArcs.map((a, i) => (
+        <path
+          key={i}
+          d={arcPath(innerR, midR, a.start, a.end)}
+          fill={QCOLORS[a.q]}
+          fillOpacity="0.85"
+          stroke="#000"
+          strokeWidth="1.5"
+        >
+          <title>
+            Q{a.q + 1}: {fmtSec(a.value)}
+          </title>
+        </path>
+      ))}
+      {monthArcs.map((a, i) => {
+        const qIdx = Math.floor(a.m / 3)
+        const opacity = 0.3 + (a.value / maxMonthVal) * 0.55
+        return (
+          <path
+            key={i}
+            d={arcPath(midR + 2, outerR, a.start, a.end)}
+            fill={QCOLORS[qIdx]}
+            fillOpacity={opacity}
+            stroke="#000"
+            strokeWidth="1"
+          >
+            <title>
+              {MONTH_NAMES[a.m]}: {fmtSec(a.value)}
+            </title>
+          </path>
+        )
+      })}
+      <circle
+        cx={cx}
+        cy={cy}
+        r={innerR}
+        fill="#000"
+        stroke="rgba(255,255,255,0.06)"
+        strokeWidth="1"
+      />
+      <text
+        x={cx}
+        y={cy - 4}
+        textAnchor="middle"
+        fontSize="7"
+        fill="rgba(255,255,255,0.5)"
+        fontFamily="sans-serif"
+        fontWeight="bold"
+      >
+        TOTAL
+      </text>
+      <text
+        x={cx}
+        y={cy + 7}
+        textAnchor="middle"
+        fontSize="6.5"
+        fill="rgba(255,255,255,0.35)"
+        fontFamily="sans-serif"
+      >
+        {fmtSec(total)}
+      </text>
+    </svg>
+  )
+}
+
+// ===========================================================================
+// AlluvialChart — reading time flowing from source to top authors
+// ===========================================================================
+
+function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
+  if (byAuthor.length === 0) {
+    return (
+      <div className="h-40 flex items-center justify-center text-white/20 text-xs normal-case">
+        No reading data yet
+      </div>
+    )
+  }
+  const top = byAuthor.slice(0, 8)
+  const total = top.reduce((s, a) => s + a.total_seconds, 0)
+  const W = 520,
+    H = 260
+  const srcX = 24,
+    nodeW = 14,
+    srcH = H * 0.82
+  const srcY = (H - srcH) / 2
+  const dstX = 260
+  const mx = srcX + nodeW + (dstX - srcX - nodeW) / 2
+
+  // Right-side node y positions
+  const totalBarH = top.reduce(
+    (s, a) => s + (a.total_seconds / total) * srcH,
+    0
+  )
+  const gaps = Math.max((srcH - totalBarH) / (top.length + 1), 5)
+  let ry = srcY + gaps
+  const rightNodes = top.map((a) => {
+    const h = (a.total_seconds / total) * srcH
+    const y = ry
+    ry += h + gaps
+    return { ...a, y, h }
+  })
+
+  // Left-side flow slices (same proportions)
+  let srcOffset = srcY
+  const flowSlices = top.map((a) => {
+    const h = (a.total_seconds / total) * srcH
+    const y = srcOffset
+    srcOffset += h
+    return { srcY: y, srcH: h }
+  })
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 220 }}>
+      <rect
+        x={srcX}
+        y={srcY.toFixed(1)}
+        width={nodeW}
+        height={srcH.toFixed(1)}
+        fill="#258cf4"
+        fillOpacity="0.7"
+        rx="2"
+      />
+      <text
+        x={srcX + nodeW + 5}
+        y={(srcY + srcH / 2).toFixed(1)}
+        fontSize="7"
+        fill="rgba(255,255,255,0.45)"
+        fontFamily="sans-serif"
+        fontWeight="bold"
+        dominantBaseline="middle"
+      >
+        ALL
+      </text>
+      {flowSlices.map((f, i) => {
+        const rn = rightNodes[i]
+        const d = `M ${srcX + nodeW},${f.srcY.toFixed(1)} C ${mx},${f.srcY.toFixed(1)} ${mx},${rn.y.toFixed(1)} ${dstX},${rn.y.toFixed(1)} L ${dstX},${(rn.y + rn.h).toFixed(1)} C ${mx},${(rn.y + rn.h).toFixed(1)} ${mx},${(f.srcY + f.srcH).toFixed(1)} ${srcX + nodeW},${(f.srcY + f.srcH).toFixed(1)} Z`
+        return (
+          <path
+            key={i}
+            d={d}
+            fill="#258cf4"
+            fillOpacity={0.06 + (rn.h / srcH) * 0.22}
+          />
+        )
+      })}
+      {rightNodes.map((n, i) => (
+        <g key={i}>
+          <rect
+            x={dstX}
+            y={n.y.toFixed(1)}
+            width={nodeW}
+            height={n.h.toFixed(1)}
+            fill="#258cf4"
+            fillOpacity={0.4 + (n.total_seconds / total) * 0.5}
+            rx="2"
+          >
+            <title>
+              {n.author}: {fmtSec(n.total_seconds)}
+            </title>
+          </rect>
+          <text
+            x={dstX + nodeW + 5}
+            y={(n.y + n.h * 0.38).toFixed(1)}
+            fontSize="7.5"
+            fill="rgba(255,255,255,0.65)"
+            fontFamily="sans-serif"
+            fontWeight="bold"
+            dominantBaseline="middle"
+          >
+            {n.author.length > 26 ? n.author.slice(0, 26) + '…' : n.author}
+          </text>
+          <text
+            x={dstX + nodeW + 5}
+            y={(n.y + n.h * 0.38 + 10).toFixed(1)}
+            fontSize="6.5"
+            fill="rgba(255,255,255,0.3)"
+            fontFamily="sans-serif"
+            dominantBaseline="middle"
+          >
+            {fmtSec(n.total_seconds)}
+          </text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+// ===========================================================================
+// ScatterChart — author bubbles (X=sessions, Y=avg duration, size=total time)
+// ===========================================================================
+
+function ScatterChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
+  if (byAuthor.length === 0) {
+    return (
+      <div className="h-48 flex items-center justify-center text-white/20 text-xs normal-case">
+        No reading data yet
+      </div>
+    )
+  }
+  const points = byAuthor.map((a) => ({
+    author: a.author,
+    x: a.session_count,
+    y: a.session_count > 0 ? a.total_seconds / a.session_count : 0,
+    r: a.total_seconds,
+  }))
+  const maxX = Math.max(...points.map((p) => p.x), 1)
+  const maxY = Math.max(...points.map((p) => p.y), 1)
+  const maxR = Math.max(...points.map((p) => p.r), 1)
+  const W = 340,
+    H = 200
+  const pad = { t: 12, r: 12, b: 28, l: 38 }
+  const pw = W - pad.l - pad.r,
+    ph = H - pad.t - pad.b
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 180 }}>
+      {[0.25, 0.5, 0.75, 1].map((t) => (
+        <line
+          key={`h${t}`}
+          x1={pad.l}
+          y1={(pad.t + ph * (1 - t)).toFixed(1)}
+          x2={pad.l + pw}
+          y2={(pad.t + ph * (1 - t)).toFixed(1)}
+          stroke="rgba(255,255,255,0.05)"
+          strokeWidth="1"
+        />
+      ))}
+      {[0.25, 0.5, 0.75, 1].map((t) => (
+        <line
+          key={`v${t}`}
+          x1={(pad.l + pw * t).toFixed(1)}
+          y1={pad.t}
+          x2={(pad.l + pw * t).toFixed(1)}
+          y2={pad.t + ph}
+          stroke="rgba(255,255,255,0.05)"
+          strokeWidth="1"
+        />
+      ))}
+      {points.map((p, i) => {
+        const bx = pad.l + (p.x / maxX) * pw
+        const by = pad.t + ph - (p.y / maxY) * ph
+        const br = 4 + (p.r / maxR) * 14
+        return (
+          <g key={i}>
+            <circle
+              cx={bx.toFixed(1)}
+              cy={by.toFixed(1)}
+              r={br.toFixed(1)}
+              fill="#258cf4"
+              fillOpacity={0.12 + (p.r / maxR) * 0.45}
+              stroke="#258cf4"
+              strokeWidth="1"
+              strokeOpacity="0.35"
+            >
+              <title>
+                {p.author} · {p.x} sessions · avg {fmtSec(Math.round(p.y))} ·{' '}
+                {fmtSec(p.r)} total
+              </title>
+            </circle>
+            {p.r / maxR > 0.15 && (
+              <text
+                x={bx.toFixed(1)}
+                y={(by - br - 2).toFixed(1)}
+                textAnchor="middle"
+                fontSize="5.5"
+                fill="rgba(255,255,255,0.4)"
+                fontFamily="sans-serif"
+                fontWeight="bold"
+              >
+                {p.author.split(' ').slice(-1)[0]}
+              </text>
+            )}
+          </g>
+        )
+      })}
+      <text
+        x={pad.l + pw / 2}
+        y={H - 5}
+        textAnchor="middle"
+        fontSize="7"
+        fill="rgba(255,255,255,0.25)"
+        fontFamily="sans-serif"
+        fontWeight="bold"
+      >
+        SESSIONS
+      </text>
+      <text
+        x={9}
+        y={pad.t + ph / 2}
+        textAnchor="middle"
+        fontSize="7"
+        fill="rgba(255,255,255,0.25)"
+        fontFamily="sans-serif"
+        fontWeight="bold"
+        transform={`rotate(-90,9,${pad.t + ph / 2})`}
+      >
+        AVG SESSION
+      </text>
+    </svg>
+  )
+}
+
+// ===========================================================================
 // MonthCalendar
 // ===========================================================================
 
@@ -708,7 +1193,7 @@ function MonthCalendar({
             <div
               key={i}
               className={`bg-black p-1 ${isToday ? 'border border-primary/50' : ''} ${cell.day === null ? 'opacity-20' : ''}`}
-              style={{ minHeight: 72 }}
+              style={{ height: 80, overflow: 'hidden' }}
             >
               {cell.day !== null && (
                 <>
@@ -851,8 +1336,8 @@ function OverviewTab({
         </div>
       ))}
 
-      {/* Reading time bar chart */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 8' }}>
+      {/* Reading time bar chart — full row */}
+      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
         <div className="flex justify-between items-end mb-6">
           <div>
             <h3 className="text-sm font-black uppercase tracking-widest mb-1">
@@ -872,8 +1357,8 @@ function OverviewTab({
         />
       </div>
 
-      {/* Monthly calendar */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      {/* Monthly calendar — full row */}
+      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
         <MonthCalendar
           year={calYear}
           month={calMonth}
@@ -954,7 +1439,7 @@ function OverviewTab({
       )}
 
       {/* By author */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
         <h3 className="text-sm font-black uppercase tracking-widest mb-6">
           Reading by Author
         </h3>
@@ -976,8 +1461,35 @@ function OverviewTab({
         )}
       </div>
 
+      {/* Reading profile radar */}
+      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+        <h3 className="text-sm font-black uppercase tracking-widest mb-4">
+          Reading Profile
+        </h3>
+        <RadarChart
+          speed={avgSpeed !== null ? Math.min((avgSpeed / 100) * 100, 100) : 0}
+          consistency={
+            streaks !== null ? Math.min((streaks.current / 30) * 100, 100) : 0
+          }
+          volume={
+            overview !== null
+              ? Math.min((overview.total_pages_read / 5000) * 100, 100)
+              : 0
+          }
+          completion={
+            overview !== null && overview.books_owned > 0
+              ? Math.min(
+                  (overview.books_read / overview.books_owned) * 100,
+                  100
+                )
+              : 0
+          }
+          diversity={Math.min((byAuthor.length / 20) * 100, 100)}
+        />
+      </div>
+
       {/* Time of day */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
         <h3 className="text-sm font-black uppercase tracking-widest mb-6">
           Time of Day
         </h3>
@@ -998,11 +1510,13 @@ function OverviewTab({
 function ReadingTimeTab({
   readingTime,
   pagesData,
+  monthlyData,
   granularity,
   setGranularity,
 }: {
   readingTime: TimeSeriesEntry[]
   pagesData: TimeSeriesEntry[]
+  monthlyData: TimeSeriesEntry[]
   granularity: Granularity
   setGranularity: (g: Granularity) => void
 }) {
@@ -1059,6 +1573,49 @@ function ReadingTimeTab({
           granularity={granularity}
           data-testid="speed-chart"
         />
+      </div>
+
+      {/* Sunburst: quarter → month breakdown */}
+      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+        <h3 className="text-sm font-black uppercase tracking-widest mb-4">
+          Quarterly Breakdown
+        </h3>
+        <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
+          Inner ring = quarters · outer ring = months
+        </p>
+        <SunburstChart monthlyData={monthlyData} />
+      </div>
+
+      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+        <h3 className="text-sm font-black uppercase tracking-widest mb-4">
+          By Quarter
+        </h3>
+        {(() => {
+          const monthTotals = Array.from({ length: 12 }, () => 0)
+          for (const d of monthlyData) {
+            const m = parseInt(d.date.split('-')[1] ?? '0', 10) - 1
+            if (m >= 0 && m < 12) monthTotals[m] += d.value
+          }
+          const quarters = [0, 1, 2, 3].map((q) => ({
+            label: `Q${q + 1}`,
+            value: monthTotals
+              .slice(q * 3, q * 3 + 3)
+              .reduce((a, b) => a + b, 0),
+          }))
+          const qMax = Math.max(...quarters.map((q) => q.value), 1)
+          return (
+            <div className="space-y-4">
+              {quarters.map((q) => (
+                <HorizontalBar
+                  key={q.label}
+                  label={q.label}
+                  value={q.value}
+                  max={qMax}
+                />
+              ))}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
@@ -1152,6 +1709,28 @@ function BooksAuthorsTab({
         )}
       </div>
 
+      {/* Scatter (placed next to author bars) */}
+      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+        <h3 className="text-sm font-black uppercase tracking-widest mb-2">
+          Author Engagement Map
+        </h3>
+        <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
+          X = sessions · Y = avg session length · size = total time
+        </p>
+        <ScatterChart byAuthor={byAuthor} />
+      </div>
+
+      {/* Alluvial / Sankey */}
+      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+        <h3 className="text-sm font-black uppercase tracking-widest mb-2">
+          Time Flow by Author
+        </h3>
+        <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
+          Reading time flowing from total to individual authors
+        </p>
+        <AlluvialChart byAuthor={byAuthor} />
+      </div>
+
       <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
         <h3 className="text-sm font-black uppercase tracking-widest mb-6">
           Reading by Tag
@@ -1162,7 +1741,7 @@ function BooksAuthorsTab({
           </p>
         ) : (
           <div className="space-y-4">
-            {byTag.slice(0, 15).map((t) => (
+            {byTag.slice(0, 12).map((t) => (
               <HorizontalBar
                 key={t.tag}
                 label={t.tag}
@@ -1422,6 +2001,9 @@ export default function Stats() {
   const { data: calendarDays } = useApi<CalendarDay[]>(
     `/api/stats/calendar?year=${calYear}&month=${calMonth}`
   )
+  const { data: monthlyData } = useApi<TimeSeriesEntry[]>(
+    '/api/stats/reading-time?granularity=month'
+  )
 
   // ── Calendar navigation ───────────────────────────────────────────────────
   const handleCalPrev = useCallback(() => {
@@ -1534,6 +2116,7 @@ export default function Stats() {
           <ReadingTimeTab
             readingTime={readingTime ?? []}
             pagesData={pagesData ?? []}
+            monthlyData={monthlyData ?? []}
             granularity={granularity}
             setGranularity={setGranularity}
           />
