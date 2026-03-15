@@ -1,7 +1,12 @@
 from app.models.book import Book, BookHash  # noqa: F401
 from app.models.kosync import KoSyncProgress, KoSyncUser  # noqa: F401
 from app.models.organize import RenameLog  # noqa: F401
-from app.models.reading import Highlight, ReadingProgress, ReadingSession  # noqa: F401
+from app.models.reading import (  # noqa: F401
+    Highlight,
+    ReadingProgress,
+    ReadingSession,
+    UnmatchedKOReaderEntry,
+)
 from app.models.series import (
     BookSeries as BookSeries,
 )

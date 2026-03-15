@@ -9,6 +9,7 @@ import Serials from './pages/Serials'
 import SeriesList from './pages/SeriesList'
 import SeriesDetail from './pages/SeriesDetail'
 import Settings from './pages/Settings'
+import DataManagement from './pages/DataManagement'
 import NotFound from './pages/NotFound'
 import SetupWizard from './components/SetupWizard'
 
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="series" element={<SeriesList />} />
           <Route path="series/:id" element={<SeriesDetail />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="data-management" element={<DataManagement />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

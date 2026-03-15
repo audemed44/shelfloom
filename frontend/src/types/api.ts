@@ -166,3 +166,72 @@ export interface BackfillCoversResponse {
   failed: number
   skipped: number
 }
+
+// ── Data Management (step 4.5) ──────────────────────────────────────────────
+
+export interface DuplicateSessionOut {
+  id: number
+  book_id: string
+  start_time: string | null
+  duration: number | null
+  pages_read: number | null
+  source: string
+  dismissed: boolean
+}
+
+export interface DuplicateSessionPair {
+  dismissed: DuplicateSessionOut
+  active: DuplicateSessionOut | null
+}
+
+export interface DuplicateSessionGroup {
+  book_id: string
+  book_title: string
+  book_author: string | null
+  pairs: DuplicateSessionPair[]
+}
+
+export interface UnmatchedEntry {
+  id: number
+  title: string
+  author: string | null
+  source: string
+  source_path: string | null
+  session_count: number
+  total_duration_seconds: number
+  dismissed: boolean
+  linked_book_id: string | null
+  created_at: string
+}
+
+export interface DuplicateBookSummary {
+  id: string
+  title: string
+  author: string | null
+  format: string
+  shelf_id: number
+  date_added: string
+  session_count: number
+}
+
+export interface DuplicateBookGroup {
+  books: DuplicateBookSummary[]
+}
+
+export interface ImportLogEntry {
+  id: number
+  book_id: string
+  book_title: string
+  book_author: string | null
+  hash_sha: string
+  hash_md5: string
+  page_count: number | null
+  recorded_at: string
+}
+
+export interface ImportLogResponse {
+  items: ImportLogEntry[]
+  total: number
+  limit: number
+  offset: number
+}

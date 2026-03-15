@@ -6,6 +6,27 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
+class UnmatchedKOReaderEntry(Base):
+    """KOReader book that could not be matched to a Shelfloom book during import."""
+
+    __tablename__ = "unmatched_koreader_entries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    author: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(Text, nullable=False)  # "stats_db" or "sdr"
+    source_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    session_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_duration_seconds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    linked_book_id: Mapped[str | None] = mapped_column(
+        Text, ForeignKey("books.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), nullable=False
+    )
+
+
 class ReadingProgress(Base):
     __tablename__ = "reading_progress"
 

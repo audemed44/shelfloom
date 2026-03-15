@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.koreader.stats_db_reader import StatsBook, read_stats_db
 from app.models.book import Book, BookHash
-from app.models.reading import ReadingProgress, ReadingSession
+from app.models.reading import ReadingProgress, ReadingSession, UnmatchedKOReaderEntry
 
 log = logging.getLogger(__name__)
 
@@ -79,6 +79,25 @@ async def import_stats_db(
         if shelfloom_book is None:
             log.debug("No match for stats DB book: %s", stats_book.title)
             unmatched.append(stats_book.title)
+            # Persist unmatched entry (skip if already recorded and not dismissed)
+            existing_unmatched = await session.execute(
+                select(UnmatchedKOReaderEntry).where(
+                    UnmatchedKOReaderEntry.title == stats_book.title,
+                    UnmatchedKOReaderEntry.source == "stats_db",
+                )
+            )
+            if existing_unmatched.scalar_one_or_none() is None:
+                book_sessions = sessions_by_book.get(stats_book.id, [])
+                session.add(
+                    UnmatchedKOReaderEntry(
+                        title=stats_book.title,
+                        author=stats_book.authors,
+                        source="stats_db",
+                        source_path=str(db_path),
+                        session_count=len(book_sessions),
+                        total_duration_seconds=sum(s.duration for s in book_sessions),
+                    )
+                )
             continue
 
         book_sessions = sessions_by_book.get(stats_book.id, [])

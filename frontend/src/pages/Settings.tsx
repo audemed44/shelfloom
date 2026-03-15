@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   HardDrive,
   FolderCog,
@@ -12,6 +13,7 @@ import {
   Clock,
   ChevronRight,
   Loader2,
+  DatabaseZap,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
@@ -221,6 +223,7 @@ function OrganizerResultTable({ results }: { results: OrganizerResult[] }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function Settings() {
+  const navigate = useNavigate()
   const [shelvesKey, setShelvesKey] = useState(0)
   const { data: shelves } = useApi<Shelf[]>(`/api/shelves?_k=${shelvesKey}`)
   const [editingShelf, setEditingShelf] = useState<Shelf | null>(null)
@@ -765,6 +768,42 @@ export default function Settings() {
             </button>
           </div>
         </div>
+      </section>
+
+      {/* ── 04 Data Management ── */}
+      <section>
+        <SectionHeader
+          num="04"
+          title="Data Management"
+          description="Review duplicate sessions, link unmatched KOReader data, and merge duplicate books."
+        />
+        <button
+          onClick={() => navigate('/data-management')}
+          data-testid="data-mgmt-btn"
+          className="flex items-center justify-between w-full px-4 py-4 border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="size-9 flex items-center justify-center border border-white/10 shrink-0">
+              <DatabaseZap
+                size={16}
+                className="text-white/40 group-hover:text-primary transition-colors"
+              />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-medium text-white">
+                Open Data Management
+              </p>
+              <p className="text-[11px] text-white/30 normal-case mt-0.5">
+                Duplicate sessions · Unmatched data · Duplicate books · Import
+                log
+              </p>
+            </div>
+          </div>
+          <ChevronRight
+            size={16}
+            className="text-white/30 group-hover:text-white/60 transition-colors"
+          />
+        </button>
       </section>
 
       {/* Modals */}
