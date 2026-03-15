@@ -22,13 +22,14 @@ async def _make_book(
     title: str = "A Book",
     author: str | None = "Author A",
 ) -> Book:
+    book_id = str(uuid.uuid4())
     book = Book(
-        id=str(uuid.uuid4()),
+        id=book_id,
         title=title,
         author=author,
         shelf_id=shelf_id,
         format="epub",
-        file_path=f"/shelves/{title}.epub",
+        file_path=f"{book_id}.epub",  # unique path per book to satisfy unique constraint
     )
     db_session.add(book)
     await db_session.commit()

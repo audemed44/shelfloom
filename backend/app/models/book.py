@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -8,6 +8,7 @@ from app.database import Base
 
 class Book(Base):
     __tablename__ = "books"
+    __table_args__ = (Index("ix_books_shelf_id_file_path", "shelf_id", "file_path", unique=True),)
 
     id: Mapped[str] = mapped_column(Text, primary_key=True)  # UUID
     title: Mapped[str] = mapped_column(Text, nullable=False)
@@ -19,7 +20,10 @@ class Book(Base):
         Integer, ForeignKey("shelves.id", ondelete="RESTRICT"), nullable=False
     )
     file_hash: Mapped[str | None] = mapped_column(Text, nullable=True)  # SHA-256
-    file_hash_md5: Mapped[str | None] = mapped_column(Text, nullable=True)  # MD5
+    file_hash_md5: Mapped[str | None] = mapped_column(Text, nullable=True)  # full MD5
+    file_hash_md5_ko: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # KOReader partial MD5
     epub_uid: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cover_path: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -67,6 +71,7 @@ class BookHash(Base):
     )
     hash_sha: Mapped[str] = mapped_column(Text, nullable=False)
     hash_md5: Mapped[str] = mapped_column(Text, nullable=False)
+    hash_md5_ko: Mapped[str | None] = mapped_column(Text, nullable=True)  # KOReader partial MD5
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
