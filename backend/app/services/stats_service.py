@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.book import Book
@@ -84,26 +84,43 @@ def _streak_from_dates(dates: list[date]) -> dict:
 # ---------------------------------------------------------------------------
 
 
-async def get_overview(session: AsyncSession) -> dict:
-    """High-level totals: books owned, read, time, pages, current streak."""
+async def get_overview(
+    session: AsyncSession,
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
+) -> dict:
+    """High-level totals: books owned, read, time, pages, current streak.
+
+    When ``from_dt``/``to_dt`` are supplied the time-based metrics (reading
+    time, pages, books read) are scoped to sessions within that window.
+    """
     books_owned: int = (await session.execute(select(func.count()).select_from(Book))).scalar_one()
 
-    books_read: int = (
-        await session.execute(
-            select(func.count(func.distinct(ReadingProgress.book_id))).where(
-                ReadingProgress.progress >= 99.0
-            )
+    # books_read: completed books (progress >= 99%) that have at least one
+    # session in the requested time window (or all time when no window given).
+    books_read_q = (
+        select(func.count(func.distinct(ReadingProgress.book_id)))
+        .join(ReadingSession, ReadingSession.book_id == ReadingProgress.book_id)
+        .where(
+            ReadingProgress.progress >= 99.0,
+            ReadingSession.dismissed == False,  # noqa: E712
         )
-    ).scalar_one()
+    )
+    if from_dt:
+        books_read_q = books_read_q.where(ReadingSession.start_time >= from_dt)
+    if to_dt:
+        books_read_q = books_read_q.where(ReadingSession.start_time <= to_dt)
+    books_read: int = (await session.execute(books_read_q)).scalar_one()
 
-    agg_row = (
-        await session.execute(
-            select(
-                func.coalesce(func.sum(ReadingSession.duration), 0),
-                func.coalesce(func.sum(ReadingSession.pages_read), 0),
-            ).where(ReadingSession.dismissed == False)  # noqa: E712
-        )
-    ).one()
+    agg_q = select(
+        func.coalesce(func.sum(ReadingSession.duration), 0),
+        func.coalesce(func.sum(ReadingSession.pages_read), 0),
+    ).where(ReadingSession.dismissed == False)  # noqa: E712
+    if from_dt:
+        agg_q = agg_q.where(ReadingSession.start_time >= from_dt)
+    if to_dt:
+        agg_q = agg_q.where(ReadingSession.start_time <= to_dt)
+    agg_row = (await session.execute(agg_q)).one()
     total_seconds: int = agg_row[0] or 0
     total_pages: int = agg_row[1] or 0
 
@@ -147,19 +164,43 @@ async def get_time_series(
     return [{"date": r.bucket, "value": r.value or 0} for r in rows]
 
 
-async def get_books_completed(session: AsyncSession) -> list[dict]:
-    """Books with progress >= 99.0, most-recently-completed first."""
-    result = await session.execute(
-        select(Book, ReadingProgress)
-        .join(ReadingProgress, ReadingProgress.book_id == Book.id)
-        .where(ReadingProgress.progress >= 99.0)
-        .order_by(ReadingProgress.updated_at.desc())
-    )
-    rows = result.all()
+async def get_books_completed(
+    session: AsyncSession,
+    from_dt: datetime | None = None,
+    to_dt: datetime | None = None,
+) -> list[dict]:
+    """Books with progress >= 99.0, ordered by most-recent reading session.
 
+    When ``from_dt``/``to_dt`` are given, only books whose last session falls
+    within the window are returned (HAVING on max start_time).
+    """
+    q = (
+        select(
+            Book,
+            ReadingProgress,
+            func.max(ReadingSession.start_time).label("last_session"),
+        )
+        .join(ReadingProgress, ReadingProgress.book_id == Book.id)
+        .outerjoin(
+            ReadingSession,
+            and_(
+                ReadingSession.book_id == Book.id,
+                ReadingSession.dismissed == False,  # noqa: E712
+            ),
+        )
+        .where(ReadingProgress.progress >= 99.0)
+        .group_by(Book.id, ReadingProgress.book_id)
+    )
+    if from_dt:
+        q = q.having(func.max(ReadingSession.start_time) >= from_dt)
+    if to_dt:
+        q = q.having(func.max(ReadingSession.start_time) <= to_dt)
+    q = q.order_by(func.max(ReadingSession.start_time).desc())
+
+    rows = (await session.execute(q)).all()
     seen: set[str] = set()
     out: list[dict] = []
-    for book, prog in rows:
+    for book, prog, last_session in rows:
         if book.id not in seen:
             seen.add(book.id)
             out.append(
@@ -167,7 +208,7 @@ async def get_books_completed(session: AsyncSession) -> list[dict]:
                     "book_id": book.id,
                     "title": book.title,
                     "author": book.author,
-                    "completed_at": prog.updated_at,
+                    "completed_at": last_session or prog.updated_at,
                     "cover_path": book.cover_path,
                 }
             )

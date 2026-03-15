@@ -545,28 +545,69 @@ function TimeOfDayHistogram({
 }: {
   data: { hour: number; seconds: number }[]
 }) {
+  const [tip, setTip] = useState<{
+    x: number
+    y: number
+    text: string
+  } | null>(null)
   const max = Math.max(...data.map((d) => d.seconds), 1)
   return (
-    <div>
-      <div className="h-40 flex items-end gap-px">
-        {data.map((d) => {
-          const pct = Math.max((d.seconds / max) * 100, d.seconds > 0 ? 2 : 0)
-          return (
-            <div
-              key={d.hour}
-              className={`flex-1 ${intensityClass(d.seconds, max)}`}
-              style={{ height: `${pct}%` }}
-              title={`${d.hour}:00 — ${fmtSec(d.seconds)}`}
-            />
-          )
-        })}
-      </div>
-      <div className="flex justify-between mt-3 text-[9px] font-bold text-white/25 uppercase">
-        <span>00:00</span>
-        <span>06:00</span>
-        <span>12:00</span>
-        <span>18:00</span>
-        <span>23:59</span>
+    <div className="relative">
+      {tip && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1.5 bg-black border border-white/20 text-[10px] font-bold text-white/90 whitespace-nowrap"
+          style={{ left: tip.x + 12, top: tip.y - 8 }}
+        >
+          {tip.text}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <div
+          className="flex flex-col justify-between shrink-0 pb-6"
+          style={{ height: 160 + 8 }}
+        >
+          {[max, max * 0.5, 0].map((v, i) => (
+            <span
+              key={i}
+              className="text-[8px] text-white/25 font-bold text-right leading-none"
+              style={{ width: 28 }}
+            >
+              {fmtSec(Math.round(v))}
+            </span>
+          ))}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="h-40 flex items-end gap-px border-l border-b border-white/10">
+            {data.map((d) => {
+              const pct = Math.max(
+                (d.seconds / max) * 100,
+                d.seconds > 0 ? 2 : 0
+              )
+              return (
+                <div
+                  key={d.hour}
+                  className={`flex-1 cursor-default ${intensityClass(d.seconds, max)}`}
+                  style={{ height: `${pct}%` }}
+                  onMouseMove={(e) =>
+                    setTip({
+                      x: e.clientX,
+                      y: e.clientY,
+                      text: `${d.hour}:00 — ${fmtSec(d.seconds)}`,
+                    })
+                  }
+                  onMouseLeave={() => setTip(null)}
+                />
+              )
+            })}
+          </div>
+          <div className="flex justify-between mt-3 text-[9px] font-bold text-white/25 uppercase">
+            <span>00:00</span>
+            <span>06:00</span>
+            <span>12:00</span>
+            <span>18:00</span>
+            <span>23:59</span>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -581,34 +622,72 @@ function DayOfWeekChart({
 }: {
   data: { weekday: number; seconds: number }[]
 }) {
+  const [tip, setTip] = useState<{
+    x: number
+    y: number
+    text: string
+  } | null>(null)
   // SQLite weekday: 0=Sun … 6=Sat → render Mon-Sun
   const ordered = [1, 2, 3, 4, 5, 6, 0]
   const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
   const max = Math.max(...data.map((d) => d.seconds), 1)
   return (
-    <div className="h-32 flex items-end gap-2">
-      {ordered.map((w, i) => {
-        const entry = data.find((d) => d.weekday === w)
-        const val = entry?.seconds ?? 0
-        const pct = (val / max) * 100
-        return (
-          <div key={w} className="flex-1 flex flex-col items-center gap-1">
-            <div
-              className="w-full flex flex-col justify-end"
-              style={{ height: 96 }}
+    <div className="relative">
+      {tip && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1.5 bg-black border border-white/20 text-[10px] font-bold text-white/90 whitespace-nowrap"
+          style={{ left: tip.x + 12, top: tip.y - 8 }}
+        >
+          {tip.text}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <div
+          className="flex flex-col justify-between shrink-0 pb-6"
+          style={{ height: 96 + 8 }}
+        >
+          {[max, max * 0.5, 0].map((v, i) => (
+            <span
+              key={i}
+              className="text-[8px] text-white/25 font-bold text-right leading-none"
+              style={{ width: 28 }}
             >
-              <div
-                className={`w-full transition-all ${intensityClass(val, max)}`}
-                style={{ height: `${Math.max(pct, 2)}%` }}
-                title={`${labels[i]}: ${fmtSec(val)}`}
-              />
-            </div>
-            <span className="text-[9px] font-bold text-white/30 uppercase">
-              {labels[i].slice(0, 2)}
+              {fmtSec(Math.round(v))}
             </span>
-          </div>
-        )
-      })}
+          ))}
+        </div>
+        <div className="flex-1 min-w-0 flex items-end gap-2">
+          {ordered.map((w, i) => {
+            const entry = data.find((d) => d.weekday === w)
+            const val = entry?.seconds ?? 0
+            const pct = (val / max) * 100
+            return (
+              <div key={w} className="flex-1 flex flex-col items-center gap-1">
+                <div
+                  className="w-full flex flex-col justify-end"
+                  style={{ height: 96 }}
+                >
+                  <div
+                    className={`w-full transition-all cursor-default ${intensityClass(val, max)}`}
+                    style={{ height: `${Math.max(pct, 2)}%` }}
+                    onMouseMove={(e) =>
+                      setTip({
+                        x: e.clientX,
+                        y: e.clientY,
+                        text: `${labels[i]}: ${fmtSec(val)}`,
+                      })
+                    }
+                    onMouseLeave={() => setTip(null)}
+                  />
+                </div>
+                <span className="text-[9px] font-bold text-white/30 uppercase">
+                  {labels[i].slice(0, 2)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -618,6 +697,11 @@ function DayOfWeekChart({
 // ===========================================================================
 
 function RadialClock({ data }: { data: { hour: number; seconds: number }[] }) {
+  const [tip, setTip] = useState<{
+    x: number
+    y: number
+    text: string
+  } | null>(null)
   const max = Math.max(...data.map((d) => d.seconds), 1)
   const cx = 100
   const cy = 100
@@ -645,17 +729,35 @@ function RadialClock({ data }: { data: { hour: number; seconds: number }[] }) {
   const axisHours = [0, 6, 12, 18]
 
   return (
-    <div>
+    <div className="relative">
+      {tip && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1.5 bg-black border border-white/20 text-[10px] font-bold text-white/90 whitespace-nowrap"
+          style={{ left: tip.x + 12, top: tip.y - 8 }}
+        >
+          {tip.text}
+        </div>
+      )}
       <p className="text-[9px] font-bold text-white/30 mb-2 normal-case">
         Radial view — midnight at top, clockwise
       </p>
       <svg viewBox="0 0 200 200" className="w-full max-w-[200px] mx-auto">
         {sectors.map((s, i) => (
-          <path key={i} d={s.path} fill="#258cf4" fillOpacity={s.opacity}>
-            <title>
-              {s.hour}:00 — {fmtSec(s.seconds)}
-            </title>
-          </path>
+          <path
+            key={i}
+            d={s.path}
+            fill="#258cf4"
+            fillOpacity={s.opacity}
+            style={{ cursor: 'default' }}
+            onMouseMove={(e) =>
+              setTip({
+                x: e.clientX,
+                y: e.clientY,
+                text: `${s.hour}:00 — ${fmtSec(s.seconds)}`,
+              })
+            }
+            onMouseLeave={() => setTip(null)}
+          />
         ))}
         <circle
           cx={cx}
@@ -728,6 +830,11 @@ function RadarChart({
   completion: number
   diversity: number
 }) {
+  const [tip, setTip] = useState<{
+    x: number
+    y: number
+    text: string
+  } | null>(null)
   const cx = 110,
     cy = 110,
     R = 72
@@ -749,74 +856,93 @@ function RadarChart({
     .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
     .join(' ')
   return (
-    <svg viewBox="0 0 220 220" className="w-full max-w-xs mx-auto">
-      {gridLevels.map((l) => {
-        const pts = axes
-          .map((_, i) => {
-            const p = toXY(i, R * l)
-            return `${p.x.toFixed(1)},${p.y.toFixed(1)}`
-          })
-          .join(' ')
-        return (
-          <polygon
-            key={l}
-            points={pts}
-            fill="none"
-            stroke="rgba(255,255,255,0.07)"
-            strokeWidth="1"
-          />
-        )
-      })}
-      {axes.map((_, i) => {
-        const p = toXY(i, R)
-        return (
-          <line
-            key={i}
-            x1={cx}
-            y1={cy}
-            x2={p.x.toFixed(1)}
-            y2={p.y.toFixed(1)}
-            stroke="rgba(255,255,255,0.07)"
-            strokeWidth="1"
-          />
-        )
-      })}
-      <polygon
-        points={dataPoly}
-        fill="#258cf4"
-        fillOpacity="0.15"
-        stroke="#258cf4"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-      {dataPoints.map((p, i) => (
-        <circle
-          key={i}
-          cx={p.x.toFixed(1)}
-          cy={p.y.toFixed(1)}
-          r="3"
+    <div className="relative">
+      {tip && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1.5 bg-black border border-white/20 text-[10px] font-bold text-white/90 whitespace-nowrap"
+          style={{ left: tip.x + 12, top: tip.y - 8 }}
+        >
+          {tip.text}
+        </div>
+      )}
+      <svg viewBox="0 0 220 220" className="w-full max-w-xs mx-auto">
+        {gridLevels.map((l) => {
+          const pts = axes
+            .map((_, i) => {
+              const p = toXY(i, R * l)
+              return `${p.x.toFixed(1)},${p.y.toFixed(1)}`
+            })
+            .join(' ')
+          return (
+            <polygon
+              key={l}
+              points={pts}
+              fill="none"
+              stroke="rgba(255,255,255,0.07)"
+              strokeWidth="1"
+            />
+          )
+        })}
+        {axes.map((_, i) => {
+          const p = toXY(i, R)
+          return (
+            <line
+              key={i}
+              x1={cx}
+              y1={cy}
+              x2={p.x.toFixed(1)}
+              y2={p.y.toFixed(1)}
+              stroke="rgba(255,255,255,0.07)"
+              strokeWidth="1"
+            />
+          )
+        })}
+        <polygon
+          points={dataPoly}
           fill="#258cf4"
+          fillOpacity="0.15"
+          stroke="#258cf4"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
         />
-      ))}
-      {axes.map((a, i) => {
-        const p = toXY(i, R + 18)
-        return (
-          <text
+        {dataPoints.map((p, i) => (
+          <circle
             key={i}
-            x={p.x.toFixed(1)}
-            y={p.y.toFixed(1)}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontSize="7.5"
-            fill="rgba(255,255,255,0.45)"
-            fontFamily="sans-serif"
-            fontWeight="bold"
-          >
-            {a.label.toUpperCase()}
-          </text>
-        )
-      })}
-    </svg>
+            cx={p.x.toFixed(1)}
+            cy={p.y.toFixed(1)}
+            r="5"
+            fill="#258cf4"
+            style={{ cursor: 'default' }}
+            onMouseMove={(e) =>
+              setTip({
+                x: e.clientX,
+                y: e.clientY,
+                text: `${axes[i].label}: ${Math.round(axes[i].value)}%`,
+              })
+            }
+            onMouseLeave={() => setTip(null)}
+          />
+        ))}
+        {axes.map((a, i) => {
+          const p = toXY(i, R + 18)
+          return (
+            <text
+              key={i}
+              x={p.x.toFixed(1)}
+              y={p.y.toFixed(1)}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize="7.5"
+              fill="rgba(255,255,255,0.45)"
+              fontFamily="sans-serif"
+              fontWeight="bold"
+            >
+              {a.label.toUpperCase()}
+            </text>
+          )
+        })}
+      </svg>
+    </div>
   )
 }
 
@@ -1302,6 +1428,11 @@ function MonthCalendar({
   onPrev,
   onNext,
 }: MonthCalendarProps) {
+  const [tip, setTip] = useState<{
+    x: number
+    y: number
+    text: string
+  } | null>(null)
   const today = new Date()
   const firstDay = new Date(year, month - 1, 1)
   const daysInMonth = new Date(year, month, 0).getDate()
@@ -1332,7 +1463,15 @@ function MonthCalendar({
   }
 
   return (
-    <div>
+    <div className="relative">
+      {tip && (
+        <div
+          className="fixed z-50 pointer-events-none px-2 py-1.5 bg-black border border-white/20 text-[10px] font-bold text-white/90 whitespace-nowrap"
+          style={{ left: tip.x + 12, top: tip.y - 8 }}
+        >
+          {tip.text}
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-black uppercase tracking-widest">
@@ -1397,8 +1536,15 @@ function MonthCalendar({
                       return (
                         <div
                           key={bi}
-                          className={`h-3 rounded-full px-1.5 text-[7px] flex items-center truncate ${BOOK_COLOR_CLASSES[ci]} ${BOOK_TEXT_CLASSES[ci]}`}
-                          title={`${book.title} — ${fmtSec(book.duration)}`}
+                          className={`h-3 rounded-full px-1.5 text-[7px] flex items-center truncate cursor-default ${BOOK_COLOR_CLASSES[ci]} ${BOOK_TEXT_CLASSES[ci]}`}
+                          onMouseMove={(e) =>
+                            setTip({
+                              x: e.clientX,
+                              y: e.clientY,
+                              text: `${book.title} — ${fmtSec(book.duration)}`,
+                            })
+                          }
+                          onMouseLeave={() => setTip(null)}
                         >
                           {book.title}
                         </div>
@@ -1432,40 +1578,44 @@ function MonthCalendar({
 // ===========================================================================
 
 function fmtCompletedDate(val: string): string {
-  // Handle both "2026-03-01T..." and "2026-03-01 ..." (SQLite space-separated)
-  const iso = val.replace(' ', 'T')
-  const d = new Date(iso)
+  if (!val) return ''
+  // Handle "2026-03-01 10:30:00" (SQLite space-separated) as well as ISO
+  const d = new Date(val.replace(' ', 'T'))
   if (isNaN(d.getTime())) return ''
-  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`
+  return d.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
 }
 
 function CompletedBooksCarousel({ books }: { books: CompletedBook[] }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const scroll = (dir: number) => {
-    scrollRef.current?.scrollBy({ left: dir * 320, behavior: 'smooth' })
+    scrollRef.current?.scrollBy({ left: dir * 300, behavior: 'smooth' })
   }
   if (books.length === 0) return null
   return (
-    <div className="relative">
+    <div className="flex items-start gap-2">
       <button
         onClick={() => scroll(-1)}
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-black border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors"
+        className="shrink-0 mt-[52px] p-2 border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors"
         aria-label="Scroll left"
       >
         <ChevronLeft size={14} />
       </button>
       <div
         ref={scrollRef}
-        className="flex gap-4 overflow-x-auto pb-2 px-9"
+        className="flex-1 flex gap-4 overflow-x-auto pb-1"
         style={{ scrollbarWidth: 'none' }}
       >
         {books.map((book) => (
           <Link
             key={book.book_id}
             to={`/books/${book.book_id}`}
-            className="min-w-[100px] group shrink-0"
+            className="shrink-0 w-[96px] group"
           >
-            <div className="aspect-[2/3] bg-white/5 mb-2 border border-white/10 group-hover:border-primary transition-colors overflow-hidden">
+            <div className="w-[96px] h-[144px] bg-white/5 mb-2 border border-white/10 group-hover:border-primary transition-colors overflow-hidden">
               <img
                 src={`/api/books/${book.book_id}/cover`}
                 alt={book.title}
@@ -1475,16 +1625,16 @@ function CompletedBooksCarousel({ books }: { books: CompletedBook[] }) {
                 }}
               />
             </div>
-            <p className="text-[9px] font-black uppercase tracking-tight leading-tight truncate">
+            <p className="text-[9px] font-black uppercase tracking-tight leading-tight truncate w-[96px]">
               {book.title}
             </p>
             {book.author && (
-              <p className="text-[9px] text-white/40 normal-case truncate">
+              <p className="text-[9px] text-white/40 normal-case truncate w-[96px]">
                 {book.author}
               </p>
             )}
             {book.completed_at && (
-              <p className="text-[9px] text-white/30 normal-case mt-0.5">
+              <p className="text-[9px] text-primary/60 font-bold normal-case mt-0.5">
                 {fmtCompletedDate(book.completed_at)}
               </p>
             )}
@@ -1493,7 +1643,7 @@ function CompletedBooksCarousel({ books }: { books: CompletedBook[] }) {
       </div>
       <button
         onClick={() => scroll(1)}
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-1.5 bg-black border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors"
+        className="shrink-0 mt-[52px] p-2 border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors"
         aria-label="Scroll right"
       >
         <ChevronRight size={14} />
@@ -1582,8 +1732,7 @@ function OverviewTab({
       {metrics.map(({ label, value, sub }, i) => (
         <div
           key={i}
-          className="bg-black p-6"
-          style={{ gridColumn: 'span 3' }}
+          className="bg-black p-6 col-span-6 lg:col-span-3"
           data-testid="metric-card"
         >
           <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
@@ -1601,7 +1750,7 @@ function OverviewTab({
       ))}
 
       {/* Reading time bar chart — full row */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+      <div className="bg-black p-6 col-span-12">
         <div className="flex justify-between items-end mb-6">
           <div>
             <h3 className="text-sm font-black uppercase tracking-widest mb-1">
@@ -1622,7 +1771,7 @@ function OverviewTab({
       </div>
 
       {/* Monthly calendar — full row */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+      <div className="bg-black p-6 col-span-12">
         <MonthCalendar
           year={calYear}
           month={calMonth}
@@ -1633,7 +1782,7 @@ function OverviewTab({
       </div>
 
       {/* Streaks row */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+      <div className="bg-black p-6 col-span-12">
         <div className="flex flex-col md:flex-row justify-between md:items-center gap-6">
           <div className="flex gap-12">
             <div>
@@ -1664,7 +1813,7 @@ function OverviewTab({
 
       {/* Books completed */}
       {completed.length > 0 && (
-        <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+        <div className="bg-black p-6 col-span-12">
           <h3 className="text-sm font-black uppercase tracking-widest mb-6">
             Books Completed
           </h3>
@@ -1673,7 +1822,7 @@ function OverviewTab({
       )}
 
       {/* By author */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      <div className="bg-black p-6 col-span-12 md:col-span-6 lg:col-span-4">
         <h3 className="text-sm font-black uppercase tracking-widest mb-6">
           Reading by Author
         </h3>
@@ -1696,7 +1845,7 @@ function OverviewTab({
       </div>
 
       {/* Reading profile radar */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      <div className="bg-black p-6 col-span-12 md:col-span-6 lg:col-span-4">
         <h3 className="text-sm font-black uppercase tracking-widest mb-4">
           Reading Profile
         </h3>
@@ -1723,7 +1872,7 @@ function OverviewTab({
       </div>
 
       {/* Time of day */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      <div className="bg-black p-6 col-span-12 md:col-span-6 lg:col-span-4">
         <h3 className="text-sm font-black uppercase tracking-widest mb-6">
           Time of Day
         </h3>
@@ -1763,7 +1912,7 @@ function ReadingTimeTab({
 
   return (
     <div style={gridStyle} className="border border-white/5">
-      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+      <div className="bg-black p-6 col-span-12">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-black uppercase tracking-widest mb-1">
@@ -1777,7 +1926,7 @@ function ReadingTimeTab({
         </div>
       </div>
 
-      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+      <div className="bg-black p-6 col-span-12">
         <BarChart
           data={readingTime}
           granularity={granularity}
@@ -1786,7 +1935,7 @@ function ReadingTimeTab({
         />
       </div>
 
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+      <div className="bg-black p-6 col-span-12 md:col-span-6">
         <h3 className="text-sm font-black uppercase tracking-widest mb-6">
           Pages Read Progress
         </h3>
@@ -1798,7 +1947,7 @@ function ReadingTimeTab({
         />
       </div>
 
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+      <div className="bg-black p-6 col-span-12 md:col-span-6">
         <h3 className="text-sm font-black uppercase tracking-widest mb-6">
           Reading Time Trend
         </h3>
@@ -1810,7 +1959,7 @@ function ReadingTimeTab({
       </div>
 
       {/* Sunburst: quarter → month breakdown */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+      <div className="bg-black p-6 col-span-12 md:col-span-6">
         <h3 className="text-sm font-black uppercase tracking-widest mb-4">
           Quarterly Breakdown
         </h3>
@@ -1820,7 +1969,7 @@ function ReadingTimeTab({
         <SunburstChart monthlyData={monthlyData} />
       </div>
 
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+      <div className="bg-black p-6 col-span-12 md:col-span-6">
         <h3 className="text-sm font-black uppercase tracking-widest mb-4">
           By Quarter
         </h3>
@@ -1921,7 +2070,8 @@ function BooksAuthorsTab({
 
   return (
     <div style={gridStyle} className="border border-white/5">
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+      {/* Row 1: Author bars + Tag bars (same height, top 8) */}
+      <div className="bg-black p-6 col-span-12 md:col-span-6">
         <h3 className="text-sm font-black uppercase tracking-widest mb-6">
           Reading by Author
         </h3>
@@ -1931,7 +2081,7 @@ function BooksAuthorsTab({
           </p>
         ) : (
           <div className="space-y-4">
-            {byAuthor.slice(0, 15).map((a) => (
+            {byAuthor.slice(0, 8).map((a) => (
               <HorizontalBar
                 key={a.author}
                 label={a.author}
@@ -1943,29 +2093,7 @@ function BooksAuthorsTab({
         )}
       </div>
 
-      {/* Scatter (placed next to author bars) */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
-        <h3 className="text-sm font-black uppercase tracking-widest mb-2">
-          Author Engagement Map
-        </h3>
-        <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
-          X = sessions · Y = avg session length · size = total time
-        </p>
-        <ScatterChart byAuthor={byAuthor} />
-      </div>
-
-      {/* Alluvial / Sankey */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
-        <h3 className="text-sm font-black uppercase tracking-widest mb-2">
-          Time Flow by Author
-        </h3>
-        <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
-          Reading time flowing from total to individual authors
-        </p>
-        <AlluvialChart byAuthor={byAuthor} />
-      </div>
-
-      <div className="bg-black p-6" style={{ gridColumn: 'span 6' }}>
+      <div className="bg-black p-6 col-span-12 md:col-span-6">
         <h3 className="text-sm font-black uppercase tracking-widest mb-6">
           Reading by Tag
         </h3>
@@ -1975,7 +2103,7 @@ function BooksAuthorsTab({
           </p>
         ) : (
           <div className="space-y-4">
-            {byTag.slice(0, 12).map((t) => (
+            {byTag.slice(0, 8).map((t) => (
               <HorizontalBar
                 key={t.tag}
                 label={t.tag}
@@ -1987,8 +2115,29 @@ function BooksAuthorsTab({
         )}
       </div>
 
+      {/* Row 2: Time flow + Author engagement map */}
+      <div className="bg-black p-6 col-span-12 md:col-span-6">
+        <h3 className="text-sm font-black uppercase tracking-widest mb-2">
+          Time Flow by Author
+        </h3>
+        <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
+          Reading time flowing from total to individual authors
+        </p>
+        <AlluvialChart byAuthor={byAuthor} />
+      </div>
+
+      <div className="bg-black p-6 col-span-12 md:col-span-6">
+        <h3 className="text-sm font-black uppercase tracking-widest mb-2">
+          Author Engagement Map
+        </h3>
+        <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
+          X = sessions · Y = avg session length · size = total time
+        </p>
+        <ScatterChart byAuthor={byAuthor} />
+      </div>
+
       {completed.length > 0 && (
-        <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+        <div className="bg-black p-6 col-span-12">
           <h3 className="text-sm font-black uppercase tracking-widest mb-6">
             Completed Books — Timeline
           </h3>
@@ -2026,7 +2175,7 @@ function StreakHistoryBadges({
     })
 
   return (
-    <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+    <div className="bg-black p-6 col-span-12">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-black uppercase tracking-widest">
           Streak History
@@ -2053,7 +2202,7 @@ function StreakHistoryBadges({
           </div>
         )}
       </div>
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
         {items.map((run, i) => {
           const isMax = run.days === longest
           return (
@@ -2098,7 +2247,7 @@ function StreaksTab({
   return (
     <div style={gridStyle} className="border border-white/5">
       {/* Streak summary cards */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      <div className="bg-black p-6 col-span-12 sm:col-span-4">
         <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
           Current Streak
         </p>
@@ -2114,7 +2263,7 @@ function StreaksTab({
         )}
       </div>
 
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      <div className="bg-black p-6 col-span-12 sm:col-span-4">
         <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
           Longest Streak
         </p>
@@ -2124,7 +2273,7 @@ function StreaksTab({
         <p className="text-[10px] text-white/30 font-bold mt-1">days</p>
       </div>
 
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      <div className="bg-black p-6 col-span-12 sm:col-span-4">
         <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
           Last Read
         </p>
@@ -2148,7 +2297,7 @@ function StreaksTab({
       </div>
 
       {/* Annual heatmap */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 12' }}>
+      <div className="bg-black p-6 col-span-12">
         <ReadingHeatmap
           data={heatmap}
           year={CURRENT_YEAR}
@@ -2157,7 +2306,7 @@ function StreaksTab({
       </div>
 
       {/* Radial clock */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      <div className="bg-black p-6 col-span-12 sm:col-span-4">
         <h3 className="text-sm font-black uppercase tracking-widest mb-4">
           Reading Clock
         </h3>
@@ -2169,7 +2318,7 @@ function StreaksTab({
       </div>
 
       {/* Time of day histogram */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      <div className="bg-black p-6 col-span-12 sm:col-span-4">
         <h3 className="text-sm font-black uppercase tracking-widest mb-4">
           Time of Day
         </h3>
@@ -2181,7 +2330,7 @@ function StreaksTab({
       </div>
 
       {/* Day of week */}
-      <div className="bg-black p-6" style={{ gridColumn: 'span 4' }}>
+      <div className="bg-black p-6 col-span-12 sm:col-span-4">
         <h3 className="text-sm font-black uppercase tracking-widest mb-4">
           Day of Week
         </h3>
@@ -2220,7 +2369,9 @@ export default function Stats() {
   const fromParam = useMemo(() => buildFromParam(preset), [preset])
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { data: overview } = useApi<StatsOverview>('/api/stats/overview')
+  const { data: overview } = useApi<StatsOverview>(
+    `/api/stats/overview${fromParam ? `?${fromParam.slice(1)}` : ''}`
+  )
   const { data: readingTime } = useApi<TimeSeriesEntry[]>(
     `/api/stats/reading-time?granularity=${granularity}${fromParam}`
   )
@@ -2237,7 +2388,7 @@ export default function Stats() {
   const { data: byAuthor } = useApi<AuthorEntry[]>('/api/stats/by-author')
   const { data: byTag } = useApi<TagEntry[]>('/api/stats/by-tag')
   const { data: completed } = useApi<CompletedBook[]>(
-    '/api/stats/books-completed'
+    `/api/stats/books-completed${fromParam ? `?${fromParam.slice(1)}` : ''}`
   )
   const { data: calendarDays } = useApi<CalendarDay[]>(
     `/api/stats/calendar?year=${calYear}&month=${calMonth}`
@@ -2286,7 +2437,7 @@ export default function Stats() {
   return (
     <div className="min-h-screen">
       {/* Page header */}
-      <header className="flex flex-wrap items-center justify-between gap-4 px-6 py-5 border-b border-white/10 sticky top-0 bg-black/90 backdrop-blur-md z-40">
+      <header className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-6 py-4 md:py-5 border-b border-white/10 sticky top-0 bg-black/90 backdrop-blur-md z-40">
         <h1
           className="text-3xl font-black tracking-tighter"
           data-testid="stats-heading"
@@ -2333,7 +2484,7 @@ export default function Stats() {
       </nav>
 
       {/* Tab content */}
-      <div className="p-6 lg:p-10">
+      <div className="p-4 md:p-6 lg:p-10 min-w-0">
         {tab === 'overview' && (
           <OverviewTab
             overview={overview}

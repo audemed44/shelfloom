@@ -15,9 +15,13 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 
 @router.get("/overview")
-async def overview(session: AsyncSession = Depends(get_session)) -> dict:
+async def overview(
+    from_: datetime | None = Query(None, alias="from"),
+    to_: datetime | None = Query(None, alias="to"),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
     """Totals: books owned, books read, total reading time, total pages, current streak."""
-    return await stats_service.get_overview(session)
+    return await stats_service.get_overview(session, from_dt=from_, to_dt=to_)
 
 
 @router.get("/reading-time")
@@ -43,9 +47,13 @@ async def pages_over_time(
 
 
 @router.get("/books-completed")
-async def books_completed(session: AsyncSession = Depends(get_session)) -> list[dict]:
+async def books_completed(
+    from_: datetime | None = Query(None, alias="from"),
+    to_: datetime | None = Query(None, alias="to"),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
     """Completed books (progress ≥ 99), most recent first."""
-    return await stats_service.get_books_completed(session)
+    return await stats_service.get_books_completed(session, from_dt=from_, to_dt=to_)
 
 
 @router.get("/streaks")
