@@ -6,6 +6,7 @@ from app.models.reading import (  # noqa: F401
     ReadingProgress,
     ReadingSession,
     UnmatchedKOReaderEntry,
+    UnmatchedSession,
 )
 from app.models.series import (
     BookSeries as BookSeries,

@@ -9,7 +9,13 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.book import Book, BookHash
-from app.models.reading import Highlight, ReadingProgress, ReadingSession, UnmatchedKOReaderEntry
+from app.models.reading import (
+    Highlight,
+    ReadingProgress,
+    ReadingSession,
+    UnmatchedKOReaderEntry,
+    UnmatchedSession,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -152,6 +158,31 @@ async def link_unmatched_to_book(session: AsyncSession, entry_id: int, book_id: 
 
     entry.linked_book_id = book_id
     entry.dismissed = True
+
+    # Transfer stored unmatched sessions as real ReadingSession rows
+    unmatched_sessions_result = await session.execute(
+        select(UnmatchedSession).where(UnmatchedSession.unmatched_entry_id == entry_id)
+    )
+    for us in unmatched_sessions_result.scalars().all():
+        if us.source_key:
+            existing = await session.execute(
+                select(ReadingSession).where(ReadingSession.source_key == us.source_key)
+            )
+            if existing.scalar_one_or_none() is not None:
+                continue  # Already imported — skip
+
+        session.add(
+            ReadingSession(
+                book_id=book_id,
+                start_time=us.start_time,
+                duration=us.duration,
+                pages_read=us.pages_read,
+                source="stats_db",
+                source_key=us.source_key,
+                dismissed=False,
+            )
+        )
+
     await session.commit()
     return True
 

@@ -27,6 +27,21 @@ class UnmatchedKOReaderEntry(Base):
     )
 
 
+class UnmatchedSession(Base):
+    """Raw session data preserved for an unmatched KOReader entry, transferred on link."""
+
+    __tablename__ = "unmatched_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    unmatched_entry_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("unmatched_koreader_entries.id", ondelete="CASCADE"), nullable=False
+    )
+    start_time: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    duration: Mapped[int | None] = mapped_column(Integer, nullable=True)  # seconds
+    pages_read: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class ReadingProgress(Base):
     __tablename__ = "reading_progress"
 
