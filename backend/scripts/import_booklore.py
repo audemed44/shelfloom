@@ -45,11 +45,10 @@ from pathlib import Path
 # Add backend/ to sys.path so "from app.xxx" imports work
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import select
+from sqlalchemy import create_engine, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import app.models  # noqa: F401 — registers all models with Base.metadata
-from app.database import Base
 from app.models.book import Book
 from app.models.series import BookSeries, Series
 from app.models.shelf import Shelf
@@ -355,6 +354,28 @@ async def phase3_enrich(
 # ---------------------------------------------------------------------------
 
 
+def _run_alembic_migrations(db_path: Path) -> None:
+    """Apply Alembic migrations (sync). Creates alembic_version so the server
+    startup auto-stamp path is never triggered."""
+    from alembic import command as alembic_command
+    from alembic.config import Config
+
+    alembic_ini = Path(__file__).parent.parent / "alembic.ini"
+    cfg = Config(str(alembic_ini))
+    sync_url = f"sqlite:///{db_path}"
+    cfg.set_main_option("sqlalchemy.url", sync_url)
+
+    # Auto-stamp databases that existed before Alembic was added
+    engine = create_engine(sync_url)
+    with engine.connect() as conn:
+        table_names = inspect(conn).get_table_names()
+        if table_names and "alembic_version" not in table_names:
+            alembic_command.stamp(cfg, "head")
+    engine.dispose()
+
+    alembic_command.upgrade(cfg, "head")
+
+
 async def get_or_create_shelf(session: AsyncSession, name: str, path: str) -> Shelf:
     shelf = await session.scalar(select(Shelf).where(Shelf.path == path))
     if shelf is None:
@@ -408,9 +429,8 @@ async def run(args: argparse.Namespace) -> None:
     engine = create_async_engine(db_url, echo=False)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
-    # Ensure all tables exist
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Ensure all tables exist via Alembic (creates alembic_version table too)
+    _run_alembic_migrations(db_path)
 
     # ── Phase 1: Copy ────────────────────────────────────────────────────────
     if not args.in_place:
