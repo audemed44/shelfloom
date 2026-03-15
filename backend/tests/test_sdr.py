@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+import pytest
 from sqlalchemy import select
 
 from app.models.reading import Highlight, ReadingProgress, ReadingSession
@@ -515,3 +516,95 @@ async def test_find_book_for_sdr_unknown(db_session, book_factory, shelf_factory
     sdr_folder = pathlib.Path("/tmp/missing.epub.sdr")
     found = await find_book_for_sdr(db_session, sdr_data, sdr_folder)
     assert found is None
+
+
+@pytest.mark.asyncio
+async def test_import_sdr_preserves_old_ko_md5_in_history(db_session, book_factory, shelf_factory):
+    """Replacing file_hash_md5_ko saves the old value to book_hashes."""
+    from app.koreader.sdr_importer import import_sdr
+    from app.koreader.sdr_reader import SdrReadingData
+    from app.models.book import BookHash
+
+    await shelf_factory()
+    book = await book_factory()
+    book.file_hash = "sha256aabbcc"
+    book.file_hash_md5 = "full_md5_aabbcc"
+    book.file_hash_md5_ko = "old_ko_md5"
+    await db_session.commit()
+    await db_session.refresh(book)
+
+    sdr_data = SdrReadingData(
+        partial_md5="new_ko_md5",
+        doc_path=None,
+        title=None,
+        authors=None,
+        percent_finished=0.5,
+        last_xpointer=None,
+        doc_pages=None,
+        status=None,
+        performance_in_pages={},
+        total_time_in_sec=None,
+        annotations=[],
+        raw={},
+    )
+
+    await import_sdr(db_session, book, sdr_data)
+    await db_session.refresh(book)
+
+    # Active KO MD5 updated to new value
+    assert book.file_hash_md5_ko == "new_ko_md5"
+
+    # Old KO MD5 preserved in history
+    result = await db_session.execute(
+        select(BookHash).where(
+            BookHash.book_id == book.id,
+            BookHash.hash_md5_ko == "old_ko_md5",
+        )
+    )
+    saved = result.scalar_one_or_none()
+    assert saved is not None
+    assert saved.hash_sha == "sha256aabbcc"
+    assert saved.hash_md5 == "full_md5_aabbcc"
+
+
+@pytest.mark.asyncio
+async def test_import_sdr_no_duplicate_hash_history(db_session, book_factory, shelf_factory):
+    """Re-importing with the same new MD5 does not create a duplicate BookHash row."""
+    from app.koreader.sdr_importer import import_sdr
+    from app.koreader.sdr_reader import SdrReadingData
+    from app.models.book import BookHash
+
+    await shelf_factory()
+    book = await book_factory()
+    book.file_hash = "sha256aabbcc"
+    book.file_hash_md5 = "full_md5_aabbcc"
+    book.file_hash_md5_ko = "old_ko_md5"
+    await db_session.commit()
+
+    sdr_data = SdrReadingData(
+        partial_md5="new_ko_md5",
+        doc_path=None,
+        title=None,
+        authors=None,
+        percent_finished=0.5,
+        last_xpointer=None,
+        doc_pages=None,
+        status=None,
+        performance_in_pages={},
+        total_time_in_sec=None,
+        annotations=[],
+        raw={},
+    )
+
+    # Import twice
+    await import_sdr(db_session, book, sdr_data)
+    await import_sdr(db_session, book, sdr_data)
+
+    result = await db_session.execute(
+        select(BookHash).where(
+            BookHash.book_id == book.id,
+            BookHash.hash_md5_ko == "old_ko_md5",
+        )
+    )
+    rows = result.scalars().all()
+    assert len(rows) == 1
