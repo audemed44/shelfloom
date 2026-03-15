@@ -105,11 +105,11 @@ def read_stats_db(
     if not db_path.exists():
         raise FileNotFoundError(f"Stats DB not found: {db_path}")
 
-    uri = db_path.as_uri() + "?mode=ro"
+    uri = db_path.as_uri() + "?mode=ro&immutable=1"
     try:
         conn = sqlite3.connect(uri, uri=True)
     except Exception:
-        # Fallback: open normally
+        # Fallback: open normally (requires write access to directory)
         conn = sqlite3.connect(str(db_path))
 
     books: list[StatsBook] = []
