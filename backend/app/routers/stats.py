@@ -90,6 +90,16 @@ async def recent_sessions(
     return await stats_service.get_recent_sessions(session, limit)
 
 
+@router.get("/calendar")
+async def calendar_month(
+    year: Annotated[int, Query(ge=2000, le=2100)] = 2024,
+    month: Annotated[int, Query(ge=1, le=12)] = 1,
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
+    """Sessions grouped by day for a calendar month, with book info."""
+    return await stats_service.get_calendar_month(session, year, month)
+
+
 @router.get("/by-book/{book_id}")
 async def by_book(
     book_id: str,

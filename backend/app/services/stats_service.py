@@ -331,6 +331,57 @@ async def get_recent_sessions(session: AsyncSession, limit: int = 10) -> list[di
     ]
 
 
+async def get_calendar_month(session: AsyncSession, year: int, month: int) -> list[dict]:
+    """Sessions grouped by date for a calendar month, with book info.
+
+    Returns one entry per day in the month; days with no sessions have ``books: []``.
+    """
+    if month < 12:
+        end_dt = datetime(year, month + 1, 1, tzinfo=UTC) - timedelta(seconds=1)
+    else:
+        end_dt = datetime(year + 1, 1, 1, tzinfo=UTC) - timedelta(seconds=1)
+    start_dt = datetime(year, month, 1, tzinfo=UTC)
+
+    result = await session.execute(
+        select(
+            func.strftime("%Y-%m-%d", ReadingSession.start_time).label("day"),
+            Book.id.label("book_id"),
+            Book.title,
+            func.coalesce(func.sum(ReadingSession.duration), 0).label("total_duration"),
+        )
+        .join(Book, ReadingSession.book_id == Book.id)
+        .where(
+            ReadingSession.dismissed == False,  # noqa: E712
+            ReadingSession.start_time.is_not(None),
+            ReadingSession.start_time >= start_dt,
+            ReadingSession.start_time <= end_dt,
+            ReadingSession.duration > 0,
+        )
+        .group_by("day", Book.id)
+        .order_by("day", func.sum(ReadingSession.duration).desc())
+    )
+
+    day_map: dict[str, list[dict]] = {}
+    for row in result.all():
+        if row.day not in day_map:
+            day_map[row.day] = []
+        day_map[row.day].append(
+            {
+                "book_id": str(row.book_id),
+                "title": row.title,
+                "duration": row.total_duration or 0,
+            }
+        )
+
+    out: list[dict] = []
+    d = date(year, month, 1)
+    while d.month == month:
+        key = d.isoformat()
+        out.append({"date": key, "books": day_map.get(key, [])})
+        d += timedelta(days=1)
+    return out
+
+
 async def get_book_stats(session: AsyncSession, book_id: str) -> dict | None:
     """Per-book analytics. Returns None if book doesn't exist."""
     book = (await session.execute(select(Book).where(Book.id == book_id))).scalar_one_or_none()

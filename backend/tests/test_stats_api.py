@@ -620,6 +620,59 @@ async def test_recent_sessions_limit(
     assert len(resp.json()) == 5
 
 
+# ---------------------------------------------------------------------------
+# /api/stats/calendar
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_calendar_empty_month(client: AsyncClient) -> None:
+    resp = await client.get("/api/stats/calendar?year=2024&month=2")
+    assert resp.status_code == 200
+    data = resp.json()
+    # Feb 2024 is a leap year → 29 days
+    assert len(data) == 29
+    assert all(d["books"] == [] for d in data)
+    assert all(d["date"].startswith("2024-02") for d in data)
+
+
+@pytest.mark.asyncio
+async def test_calendar_with_data(
+    client: AsyncClient, db_session: AsyncSession, shelf: Shelf
+) -> None:
+    book = await _make_book(db_session, shelf.id, "Test Book")
+    await _make_session(db_session, book.id, datetime(2024, 3, 15, 10, tzinfo=UTC), duration=1800)
+    await _make_session(db_session, book.id, datetime(2024, 3, 15, 14, tzinfo=UTC), duration=600)
+
+    resp = await client.get("/api/stats/calendar?year=2024&month=3")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 31  # March has 31 days
+    day_15 = next(d for d in data if d["date"] == "2024-03-15")
+    assert len(day_15["books"]) == 1
+    assert day_15["books"][0]["title"] == "Test Book"
+    assert day_15["books"][0]["duration"] == 2400  # aggregated
+    # other days empty
+    assert all(d["books"] == [] for d in data if d["date"] != "2024-03-15")
+
+
+@pytest.mark.asyncio
+async def test_calendar_dismissed_excluded(
+    client: AsyncClient, db_session: AsyncSession, shelf: Shelf
+) -> None:
+    book = await _make_book(db_session, shelf.id)
+    await _make_session(
+        db_session,
+        book.id,
+        datetime(2024, 4, 10, tzinfo=UTC),
+        duration=9999,
+        dismissed=True,
+    )
+    resp = await client.get("/api/stats/calendar?year=2024&month=4")
+    data = resp.json()
+    assert all(d["books"] == [] for d in data)
+
+
 @pytest.mark.asyncio
 async def test_recent_sessions_sorted_newest_first(
     client: AsyncClient, db_session: AsyncSession, shelf: Shelf
