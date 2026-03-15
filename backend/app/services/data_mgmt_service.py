@@ -364,7 +364,7 @@ async def get_session_log(
     total = len(total_result.all())
 
     result = await session.execute(
-        base_query.order_by(ReadingSession.start_time.desc(), ReadingSession.id.desc())
+        base_query.order_by(ReadingSession.created_at.desc(), ReadingSession.id.desc())
         .offset(offset)
         .limit(limit)
     )
