@@ -76,6 +76,27 @@ class ImportLogResponse(BaseModel):
     offset: int
 
 
+class SessionLogEntry(BaseModel):
+    id: int
+    book_id: str
+    book_title: str
+    book_author: str | None
+    source: str
+    start_time: str | None
+    duration: int | None
+    pages_read: int | None
+    device: str | None
+    dismissed: bool
+    created_at: str | None
+
+
+class SessionLogResponse(BaseModel):
+    items: list[SessionLogEntry]
+    total: int
+    limit: int
+    offset: int
+
+
 class MergeBooksRequest(BaseModel):
     keep_id: str
     discard_id: str

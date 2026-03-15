@@ -13,6 +13,7 @@ from app.schemas.data_mgmt import (
     ImportLogResponse,
     LinkUnmatchedRequest,
     MergeBooksRequest,
+    SessionLogResponse,
     SetDismissedRequest,
     UnmatchedEntryOut,
 )
@@ -126,6 +127,25 @@ async def merge_books(
 # ---------------------------------------------------------------------------
 # Import Log
 # ---------------------------------------------------------------------------
+
+
+@router.get("/sessions-log", response_model=SessionLogResponse)
+async def get_session_log(
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    search: str | None = Query(None),
+    source: str | None = Query(None),
+    session: AsyncSession = Depends(get_session),
+) -> SessionLogResponse:
+    """Return all reading sessions with book metadata."""
+    data = await svc.get_session_log(
+        session,
+        limit=limit,
+        offset=offset,
+        search=search or None,
+        source=source or None,
+    )
+    return SessionLogResponse(**data)
 
 
 @router.get("/import-log", response_model=ImportLogResponse)
