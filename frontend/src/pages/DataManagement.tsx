@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -12,8 +12,10 @@ import {
   History,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
+import { useDebounce } from '../hooks/useDebounce'
 import { api } from '../api/client'
 import type {
+  PaginatedResponse,
   DuplicateSessionGroup,
   UnmatchedEntry,
   DuplicateBookGroup,
@@ -273,6 +275,94 @@ function DuplicateSessionsTab() {
   )
 }
 
+// ── Book Search Input ─────────────────────────────────────────────────────────
+
+interface BookSearchInputProps {
+  onSelect: (bookId: string, bookTitle: string) => void
+}
+
+function BookSearchInput({ onSelect }: BookSearchInputProps) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const debouncedQuery = useDebounce(query, 250)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const searchPath =
+    debouncedQuery.trim().length >= 1
+      ? `/api/books?search=${encodeURIComponent(debouncedQuery.trim())}&per_page=5&sort=title`
+      : null
+
+  const { data, loading } = useApi<PaginatedResponse<Book>>(searchPath)
+  const results = data?.items ?? []
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative flex-1"
+      data-testid="book-search-input"
+    >
+      <input
+        type="text"
+        placeholder="Search books by title or author…"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value)
+          setOpen(true)
+        }}
+        onFocus={() => query.trim() && setOpen(true)}
+        className="w-full bg-black border border-white/10 px-3 py-2 text-sm text-white placeholder-white/20 normal-case focus:outline-none focus:border-primary"
+      />
+      {open && debouncedQuery.trim().length >= 1 && (
+        <div className="absolute z-50 top-full left-0 right-0 border border-white/10 bg-[#0a0a0a] mt-px">
+          {loading ? (
+            <div className="px-3 py-2 text-[11px] text-white/30 normal-case">
+              Searching…
+            </div>
+          ) : results.length === 0 ? (
+            <div className="px-3 py-2 text-[11px] text-white/30 normal-case">
+              No books found
+            </div>
+          ) : (
+            results.map((book) => (
+              <button
+                key={book.id}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  onSelect(String(book.id), book.title)
+                  setQuery(book.title)
+                  setOpen(false)
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
+              >
+                <span className="text-sm text-white">{book.title}</span>
+                {book.author && (
+                  <span className="text-[11px] text-white/40 ml-2 normal-case">
+                    {book.author}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Unmatched Data Tab ────────────────────────────────────────────────────────
 
 function UnmatchedDataTab() {
@@ -281,20 +371,19 @@ function UnmatchedDataTab() {
   const { data: entries, loading } = useApi<UnmatchedEntry[]>(
     `/api/data-mgmt/unmatched?include_dismissed=${showDismissed}&_k=${key}`
   )
-  const { data: books } = useApi<Book[]>('/api/books?per_page=500')
   const [linkingId, setLinkingId] = useState<number | null>(null)
-  const [selectedBookId, setSelectedBookId] = useState<Record<number, string>>(
-    {}
-  )
+  const [selectedBook, setSelectedBook] = useState<
+    Record<number, { id: string; title: string }>
+  >({})
   const [error, setError] = useState<string | null>(null)
 
   const handleLink = async (entryId: number) => {
-    const bookId = selectedBookId[entryId]
-    if (!bookId) return
+    const book = selectedBook[entryId]
+    if (!book) return
     setError(null)
     try {
       await api.post(`/api/data-mgmt/unmatched/${entryId}/link`, {
-        book_id: bookId,
+        book_id: book.id,
       })
       setKey((k) => k + 1)
       setLinkingId(null)
@@ -322,7 +411,6 @@ function UnmatchedDataTab() {
   }
 
   const allEntries = entries ?? []
-  const bookList = books ?? []
 
   return (
     <div className="space-y-6">
@@ -430,28 +518,18 @@ function UnmatchedDataTab() {
                     Select book to link
                   </p>
                   <div className="flex items-center gap-2">
-                    <select
-                      value={selectedBookId[entry.id] ?? ''}
-                      onChange={(e) =>
-                        setSelectedBookId((prev) => ({
+                    <BookSearchInput
+                      onSelect={(bookId, bookTitle) =>
+                        setSelectedBook((prev) => ({
                           ...prev,
-                          [entry.id]: e.target.value,
+                          [entry.id]: { id: bookId, title: bookTitle },
                         }))
                       }
-                      className="flex-1 bg-black border border-white/10 px-3 py-2 text-sm text-white normal-case focus:outline-none focus:border-primary appearance-none"
-                    >
-                      <option value="">— Choose a book —</option>
-                      {bookList.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.title}
-                          {b.author ? ` — ${b.author}` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    />
                     <button
                       onClick={() => handleLink(entry.id)}
-                      disabled={!selectedBookId[entry.id]}
-                      className="px-4 py-2 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-40 transition-colors"
+                      disabled={!selectedBook[entry.id]}
+                      className="px-4 py-2 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-40 transition-colors shrink-0"
                     >
                       Confirm
                     </button>
