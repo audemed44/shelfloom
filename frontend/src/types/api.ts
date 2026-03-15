@@ -238,3 +238,24 @@ export interface ImportLogResponse {
   limit: number
   offset: number
 }
+
+export interface SessionLogEntry {
+  id: number
+  book_id: string
+  book_title: string
+  book_author: string | null
+  source: string
+  start_time: string | null
+  duration: number | null
+  pages_read: number | null
+  device: string | null
+  dismissed: boolean
+  created_at: string | null
+}
+
+export interface SessionLogResponse {
+  items: SessionLogEntry[]
+  total: number
+  limit: number
+  offset: number
+}

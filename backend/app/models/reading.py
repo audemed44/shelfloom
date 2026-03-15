@@ -74,6 +74,9 @@ class ReadingSession(Base):
     source: Mapped[str] = mapped_column(Text, nullable=False)  # "stats_db", "sdr", "manual"
     source_key: Mapped[str | None] = mapped_column(Text, unique=True, nullable=True)
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime, server_default=func.now(), nullable=True
+    )
 
     book: Mapped["Book"] = relationship("Book", back_populates="reading_sessions")  # type: ignore[name-defined]  # noqa: F821
 
