@@ -6,20 +6,49 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.database import Base, get_engine
 
 # Frontend build output — repo_root/frontend/dist
 _FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
+_ALEMBIC_INI = Path(__file__).parent.parent / "alembic.ini"
+
+
+def _run_migrations() -> None:  # pragma: no cover
+    """
+    Apply Alembic migrations to head.
+
+    For databases created before Alembic was introduced (i.e. those built by
+    SQLAlchemy's create_all with no alembic_version table), we stamp them at
+    head first so upgrade becomes a no-op.
+    """
+    from sqlalchemy import create_engine, inspect
+
+    from alembic import command as alembic_command
+    from alembic.config import Config
+
+    settings = get_settings()
+    cfg = Config(str(_ALEMBIC_INI))
+    # Use the plain sqlite:// driver — Alembic's runner is synchronous
+    sync_url = f"sqlite:///{settings.db_path}"
+    cfg.set_main_option("sqlalchemy.url", sync_url)
+
+    # Auto-stamp databases that existed before Alembic was added
+    engine = create_engine(sync_url)
+    with engine.connect() as conn:
+        table_names = inspect(conn).get_table_names()
+        if table_names and "alembic_version" not in table_names:
+            alembic_command.stamp(cfg, "head")
+    engine.dispose()
+
+    alembic_command.upgrade(cfg, "head")
 
 
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
-    # Import all models so their tables are registered on Base.metadata
+    # Import all models so Alembic and SQLAlchemy see them
     import app.models  # noqa: F401
 
-    engine = get_engine()
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Run DB migrations (creates schema on first run; applies new migrations on upgrades)
+    _run_migrations()
 
     # Start background scan scheduler
     from app.database import get_session_factory
@@ -33,7 +62,9 @@ async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
     yield
 
     await scheduler.stop()
-    await engine.dispose()
+    from app.database import get_engine
+
+    await get_engine().dispose()
 
 
 def create_app() -> FastAPI:

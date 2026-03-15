@@ -1,7 +1,6 @@
-import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import create_engine
 
 from alembic import context
 
@@ -29,22 +28,22 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection):
-    context.configure(connection=connection, target_metadata=target_metadata)
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-async def run_async_migrations() -> None:
-    url = config.get_main_option("sqlalchemy.url")
-    connectable = create_async_engine(url)
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
-
-
 def run_migrations_online() -> None:
-    asyncio.run(run_async_migrations())
+    """
+    Run migrations using a synchronous engine.
+    This avoids event-loop conflicts when called from an async context
+    (e.g., FastAPI lifespan). The async aiosqlite URL is converted to a
+    plain sqlite URL for the migration runner only.
+    """
+    url = config.get_main_option("sqlalchemy.url")
+    # Strip async driver — Alembic uses the sync path only
+    sync_url = url.replace("+aiosqlite", "")
+    connectable = create_engine(sync_url)
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+    connectable.dispose()
 
 
 if context.is_offline_mode():
