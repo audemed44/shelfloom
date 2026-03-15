@@ -33,17 +33,17 @@ async def _find_book_for_stats(
     3. Match by title + author
     """
     if stats_book.md5:
-        # Match current hash
-        result = await session.execute(select(Book).where(Book.file_hash_md5 == stats_book.md5))
+        # stats_book.md5 is KOReader's partial MD5 — match against our stored partial MD5
+        result = await session.execute(select(Book).where(Book.file_hash_md5_ko == stats_book.md5))
         book = result.scalar_one_or_none()
         if book:
             return book
 
-        # Match historical hashes
+        # Match historical KOReader partial MD5s
         result = await session.execute(
             select(Book)
             .join(BookHash, Book.id == BookHash.book_id)
-            .where(BookHash.hash_md5 == stats_book.md5)
+            .where(BookHash.hash_md5_ko == stats_book.md5)
         )
         book = result.scalar_one_or_none()
         if book:
