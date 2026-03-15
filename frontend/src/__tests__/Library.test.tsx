@@ -291,23 +291,24 @@ describe('Library', () => {
     expect(screen.getByTestId('group-by-series-toggle')).toBeInTheDocument()
   })
 
-  it('sends sort=series when group-by-series is toggled on', async () => {
+  it('keeps user sort when group-by-series is toggled on', async () => {
     const user = userEvent.setup()
     renderLibrary()
     await waitFor(() => screen.getAllByTestId('book-card'))
 
     await user.click(screen.getByTestId('group-by-series-toggle'))
 
+    // Sort should remain last_read (default), not switch to series
     await waitFor(() => {
       const booksCall = fetchSpy.mock.calls.find(
         ([url]: [string]) =>
           url.includes('/api/books') && url.includes('sort=series')
       )
-      expect(booksCall).toBeTruthy()
+      expect(booksCall).toBeFalsy()
     })
   })
 
-  it('shows series group headers when grouping is on', async () => {
+  it('shows series group headers only for series books when grouping is on', async () => {
     const seriesBooks = [
       {
         ...MOCK_BOOKS[0],
@@ -331,11 +332,54 @@ describe('Library', () => {
     renderLibrary()
 
     await waitFor(() => {
-      expect(screen.getAllByTestId('series-group-header')).toHaveLength(3)
+      // Only 2 headers — series groups only, no header for standalone books
+      expect(screen.getAllByTestId('series-group-header')).toHaveLength(2)
     })
     expect(screen.getByText('Dune Saga')).toBeInTheDocument()
     expect(screen.getByText('Foundation Series')).toBeInTheDocument()
-    expect(screen.getByText('Ungrouped')).toBeInTheDocument()
+    expect(screen.queryByText('Ungrouped')).not.toBeInTheDocument()
+    localStorage.removeItem('shelfloom:groupBySeries')
+  })
+
+  it('collapses series members to the position of the first member', async () => {
+    // Order: A (series 1), D (no series), B (series 1)
+    // With grouping: [A, B] at position 0, D at position 1
+    const seriesBooks = [
+      {
+        ...MOCK_BOOKS[0],
+        id: 1,
+        title: 'A',
+        series_id: 10,
+        series_name: 'ABC',
+        series_sequence: 1,
+      },
+      {
+        ...MOCK_BOOKS[1],
+        id: 2,
+        title: 'D',
+      },
+      {
+        ...MOCK_BOOKS[2],
+        id: 3,
+        title: 'B',
+        series_id: 10,
+        series_name: 'ABC',
+        series_sequence: 2,
+      },
+    ]
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({ books: seriesBooks, total: 3 })
+    localStorage.setItem('shelfloom:groupBySeries', 'true')
+    renderLibrary()
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId('series-group-header')).toHaveLength(1)
+    })
+    // ABC header with 2 books
+    expect(screen.getByText('ABC')).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
+    // All 3 books still rendered
+    expect(screen.getAllByTestId('book-card')).toHaveLength(3)
     localStorage.removeItem('shelfloom:groupBySeries')
   })
 
