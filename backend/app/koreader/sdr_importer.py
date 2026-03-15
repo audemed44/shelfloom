@@ -102,7 +102,26 @@ async def import_sdr(
     # The SDR's partial_md5_checksum is the authoritative KOReader hash of the
     # original (pre-modification) file — store it so stats DB matching works even
     # when the EPUB has since been modified by Shelfloom or Booklore.
+    # Before overwriting, preserve the old KOReader MD5 in book_hashes so that
+    # future imports using the old MD5 can still match this book.
     if sdr_data.partial_md5 and book.file_hash_md5_ko != sdr_data.partial_md5:
+        if book.file_hash_md5_ko and book.file_hash and book.file_hash_md5:
+            existing_hash = await session.execute(
+                select(BookHash).where(
+                    BookHash.book_id == book.id,
+                    BookHash.hash_md5_ko == book.file_hash_md5_ko,
+                )
+            )
+            if existing_hash.scalar_one_or_none() is None:
+                session.add(
+                    BookHash(
+                        book_id=book.id,
+                        hash_sha=book.file_hash,
+                        hash_md5=book.file_hash_md5,
+                        hash_md5_ko=book.file_hash_md5_ko,
+                        page_count=book.page_count,
+                    )
+                )
         book.file_hash_md5_ko = sdr_data.partial_md5
 
     # Upsert reading progress
