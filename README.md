@@ -4,14 +4,46 @@ Self-hosted book library manager with deep KOReader integration and rich reading
 
 ## Quick Start (Docker)
 
+### Using the pre-built image (recommended)
+
+Images are published automatically to GHCR on every push to `main` and on version tags (`v*`).
+
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  shelfloom:
+    image: ghcr.io/audemed44/shelfloom:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./.data:/data
+      - ./.data/books:/books
+    restart: unless-stopped
+```
+
+Then:
+
 ```bash
-git clone https://github.com/your-user/shelfloom.git
+mkdir -p .data/books .data/covers
+docker compose up -d
+```
+
+To pin to a specific release, use a version tag instead of `latest`:
+
+```yaml
+image: ghcr.io/audemed44/shelfloom:v1.0.0
+```
+
+### Building from source
+
+```bash
+git clone https://github.com/audemed44/shelfloom.git
 cd shelfloom
 
-# Create local directories for persistent data
 mkdir -p .data/books .data/covers
 
-# Start the container
+# Start the container (builds the image locally)
 docker compose up -d --build
 ```
 
