@@ -81,7 +81,7 @@ If you have a KOReader `statistics.sqlite3` file, mount it into the container an
 
 ## Importing from Booklore
 
-Shelfloom includes a migration script for [Booklore](https://github.com/adamsuk/booklore) libraries.
+Shelfloom includes a migration script for Booklore libraries.
 
 **1. Add your source directory to `docker-compose.yml`** (if not already):
 
