@@ -27,6 +27,7 @@ class StatsBook:
     total_read_pages: int | None
     last_open: int | None
     ko_total_pages: int | None = None  # KOReader's page count (mode across sessions)
+    max_page_reached: int | None = None  # Furthest page seen in page_stat_data
 
 
 @dataclass
@@ -151,6 +152,7 @@ def read_stats_db(
             # Group rows by book
             raw_by_book: dict[int, list[tuple[int, int, int]]] = {}
             total_pages_by_book: dict[int, list[int]] = {}
+            max_page_by_book: dict[int, int] = {}
             for row in cursor.fetchall():
                 bid = row["id_book"]
                 if bid not in raw_by_book:
@@ -159,6 +161,9 @@ def read_stats_db(
                 raw_by_book[bid].append((row["page"], row["start_time"], row["duration"]))
                 if row["total_pages"]:
                     total_pages_by_book[bid].append(row["total_pages"])
+                page = row["page"]
+                if page and (bid not in max_page_by_book or page > max_page_by_book[bid]):
+                    max_page_by_book[bid] = page
 
             # Compute mode of total_pages per book (most common value = most typical layout)
             ko_pages_map: dict[int, int] = {}
@@ -171,9 +176,10 @@ def read_stats_db(
             for bid, rows in raw_by_book.items():
                 sessions_by_book[bid] = _aggregate_page_stats(rows, book_md5_map.get(bid), bid)
 
-            # Attach ko_total_pages to each StatsBook
+            # Attach ko_total_pages and max_page_reached to each StatsBook
             for book in books:
                 book.ko_total_pages = ko_pages_map.get(book.id)
+                book.max_page_reached = max_page_by_book.get(book.id)
 
     finally:
         conn.close()
