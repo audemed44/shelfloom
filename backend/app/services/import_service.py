@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.book import Book, BookHash
@@ -250,7 +251,12 @@ async def _process_file(
     if pre_sha != post_sha:
         await _record_hash(session, book, post_sha, post_md5, page_count)
 
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Concurrent scan already committed this file — roll back and treat as skipped
+        await session.rollback()
+        return "skipped"
     return "created"
 
 
