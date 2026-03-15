@@ -357,8 +357,9 @@ async def phase3_enrich(
 def _run_alembic_migrations(db_path: Path) -> None:
     """Apply Alembic migrations (sync). Creates alembic_version so the server
     startup auto-stamp path is never triggered."""
-    from alembic import command as alembic_command
     from alembic.config import Config
+
+    from alembic import command as alembic_command
 
     alembic_ini = Path(__file__).parent.parent / "alembic.ini"
     cfg = Config(str(alembic_ini))
