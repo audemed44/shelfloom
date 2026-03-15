@@ -30,6 +30,12 @@
 }
 
 /* Heatmap scrollbar — thin, primary-coloured */
-.heatmap-container::-webkit-scrollbar { height: 4px; }
-.heatmap-container::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-.heatmap-container::-webkit-scrollbar-thumb { background: #258cf4; }
+.heatmap-container::-webkit-scrollbar {
+  height: 4px;
+}
+.heatmap-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+.heatmap-container::-webkit-scrollbar-thumb {
+  background: #258cf4;
+}
