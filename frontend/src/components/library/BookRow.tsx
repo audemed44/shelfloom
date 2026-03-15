@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Book } from '../../types'
 
@@ -48,6 +49,30 @@ export default function BookRow({ book }: BookRowProps) {
             {book.page_count} Pages
           </span>
         )}
+        {book.reading_progress != null && book.reading_progress >= 100 ? (
+          <Check
+            size={14}
+            className="text-primary"
+            data-testid="book-row-complete"
+          />
+        ) : book.reading_progress != null && book.reading_progress > 0 ? (
+          <div
+            className="flex flex-col items-end gap-0.5 min-w-[80px]"
+            data-testid="book-row-progress"
+          >
+            <span className="text-[10px] font-bold tracking-wider text-white/30">
+              {book.page_count != null && book.page_count > 0
+                ? `${Math.round((book.reading_progress * book.page_count) / 100)} / ${book.page_count} (${Math.round(book.reading_progress)}%)`
+                : `${Math.round(book.reading_progress)}%`}
+            </span>
+            <div className="w-full h-0.5 bg-white/10 rounded-full">
+              <div
+                className="h-full bg-primary rounded-full"
+                style={{ width: `${Math.min(book.reading_progress, 100)}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
     </Link>
   )
