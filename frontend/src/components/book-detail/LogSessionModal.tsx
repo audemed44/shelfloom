@@ -98,7 +98,7 @@ export default function LogSessionModal({ bookId, onClose, onSaved }: Props) {
               Duration
             </label>
             <div className="flex gap-3">
-              <div className="flex-1 relative">
+              <div className="flex-1 flex items-center gap-2">
                 <input
                   type="number"
                   min="0"
@@ -108,11 +108,11 @@ export default function LogSessionModal({ bookId, onClose, onSaved }: Props) {
                   className={inputClass}
                   data-testid="session-hours"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black tracking-widest text-white/30">
+                <span className="text-[10px] font-black tracking-widest text-white/30 shrink-0">
                   HRS
                 </span>
               </div>
-              <div className="flex-1 relative">
+              <div className="flex-1 flex items-center gap-2">
                 <input
                   type="number"
                   min="0"
@@ -123,7 +123,7 @@ export default function LogSessionModal({ bookId, onClose, onSaved }: Props) {
                   className={inputClass}
                   data-testid="session-minutes"
                 />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black tracking-widest text-white/30">
+                <span className="text-[10px] font-black tracking-widest text-white/30 shrink-0">
                   MIN
                 </span>
               </div>
