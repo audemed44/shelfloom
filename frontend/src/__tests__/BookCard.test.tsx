@@ -27,6 +27,7 @@ const BOOK: Book = {
   series_id: null,
   series_name: null,
   series_sequence: null,
+  tags: [],
 }
 
 function renderCard(book: Book = BOOK) {

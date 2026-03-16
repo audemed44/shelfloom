@@ -55,6 +55,11 @@ export interface BookSeries {
   sequence: number | null
 }
 
+export interface Tag {
+  id: number
+  name: string
+}
+
 export interface ReadingSession {
   id: number
   book_id: string
@@ -103,6 +108,7 @@ export interface Book {
   series_id: number | null
   series_name: string | null
   series_sequence: number | null
+  tags: Tag[]
 }
 
 export interface BookDetail extends Omit<Book, 'reading_progress'> {
