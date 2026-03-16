@@ -44,6 +44,12 @@ class ReadingProgressOut(BaseModel):
     updated_at: datetime
 
 
+class ManualSessionCreate(BaseModel):
+    start_time: datetime
+    duration: int | None = None  # seconds
+    pages_read: int | None = None
+
+
 class BookReadingSummary(BaseModel):
     total_sessions: int
     total_time_seconds: int

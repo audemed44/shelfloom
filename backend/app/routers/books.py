@@ -16,6 +16,7 @@ from app.schemas.book import (
     BookResponse,
     BookSeriesMembership,
     BookUpdate,
+    ManualBookCreate,
 )
 from app.services.book_service import (
     BookNotFound,
@@ -122,6 +123,40 @@ async def list_books_endpoint(
         per_page=per_page,
         pages=max(1, math.ceil(total / per_page)),
     )
+
+
+@router.post("/manual", status_code=status.HTTP_201_CREATED, response_model=BookResponse)
+async def create_manual_book_endpoint(
+    data: ManualBookCreate,
+    session: AsyncSession = Depends(get_session),
+):
+    """Create a manual book entry (physical book or visual novel) without a file."""
+    import uuid as _uuid
+
+    from app.models.book import Book
+    from app.services.shelf_service import ensure_manual_shelf
+
+    shelf = await ensure_manual_shelf(session)
+    book_id = str(_uuid.uuid4())
+    book = Book(
+        id=book_id,
+        title=data.title,
+        author=data.author,
+        isbn=data.isbn,
+        format=data.format,
+        file_path=f"manual://{book_id}",
+        shelf_id=shelf.id,
+        publisher=data.publisher,
+        language=data.language,
+        description=data.description,
+        page_count=data.page_count,
+        date_published=data.date_published,
+        genre=data.genre,
+    )
+    session.add(book)
+    await session.commit()
+    await session.refresh(book)
+    return _book_response(book)
 
 
 @router.get("/{book_id}/series", response_model=list[BookSeriesMembership])
@@ -257,6 +292,9 @@ async def download_book_endpoint(book_id: str, session: AsyncSession = Depends(g
     except BookNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+    if book.file_path.startswith("manual://"):
+        raise HTTPException(status_code=400, detail="Manual books have no downloadable file")
+
     shelf_result = await session.execute(select(Shelf).where(Shelf.id == book.shelf_id))
     shelf = shelf_result.scalar_one_or_none()
     if shelf is None:
@@ -276,6 +314,16 @@ async def refresh_cover_endpoint(
     session: AsyncSession = Depends(get_session),
 ):
     from app.config import get_settings
+
+    try:
+        book = await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if book.file_path.startswith("manual://"):
+        raise HTTPException(
+            status_code=400, detail="Manual books have no file to extract cover from"
+        )
 
     settings = get_settings()
     try:
@@ -314,6 +362,14 @@ async def move_book_endpoint(
     data: BookMoveRequest,
     session: AsyncSession = Depends(get_session),
 ):
+    try:
+        book = await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if book.file_path.startswith("manual://"):
+        raise HTTPException(status_code=400, detail="Manual books cannot be moved between shelves")
+
     try:
         book = await move_book(session, book_id, data.shelf_id)
     except BookNotFound as e:
