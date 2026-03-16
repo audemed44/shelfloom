@@ -209,7 +209,7 @@ describe('BookDetail', () => {
     renderDetail()
     await waitFor(() => screen.getByRole('heading', { level: 1 }))
     const badges = screen.getByTestId('book-badges')
-    expect(badges).toHaveTextContent('epub')
+    expect(badges).toHaveTextContent('Epub')
     expect(badges).toHaveTextContent('Main Library')
   })
 

@@ -25,6 +25,11 @@ import type { SeriesBook } from '../types/api'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
+function fmtFormat(format: string | null | undefined): string {
+  if (!format) return ''
+  return format.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 function fmtDuration(seconds: number | null | undefined): string {
   if (!seconds || seconds <= 0) return '0 min'
   const h = Math.floor(seconds / 3600)
@@ -703,7 +708,7 @@ export default function BookDetailPage() {
           <div className="flex flex-wrap gap-2 mb-8" data-testid="book-badges">
             {book.format && (
               <span className="px-2.5 py-0.5 text-[10px] font-black tracking-widest uppercase border border-primary/40 text-primary rounded">
-                {book.format}
+                {fmtFormat(book.format)}
               </span>
             )}
             {currentShelf && (
@@ -934,7 +939,7 @@ export default function BookDetailPage() {
             {book.format && (
               <div className="flex flex-col gap-1">
                 <span className="text-white/30">Format</span>
-                <span>{book.format}</span>
+                <span>{fmtFormat(book.format)}</span>
               </div>
             )}
             <div className="flex flex-col gap-1">
