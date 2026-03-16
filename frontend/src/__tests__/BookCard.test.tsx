@@ -5,7 +5,7 @@ import BookCard from '../components/library/BookCard'
 import type { Book } from '../types'
 
 const BOOK: Book = {
-  id: 1,
+  id: 'test-uuid-1',
   title: 'The Way of Kings',
   author: 'Brandon Sanderson',
   format: 'epub',
@@ -58,7 +58,7 @@ describe('BookCard', () => {
   it('links to the book detail page', () => {
     renderCard()
     const link = screen.getByTestId('book-card')
-    expect(link.getAttribute('href')).toBe('/books/1')
+    expect(link.getAttribute('href')).toBe('/books/test-uuid-1')
   })
 
   it('renders without author when author is absent', () => {
@@ -70,6 +70,6 @@ describe('BookCard', () => {
   it('renders cover image with correct src', () => {
     renderCard()
     const img = screen.getByRole('img')
-    expect(img.getAttribute('src')).toContain('/api/books/1/cover')
+    expect(img.getAttribute('src')).toContain('/api/books/test-uuid-1/cover')
   })
 })
