@@ -57,7 +57,7 @@ export interface BookSeries {
 
 export interface ReadingSession {
   id: number
-  book_id: number
+  book_id: string
   started_at: string
   duration_seconds: number
   source: string
@@ -66,7 +66,7 @@ export interface ReadingSession {
 
 export interface Highlight {
   id: number
-  book_id: number
+  book_id: string
   text: string
   note: string | null
   chapter: string | null
@@ -74,14 +74,14 @@ export interface Highlight {
 }
 
 export interface ReadingProgress {
-  book_id: number
+  book_id: string
   percent: number
   device: string | null
   updated_at: string
 }
 
 export interface Book {
-  id: number
+  id: string
   title: string
   author: string | null
   format: string | null
