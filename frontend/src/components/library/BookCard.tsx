@@ -2,6 +2,11 @@ import { Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Book } from '../../types'
 
+function fmtFormat(format: string | null | undefined): string {
+  if (!format) return ''
+  return format.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 interface BookCardProps {
   book: Book
 }
@@ -31,7 +36,7 @@ export default function BookCard({ book }: BookCardProps) {
         {/* Format badge */}
         <div className="absolute top-2 right-2">
           <span className="bg-black/70 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white/50">
-            {book.format?.toUpperCase()}
+            {fmtFormat(book.format)}
           </span>
         </div>
 

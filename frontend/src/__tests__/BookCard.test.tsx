@@ -52,7 +52,7 @@ describe('BookCard', () => {
 
   it('renders the format badge', () => {
     renderCard()
-    expect(screen.getByText('EPUB')).toBeInTheDocument()
+    expect(screen.getByText('Epub')).toBeInTheDocument()
   })
 
   it('links to the book detail page', () => {
