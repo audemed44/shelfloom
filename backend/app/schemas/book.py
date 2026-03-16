@@ -51,6 +51,19 @@ class BookListResponse(BaseModel):
     pages: int
 
 
+class ManualBookCreate(BaseModel):
+    title: str
+    author: str | None = None
+    isbn: str | None = None
+    format: str = "physical"  # "physical" or "visual_novel"
+    publisher: str | None = None
+    language: str | None = None
+    description: str | None = None
+    page_count: int | None = None
+    date_published: str | None = None
+    genre: str | None = None
+
+
 class BookMoveRequest(BaseModel):
     shelf_id: int
 
