@@ -7,6 +7,7 @@ import {
   ChevronRight,
   BookOpen,
   Layers,
+  Plus,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
@@ -14,6 +15,7 @@ import BookCard from '../components/library/BookCard'
 import BookRow from '../components/library/BookRow'
 import { SkeletonCard, SkeletonRow } from '../components/library/SkeletonCard'
 import UploadZone from '../components/library/UploadZone'
+import CreateManualBookModal from '../components/library/CreateManualBookModal'
 import type { Book, Shelf, PaginatedResponse } from '../types'
 
 const PER_PAGE = 24
@@ -270,6 +272,7 @@ export default function Library() {
   )
   const [page, setPage] = useState(1)
   const [rev, setRev] = useState(0)
+  const [showManualModal, setShowManualModal] = useState(false)
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const dragCounter = useRef(0)
 
@@ -384,11 +387,23 @@ export default function Library() {
         )}
       </header>
 
-      {/* Upload zone */}
-      <UploadZone
-        onSuccess={handleUploadSuccess}
-        highlighted={isDraggingOver}
-      />
+      {/* Upload zone + manual book button */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-0">
+        <div className="flex-1">
+          <UploadZone
+            onSuccess={handleUploadSuccess}
+            highlighted={isDraggingOver}
+          />
+        </div>
+        <button
+          onClick={() => setShowManualModal(true)}
+          className="flex items-center justify-center gap-2 px-6 py-4 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors sm:self-stretch"
+          data-testid="add-manual-book-btn"
+        >
+          <Plus size={14} />
+          Manual Book
+        </button>
+      </div>
 
       {/* Shelf tabs */}
       {shelves && shelves.length > 0 && (
@@ -512,6 +527,10 @@ export default function Library() {
           total={total}
           onPage={setPage}
         />
+      )}
+
+      {showManualModal && (
+        <CreateManualBookModal onClose={() => setShowManualModal(false)} />
       )}
     </div>
   )

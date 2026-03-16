@@ -13,11 +13,13 @@ import {
   RefreshCw,
   Loader2,
   Upload,
+  PlusCircle,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import EditBookModal from '../components/book-detail/EditBookModal'
 import DeleteBookModal from '../components/book-detail/DeleteBookModal'
+import LogSessionModal from '../components/book-detail/LogSessionModal'
 import type { BookDetail, Shelf, ReadingSession, Highlight } from '../types'
 import type { SeriesBook } from '../types/api'
 
@@ -117,6 +119,7 @@ export default function BookDetailPage() {
   const [notFound, setNotFound] = useState(false)
   const [showEdit, setShowEdit] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [showLogSession, setShowLogSession] = useState(false)
   const [seriesRefreshKey, setSeriesRefreshKey] = useState(0)
   const [moveOpen, setMoveOpen] = useState(false)
   const [movingTo, setMovingTo] = useState<number | null>(null)
@@ -125,13 +128,14 @@ export default function BookDetailPage() {
   const [coverKey, setCoverKey] = useState(0)
   const [markingRead, setMarkingRead] = useState(false)
   const [summaryKey, setSummaryKey] = useState(0)
+  const [sessionsKey, setSessionsKey] = useState(0)
 
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
   const { data: summary } = useApi<ReadingSummary>(
     id ? `/api/books/${id}/reading-summary?_k=${summaryKey}` : null
   )
   const { data: sessionsData } = useApi<{ items: SessionDisplay[] }>(
-    id ? `/api/books/${id}/sessions?per_page=10` : null
+    id ? `/api/books/${id}/sessions?per_page=10&_k=${sessionsKey}` : null
   )
   const { data: highlightsData } = useApi<{ items: Highlight[] }>(
     id ? `/api/books/${id}/highlights?per_page=5` : null
@@ -719,46 +723,59 @@ export default function BookDetailPage() {
 
           {/* Action buttons */}
           <div className="flex flex-wrap gap-3 mb-10">
-            <a
-              href={`/api/books/${book.id}/download`}
-              className="flex items-center gap-2 px-6 py-3 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 rounded-lg transition-all"
-              data-testid="download-btn"
-            >
-              <Download size={14} />
-              Download
-            </a>
+            {!book.file_path?.startsWith('manual://') && (
+              <a
+                href={`/api/books/${book.id}/download`}
+                className="flex items-center gap-2 px-6 py-3 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 rounded-lg transition-all"
+                data-testid="download-btn"
+              >
+                <Download size={14} />
+                Download
+              </a>
+            )}
 
             {/* Move shelf dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setMoveOpen((v) => !v)}
-                disabled={movingTo != null || otherShelves.length === 0}
-                data-testid="move-shelf-btn"
-                className="flex items-center gap-2 px-6 py-3 text-[10px] font-black tracking-widest uppercase bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-white/30 disabled:opacity-40 rounded-lg transition-all"
-              >
-                Move Shelf
-                <ChevronRight
-                  size={12}
-                  className={`transition-transform ${moveOpen ? 'rotate-90' : ''}`}
-                />
-              </button>
-              {moveOpen && (
-                <div
-                  className="absolute left-0 top-full mt-1 z-30 min-w-[160px] bg-black border border-white/20 rounded-lg shadow-xl"
-                  data-testid="move-shelf-dropdown"
+            {!book.file_path?.startsWith('manual://') && (
+              <div className="relative">
+                <button
+                  onClick={() => setMoveOpen((v) => !v)}
+                  disabled={movingTo != null || otherShelves.length === 0}
+                  data-testid="move-shelf-btn"
+                  className="flex items-center gap-2 px-6 py-3 text-[10px] font-black tracking-widest uppercase bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-white/30 disabled:opacity-40 rounded-lg transition-all"
                 >
-                  {otherShelves.map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => handleMove(s.id)}
-                      className="w-full text-left px-4 py-2.5 text-xs text-white/70 normal-case hover:bg-white/5 hover:text-white transition-colors"
-                    >
-                      {s.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                  Move Shelf
+                  <ChevronRight
+                    size={12}
+                    className={`transition-transform ${moveOpen ? 'rotate-90' : ''}`}
+                  />
+                </button>
+                {moveOpen && (
+                  <div
+                    className="absolute left-0 top-full mt-1 z-30 min-w-[160px] bg-black border border-white/20 rounded-lg shadow-xl"
+                    data-testid="move-shelf-dropdown"
+                  >
+                    {otherShelves.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => handleMove(s.id)}
+                        className="w-full text-left px-4 py-2.5 text-xs text-white/70 normal-case hover:bg-white/5 hover:text-white transition-colors"
+                      >
+                        {s.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowLogSession(true)}
+              data-testid="log-session-btn"
+              className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 rounded-lg transition-all"
+            >
+              <PlusCircle size={13} />
+              Log Session
+            </button>
 
             <button
               onClick={() => handleMarkRead(percent == null || percent < 100)}
@@ -946,6 +963,17 @@ export default function BookDetailPage() {
           book={book}
           onClose={() => setShowDelete(false)}
           onDeleted={() => navigate('/library')}
+        />
+      )}
+      {showLogSession && book && (
+        <LogSessionModal
+          bookId={String(book.id)}
+          onClose={() => setShowLogSession(false)}
+          onSaved={() => {
+            setShowLogSession(false)
+            setSummaryKey((k) => k + 1)
+            setSessionsKey((k) => k + 1)
+          }}
         />
       )}
     </div>
