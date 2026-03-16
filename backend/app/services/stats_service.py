@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Literal
 
 from sqlalchemy import and_, func, select
@@ -46,7 +46,7 @@ def _streak_from_dates(dates: list[date]) -> dict:
     if not dates:
         return {"current": 0, "longest": 0, "last_read_date": None, "history": []}
 
-    today = datetime.now(UTC).date()
+    today = datetime.now().date()
 
     # Build consecutive runs
     runs: list[dict] = []
@@ -378,10 +378,10 @@ async def get_calendar_month(session: AsyncSession, year: int, month: int) -> li
     Returns one entry per day in the month; days with no sessions have ``books: []``.
     """
     if month < 12:
-        end_dt = datetime(year, month + 1, 1, tzinfo=UTC) - timedelta(seconds=1)
+        end_dt = datetime(year, month + 1, 1) - timedelta(seconds=1)
     else:
-        end_dt = datetime(year + 1, 1, 1, tzinfo=UTC) - timedelta(seconds=1)
-    start_dt = datetime(year, month, 1, tzinfo=UTC)
+        end_dt = datetime(year + 1, 1, 1) - timedelta(seconds=1)
+    start_dt = datetime(year, month, 1)
 
     result = await session.execute(
         select(

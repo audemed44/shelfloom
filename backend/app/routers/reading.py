@@ -84,9 +84,11 @@ async def create_manual_session(
     except BookNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+    # Strip tzinfo so the stored naive datetime is consistent with KOReader data
+    start_time = data.start_time.replace(tzinfo=None) if data.start_time.tzinfo else data.start_time
     record = ReadingSession(
         book_id=book_id,
-        start_time=data.start_time,
+        start_time=start_time,
         duration=data.duration,
         pages_read=data.pages_read,
         source="manual",

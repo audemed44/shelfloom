@@ -3,6 +3,8 @@ services:
     build: .
     ports:
       - "8001:8000"
+    environment:
+      - TZ=Asia/Kolkata
     volumes:
       - ./.data:/data
       - ./.data/books:/books
