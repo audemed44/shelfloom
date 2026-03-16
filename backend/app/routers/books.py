@@ -42,6 +42,7 @@ def _book_response(
     series_id: int | None = None,
     series_name: str | None = None,
     series_sequence: float | None = None,
+    tags: list[dict] | None = None,
 ) -> BookResponse:
     """Build BookResponse from ORM object without triggering lazy relationship loads."""
     col_data = {
@@ -52,6 +53,7 @@ def _book_response(
     col_data["series_id"] = series_id
     col_data["series_name"] = series_name
     col_data["series_sequence"] = series_sequence
+    col_data["tags"] = tags or []
     return BookResponse.model_validate(col_data)
 
 
@@ -84,9 +86,11 @@ async def list_books_endpoint(
     # Batch-fetch max reading progress per book (single query)
     progress_map: dict[str, float] = {}
     series_map: dict[str, tuple[int, str, float | None]] = {}
+    tags_map: dict[str, list[dict]] = {}
     if books:
         from app.models.reading import ReadingProgress
         from app.models.series import BookSeries, Series
+        from app.models.tag import BookTag, Tag
 
         book_ids = [b.id for b in books]
 
@@ -105,6 +109,15 @@ async def list_books_endpoint(
         for row in series_rows.all():
             series_map[row[0]] = (row[1], row[2], row[3])
 
+        tag_rows = await session.execute(
+            sa_select(BookTag.book_id, Tag.id, Tag.name)
+            .join(Tag, BookTag.tag_id == Tag.id)
+            .where(BookTag.book_id.in_(book_ids))
+            .order_by(Tag.name)
+        )
+        for row in tag_rows.all():
+            tags_map.setdefault(row[0], []).append({"id": row[1], "name": row[2]})
+
     items = [
         _book_response(
             b,
@@ -112,6 +125,7 @@ async def list_books_endpoint(
             series_id=series_map[b.id][0] if b.id in series_map else None,
             series_name=series_map[b.id][1] if b.id in series_map else None,
             series_sequence=series_map[b.id][2] if b.id in series_map else None,
+            tags=tags_map.get(b.id, []),
         )
         for b in books
     ]
@@ -205,7 +219,19 @@ async def get_book_endpoint(book_id: str, session: AsyncSession = Depends(get_se
     )
     last_read = last_read_row.scalar()
 
-    return _book_response(book, reading_progress=reading_progress, last_read=last_read)
+    from app.models.tag import BookTag, Tag
+
+    tag_rows = await session.execute(
+        sa_select(Tag.id, Tag.name)
+        .join(BookTag, BookTag.tag_id == Tag.id)
+        .where(BookTag.book_id == book_id)
+        .order_by(Tag.name)
+    )
+    book_tags = [{"id": r[0], "name": r[1]} for r in tag_rows.all()]
+
+    return _book_response(
+        book, reading_progress=reading_progress, last_read=last_read, tags=book_tags
+    )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=BookResponse)
