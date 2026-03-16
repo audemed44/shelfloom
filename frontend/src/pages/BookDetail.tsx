@@ -392,6 +392,24 @@ export default function BookDetailPage() {
                 e.currentTarget.style.display = 'none'
               }}
             />
+            {/* Genre overlay at bottom of cover */}
+            {book.genre && (
+              <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-2 bg-gradient-to-t from-black/90 to-transparent pointer-events-none">
+                {book.genre
+                  .split(',')
+                  .map((g) => g.trim())
+                  .filter(Boolean)
+                  .map((g) => (
+                    <span
+                      key={g}
+                      className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
+                    >
+                      {g}
+                    </span>
+                  ))}
+              </div>
+            )}
+
             <div className="absolute bottom-2 right-2 flex gap-1.5">
               <label
                 title="Upload cover image"
@@ -704,7 +722,7 @@ export default function BookDetailPage() {
             )}
           </div>
 
-          {/* Format / shelf badges */}
+          {/* Format / shelf / genre badges */}
           <div className="flex flex-wrap gap-2 mb-8" data-testid="book-badges">
             {book.format && (
               <span className="px-2.5 py-0.5 text-[10px] font-black tracking-widest uppercase border border-primary/40 text-primary rounded">
@@ -724,6 +742,19 @@ export default function BookDetailPage() {
                   : ''}
               </span>
             )}
+            {book.genre &&
+              book.genre
+                .split(',')
+                .map((g) => g.trim())
+                .filter(Boolean)
+                .map((g) => (
+                  <span
+                    key={g}
+                    className="px-2.5 py-0.5 text-[10px] font-black tracking-widest bg-primary/15 border border-primary/30 text-primary rounded normal-case"
+                  >
+                    {g}
+                  </span>
+                ))}
           </div>
 
           {/* Action buttons */}
@@ -933,7 +964,20 @@ export default function BookDetailPage() {
             {book.genre && (
               <div className="flex flex-col gap-1">
                 <span className="text-white/30">Genre</span>
-                <span className="normal-case">{book.genre}</span>
+                <div className="flex flex-wrap gap-1">
+                  {book.genre
+                    .split(',')
+                    .map((g) => g.trim())
+                    .filter(Boolean)
+                    .map((g) => (
+                      <span
+                        key={g}
+                        className="bg-primary/15 border border-primary/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-primary normal-case"
+                      >
+                        {g}
+                      </span>
+                    ))}
+                </div>
               </div>
             )}
             {book.format && (
