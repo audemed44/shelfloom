@@ -167,6 +167,28 @@ async def ensure_default_shelf(  # pragma: no cover
     return await create_shelf(session, data, require_path_exists=False)
 
 
+MANUAL_SHELF_PATH = "__manual__"
+
+
+async def ensure_manual_shelf(session: AsyncSession) -> Shelf:
+    """Return the virtual manual shelf, creating it if it doesn't exist."""
+    result = await session.execute(select(Shelf).where(Shelf.path == MANUAL_SHELF_PATH))
+    shelf = result.scalar_one_or_none()
+    if shelf is not None:
+        return shelf
+    shelf = Shelf(
+        name="Manual",
+        path=MANUAL_SHELF_PATH,
+        is_default=False,
+        is_sync_target=False,
+        auto_organize=False,
+    )
+    session.add(shelf)
+    await session.commit()
+    await session.refresh(shelf)
+    return shelf
+
+
 async def _clear_default(session: AsyncSession) -> None:
     result = await session.execute(select(Shelf).where(Shelf.is_default == True))  # noqa: E712
     for shelf in result.scalars().all():

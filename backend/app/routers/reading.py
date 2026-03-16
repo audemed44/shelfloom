@@ -13,6 +13,7 @@ from app.models.reading import Highlight, ReadingProgress, ReadingSession
 from app.schemas.reading import (
     BookReadingSummary,
     HighlightOut,
+    ManualSessionCreate,
     ReadingProgressOut,
     ReadingSessionOut,
 )
@@ -69,6 +70,31 @@ async def unmark_read(
     if record:
         await session.delete(record)
         await session.commit()
+
+
+@router.post("/{book_id}/sessions", status_code=201, response_model=ReadingSessionOut)
+async def create_manual_session(
+    book_id: str,
+    data: ManualSessionCreate,
+    session: AsyncSession = Depends(get_session),
+) -> ReadingSessionOut:
+    """Create a manual reading session for a book."""
+    try:
+        await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    record = ReadingSession(
+        book_id=book_id,
+        start_time=data.start_time,
+        duration=data.duration,
+        pages_read=data.pages_read,
+        source="manual",
+    )
+    session.add(record)
+    await session.commit()
+    await session.refresh(record)
+    return ReadingSessionOut.model_validate(record)
 
 
 @router.get("/{book_id}/highlights")

@@ -11,6 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.services import stats_service
 
+
+def _naive(dt: datetime | None) -> datetime | None:
+    """Strip tzinfo so SQLite string comparisons work against naive stored datetimes."""
+    if dt is not None and dt.tzinfo is not None:
+        return dt.replace(tzinfo=None)
+    return dt
+
+
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
@@ -21,7 +29,7 @@ async def overview(
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Totals: books owned, books read, total reading time, total pages, current streak."""
-    return await stats_service.get_overview(session, from_dt=from_, to_dt=to_)
+    return await stats_service.get_overview(session, from_dt=_naive(from_), to_dt=_naive(to_))
 
 
 @router.get("/reading-time")
@@ -32,7 +40,9 @@ async def reading_time(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict]:
     """Reading time (seconds) time series."""
-    return await stats_service.get_time_series(session, "duration", granularity, from_, to_)
+    return await stats_service.get_time_series(
+        session, "duration", granularity, _naive(from_), _naive(to_)
+    )
 
 
 @router.get("/pages")
@@ -43,7 +53,9 @@ async def pages_over_time(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict]:
     """Pages read time series."""
-    return await stats_service.get_time_series(session, "pages", granularity, from_, to_)
+    return await stats_service.get_time_series(
+        session, "pages", granularity, _naive(from_), _naive(to_)
+    )
 
 
 @router.get("/books-completed")
@@ -53,7 +65,9 @@ async def books_completed(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict]:
     """Completed books (progress ≥ 99), most recent first."""
-    return await stats_service.get_books_completed(session, from_dt=from_, to_dt=to_)
+    return await stats_service.get_books_completed(
+        session, from_dt=_naive(from_), to_dt=_naive(to_)
+    )
 
 
 @router.get("/streaks")
