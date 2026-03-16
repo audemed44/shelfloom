@@ -159,6 +159,21 @@ async def create_manual_book_endpoint(
     return _book_response(book)
 
 
+@router.get("/genres", response_model=list[str])
+async def list_genres_endpoint(session: AsyncSession = Depends(get_session)):
+    """Return all distinct genre values across all books, split and deduplicated."""
+    from app.models.book import Book
+
+    rows = await session.execute(sa_select(Book.genre).where(Book.genre.isnot(None)))
+    genres: set[str] = set()
+    for (raw,) in rows.all():
+        for part in raw.split(","):
+            g = part.strip()
+            if g:
+                genres.add(g)
+    return sorted(genres, key=str.lower)
+
+
 @router.get("/{book_id}/series", response_model=list[BookSeriesMembership])
 async def get_book_series_endpoint(book_id: str, session: AsyncSession = Depends(get_session)):
     try:
