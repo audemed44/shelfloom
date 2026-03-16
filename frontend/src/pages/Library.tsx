@@ -388,7 +388,7 @@ export default function Library() {
       </header>
 
       {/* Upload zone + manual book button */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-0">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="flex-1">
           <UploadZone
             onSuccess={handleUploadSuccess}

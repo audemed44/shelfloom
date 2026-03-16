@@ -69,7 +69,7 @@ export default function UploadZone({
         setIsDragOver(true)
       }}
       onDragLeave={() => setIsDragOver(false)}
-      className={`border-2 border-dashed transition-colors mb-6 ${
+      className={`border-2 border-dashed transition-colors ${
         active
           ? 'border-primary bg-primary/5'
           : 'border-white/10 hover:border-white/20'
