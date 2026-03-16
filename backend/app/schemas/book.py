@@ -3,6 +3,13 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
+class TagOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    name: str
+
+
 class BookResponse(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -28,6 +35,7 @@ class BookResponse(BaseModel):
     series_id: int | None = None
     series_name: str | None = None
     series_sequence: float | None = None
+    tags: list[TagOut] = []
 
 
 class BookUpdate(BaseModel):

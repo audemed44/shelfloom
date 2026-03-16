@@ -40,21 +40,30 @@ export default function BookRow({ book }: BookRowProps) {
             {book.author}
           </p>
         )}
-        {book.genre && (
+        {(book.genre || book.tags?.length > 0) && (
           <div className="flex flex-wrap gap-1 mt-1">
-            {book.genre
-              .split(',')
-              .map((g) => g.trim())
-              .filter(Boolean)
-              .slice(0, 3)
-              .map((g) => (
-                <span
-                  key={g}
-                  className="bg-primary/15 border border-primary/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-primary normal-case"
-                >
-                  {g}
-                </span>
-              ))}
+            {book.genre &&
+              book.genre
+                .split(',')
+                .map((g) => g.trim())
+                .filter(Boolean)
+                .slice(0, 3)
+                .map((g) => (
+                  <span
+                    key={g}
+                    className="bg-primary/15 border border-primary/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-primary normal-case"
+                  >
+                    {g}
+                  </span>
+                ))}
+            {book.tags?.slice(0, 3).map((t) => (
+              <span
+                key={t.id}
+                className="bg-amber-500/15 border border-amber-500/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-amber-400 normal-case"
+              >
+                {t.name}
+              </span>
+            ))}
           </div>
         )}
       </div>

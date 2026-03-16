@@ -392,21 +392,30 @@ export default function BookDetailPage() {
                 e.currentTarget.style.display = 'none'
               }}
             />
-            {/* Genre overlay at bottom of cover */}
-            {book.genre && (
+            {/* Genre + tag overlay at bottom of cover */}
+            {(book.genre || book.tags?.length > 0) && (
               <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-2 bg-gradient-to-t from-black/90 to-transparent pointer-events-none">
-                {book.genre
-                  .split(',')
-                  .map((g) => g.trim())
-                  .filter(Boolean)
-                  .map((g) => (
-                    <span
-                      key={g}
-                      className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
-                    >
-                      {g}
-                    </span>
-                  ))}
+                {book.genre &&
+                  book.genre
+                    .split(',')
+                    .map((g) => g.trim())
+                    .filter(Boolean)
+                    .map((g) => (
+                      <span
+                        key={g}
+                        className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
+                      >
+                        {g}
+                      </span>
+                    ))}
+                {book.tags?.map((t) => (
+                  <span
+                    key={t.id}
+                    className="bg-amber-500/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
+                  >
+                    {t.name}
+                  </span>
+                ))}
               </div>
             )}
 
@@ -755,6 +764,14 @@ export default function BookDetailPage() {
                     {g}
                   </span>
                 ))}
+            {book.tags?.map((t) => (
+              <span
+                key={t.id}
+                className="px-2.5 py-0.5 text-[10px] font-black tracking-widest bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded normal-case"
+              >
+                {t.name}
+              </span>
+            ))}
           </div>
 
           {/* Action buttons */}
@@ -984,6 +1001,21 @@ export default function BookDetailPage() {
               <div className="flex flex-col gap-1">
                 <span className="text-white/30">Format</span>
                 <span>{fmtFormat(book.format)}</span>
+              </div>
+            )}
+            {book.tags && book.tags.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-white/30">Tags</span>
+                <div className="flex flex-wrap gap-1">
+                  {book.tags.map((t) => (
+                    <span
+                      key={t.id}
+                      className="bg-amber-500/15 border border-amber-500/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-amber-400 normal-case"
+                    >
+                      {t.name}
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
             <div className="flex flex-col gap-1">
