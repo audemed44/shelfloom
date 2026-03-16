@@ -26,7 +26,7 @@ describe('Layout', () => {
     expect(screen.getAllByText('Library').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Stats').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Series').length).toBeGreaterThan(0)
-    expect(screen.getByText('Settings')).toBeInTheDocument() // sidebar only
+    expect(screen.getAllByText('Settings').length).toBeGreaterThan(0)
   })
 
   it('renders main content area', () => {
