@@ -2,6 +2,11 @@ import { Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Book } from '../../types'
 
+function fmtFormat(format: string | null | undefined): string {
+  if (!format) return ''
+  return format.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 interface BookRowProps {
   book: Book
 }
@@ -35,13 +40,30 @@ export default function BookRow({ book }: BookRowProps) {
             {book.author}
           </p>
         )}
+        {book.genre && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {book.genre
+              .split(',')
+              .map((g) => g.trim())
+              .filter(Boolean)
+              .slice(0, 3)
+              .map((g) => (
+                <span
+                  key={g}
+                  className="bg-primary/15 border border-primary/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-primary normal-case"
+                >
+                  {g}
+                </span>
+              ))}
+          </div>
+        )}
       </div>
 
       {/* Right side */}
       <div className="hidden sm:flex items-center gap-6 shrink-0 text-white/30">
         {book.format && (
           <span className="text-[10px] font-black tracking-widest">
-            {book.format.toUpperCase()}
+            {fmtFormat(book.format)}
           </span>
         )}
         {book.page_count != null && book.page_count > 0 && (
