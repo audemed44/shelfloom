@@ -259,3 +259,22 @@ export interface SessionLogResponse {
   limit: number
   offset: number
 }
+
+export interface ManualBookCreate {
+  title: string
+  author?: string | null
+  isbn?: string | null
+  format?: string
+  publisher?: string | null
+  language?: string | null
+  description?: string | null
+  page_count?: number | null
+  date_published?: string | null
+  genre?: string | null
+}
+
+export interface ManualSessionCreate {
+  start_time: string
+  duration?: number | null
+  pages_read?: number | null
+}
