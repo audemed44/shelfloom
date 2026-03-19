@@ -63,10 +63,29 @@ def _run_migrations() -> None:  # pragma: no cover
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
     settings = get_settings()
+    import sys
+
+    # Configure the 'app' namespace logger with its own stdout handler so
+    # it is independent of the root logger level (which uvicorn may reset).
+    _fmt = logging.Formatter(
+        "%(asctime)s %(levelname)-8s %(name)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+    )
+    _handler = logging.StreamHandler(sys.stdout)
+    _handler.setFormatter(_fmt)
+
+    app_log = logging.getLogger("app")
+    app_log.setLevel(settings.log_level.upper())
+    app_log.addHandler(_handler)
+    app_log.propagate = False  # don't double-log via root
+
+    # Also set root to INFO for third-party libs (alembic, httpx, etc.)
     logging.basicConfig(
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)-8s %(name)s %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
+        stream=sys.stdout,
+        force=True,
     )
     log.info("Shelfloom started (log_level=%s)", settings.log_level.upper())
 

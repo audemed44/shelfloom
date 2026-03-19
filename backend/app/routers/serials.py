@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -40,6 +41,8 @@ from app.services.serial_service import (
     update_volume,
     upload_volume_cover,
 )
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["serials"])
 
@@ -240,7 +243,11 @@ async def generate_volume_endpoint(
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except VolumeGenerationError as exc:
+        log.error("Volume generation error: %s", exc)
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    except Exception as exc:
+        log.exception("Unexpected error generating volume %d for serial %d", volume_id, serial_id)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
     return VolumeResponse.model_validate(vol)
 
 
