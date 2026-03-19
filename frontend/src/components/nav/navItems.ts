@@ -3,6 +3,7 @@ import {
   BookOpen,
   BarChart3,
   BookMarked,
+  Scroll,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -18,4 +19,5 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/library', icon: BookOpen, label: 'Library' },
   { to: '/stats', icon: BarChart3, label: 'Stats' },
   { to: '/series', icon: BookMarked, label: 'Series' },
+  { to: '/serials', icon: Scroll, label: 'Serials' },
 ]

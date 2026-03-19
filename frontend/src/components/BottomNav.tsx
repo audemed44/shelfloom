@@ -1,5 +1,4 @@
 import { NavLink } from 'react-router-dom'
-import { Settings } from 'lucide-react'
 import { NAV_ITEMS } from './nav/navItems'
 
 const NAV_LINK_CLASS = ({ isActive }: { isActive: boolean }) =>
@@ -20,10 +19,6 @@ export default function BottomNav() {
             <span>{label}</span>
           </NavLink>
         ))}
-        <NavLink to="/settings" className={NAV_LINK_CLASS}>
-          <Settings size={22} />
-          <span>Settings</span>
-        </NavLink>
       </div>
     </nav>
   )
