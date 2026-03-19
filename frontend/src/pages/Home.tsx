@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, BookOpen, Flame } from 'lucide-react'
+import { Clock, BookOpen, Flame, Settings } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { ReadingHeatmap } from '../components/ReadingHeatmap'
 import type { PaginatedResponse } from '../types'
@@ -349,6 +349,14 @@ export default function Home() {
                 {overview ? `${overview.books_read} completed` : ''}
               </span>
             </div>
+            {/* Settings shortcut — mobile only (sidebar has it on sm+) */}
+            <Link
+              to="/settings"
+              className="sm:hidden flex items-center gap-2 text-[10px] font-black tracking-widest uppercase text-white/30 hover:text-white transition-colors"
+            >
+              <Settings size={13} />
+              Settings
+            </Link>
           </div>
         </section>
       </div>

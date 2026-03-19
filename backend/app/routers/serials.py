@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
@@ -81,6 +84,17 @@ async def update_serial_endpoint(
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     return SerialResponse.model_validate(serial)
+
+
+@router.get("/serials/{serial_id}/cover")
+async def get_serial_cover_endpoint(serial_id: int, session: AsyncSession = Depends(get_session)):
+    try:
+        serial = await get_serial(session, serial_id)
+    except SerialNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    if not serial.cover_path or not Path(serial.cover_path).exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No cover available")
+    return FileResponse(serial.cover_path, media_type="image/jpeg")
 
 
 @router.delete("/serials/{serial_id}", status_code=status.HTTP_204_NO_CONTENT)
