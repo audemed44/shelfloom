@@ -228,11 +228,19 @@ async def fetch_chapters_content(
     chapters = list(result.scalars().all())
 
     fetched: list[SerialChapter] = []
+    log.info(
+        "Fetching content for chapters %d–%d of serial %d (%d to fetch)",
+        start,
+        end,
+        serial_id,
+        len(chapters),
+    )
     for chapter in chapters:
         if chapter.content is not None:
             fetched.append(chapter)
             continue
         try:
+            log.info("Fetching chapter %d: %s", chapter.chapter_number, chapter.source_url)
             content = await adapter.fetch_chapter_content(chapter.source_url)
             chapter.content = content.html_content
             chapter.word_count = content.word_count
@@ -240,6 +248,7 @@ async def fetch_chapters_content(
             if content.title and not chapter.title:
                 chapter.title = content.title
             fetched.append(chapter)
+            log.info("Chapter %d fetched (%d words)", chapter.chapter_number, content.word_count)
         except Exception as exc:
             log.warning("Failed to fetch chapter %d: %s", chapter.chapter_number, exc)
             serial.last_error = str(exc)
@@ -425,28 +434,43 @@ async def generate_volume(
     serial = await get_serial(session, serial_id)
     vol = await _get_volume(session, serial_id, volume_id)
 
-    # Ensure all chapters in range are fetched
-    await fetch_chapters_content(session, serial_id, vol.chapter_start, vol.chapter_end)
+    # Snapshot scalar values before any commits expire these ORM objects.
+    chapter_start = vol.chapter_start
+    chapter_end = vol.chapter_end
+    vol_number = vol.volume_number
+    series_id = serial.series_id
+
+    log.info(
+        "Generating volume %d (ch %d–%d) for serial %d",
+        vol_number,
+        chapter_start,
+        chapter_end,
+        serial_id,
+    )
+
+    # Ensure all chapters in range are fetched (commits internally).
+    await fetch_chapters_content(session, serial_id, chapter_start, chapter_end)
+
+    # Re-fetch serial/vol after the commit above expired them.
+    serial = await get_serial(session, serial_id)
+    vol = await _get_volume(session, serial_id, volume_id)
 
     chapters_result = await session.execute(
         select(SerialChapter)
         .where(
             SerialChapter.serial_id == serial_id,
-            SerialChapter.chapter_number >= vol.chapter_start,
-            SerialChapter.chapter_number <= vol.chapter_end,
+            SerialChapter.chapter_number >= chapter_start,
+            SerialChapter.chapter_number <= chapter_end,
             SerialChapter.content.isnot(None),
         )
         .order_by(SerialChapter.chapter_number)
     )
     chapters = list(chapters_result.scalars().all())
     if not chapters:
-        raise VolumeGenerationError(
-            f"No fetched chapters in range {vol.chapter_start}–{vol.chapter_end}"
-        )
+        raise VolumeGenerationError(f"No fetched chapters in range {chapter_start}–{chapter_end}")
 
     # Determine output shelf directory
     if shelf_id is None:
-        # default shelf
         from app.config import get_settings
 
         output_dir = Path(get_settings().default_shelf_path)
@@ -460,12 +484,21 @@ async def generate_volume(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    log.info(
+        "Building EPUB for volume %d (%d chapters) → %s",
+        vol_number,
+        len(chapters),
+        output_dir,
+    )
     try:
         epub_path = await build_volume_epub(serial, vol, chapters, output_dir)
     except Exception as exc:
+        log.exception("EPUB generation failed for volume %d: %s", vol_number, exc)
         raise VolumeGenerationError(f"EPUB generation failed: {exc}") from exc
 
-    # Create or update Book row
+    log.info("EPUB written: %s", epub_path)
+
+    # Create or update Book row (_process_file commits internally).
     from app.services.import_service import _process_file
 
     if shelf_id is None:
@@ -473,7 +506,6 @@ async def generate_volume(
 
         shelf = await session.scalar(select(Shelf).where(Shelf.path == str(output_dir)))
         if shelf is None:
-            # Create a default shelf entry if missing
             from app.config import get_settings
 
             settings = get_settings()
@@ -493,24 +525,27 @@ async def generate_volume(
     if book is None:
         raise VolumeGenerationError("Book record was not created after EPUB import")
 
+    # Re-fetch vol after _process_file's commit expired it.
+    vol = await _get_volume(session, serial_id, volume_id)
+
     # Link volume to book
     vol.book_id = book.id
     vol.generated_at = datetime.utcnow()
     vol.is_stale = False
 
     # Add book to serial's series
-    if serial.series_id is not None:
+    if series_id is not None:
         existing_entry = await session.scalar(
             select(BookSeries).where(
-                BookSeries.book_id == book.id, BookSeries.series_id == serial.series_id
+                BookSeries.book_id == book.id, BookSeries.series_id == series_id
             )
         )
         if existing_entry is None:
             session.add(
                 BookSeries(
                     book_id=book.id,
-                    series_id=serial.series_id,
-                    sequence=float(vol.volume_number),
+                    series_id=series_id,
+                    sequence=float(vol_number),
                 )
             )
 
@@ -523,13 +558,15 @@ async def generate_all_volumes(
     session: AsyncSession, serial_id: int, shelf_id: int | None = None
 ) -> list[SerialVolume]:
     volumes = await list_volumes(session, serial_id)
+    # Snapshot ids before generate_volume commits expire these objects.
+    volume_ids = [(vol.id, vol.volume_number) for vol in volumes]
     results: list[SerialVolume] = []
-    for vol in volumes:
+    for vol_id, vol_num in volume_ids:
         try:
-            generated = await generate_volume(session, serial_id, vol.id, shelf_id)
+            generated = await generate_volume(session, serial_id, vol_id, shelf_id)
             results.append(generated)
         except VolumeGenerationError as exc:
-            log.warning("Volume %d generation failed: %s", vol.volume_number, exc)
+            log.warning("Volume %d generation failed: %s", vol_num, exc)
     return results
 
 
