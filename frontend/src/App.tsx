@@ -6,6 +6,7 @@ import Library from './pages/Library'
 import BookDetail from './pages/BookDetail'
 import Stats from './pages/Stats'
 import Serials from './pages/Serials'
+import SerialDetail from './pages/SerialDetail'
 import SeriesList from './pages/SeriesList'
 import SeriesDetail from './pages/SeriesDetail'
 import Settings from './pages/Settings'
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="books/:id" element={<BookDetail />} />
           <Route path="stats" element={<Stats />} />
           <Route path="serials" element={<Serials />} />
+          <Route path="serials/:id" element={<SerialDetail />} />
           <Route path="series" element={<SeriesList />} />
           <Route path="series/:id" element={<SeriesDetail />} />
           <Route path="settings" element={<Settings />} />
