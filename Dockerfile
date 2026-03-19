@@ -26,6 +26,7 @@ COPY --from=frontend-build /build/dist /app/frontend/dist
 # Default data/config paths — the setup wizard handles everything else
 ENV SHELFLOOM_DB_PATH=/data/shelfloom.db
 ENV SHELFLOOM_COVERS_DIR=/data/covers
+ENV PYTHONUNBUFFERED=1
 
 VOLUME ["/data", "/books"]
 
