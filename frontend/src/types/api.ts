@@ -284,3 +284,47 @@ export interface ManualSessionCreate {
   duration?: number | null
   pages_read?: number | null
 }
+
+// ── Web Serials ──────────────────────────────────────────────────────────────
+
+export interface WebSerial {
+  id: number
+  url: string
+  source: string
+  title: string | null
+  author: string | null
+  description: string | null
+  cover_path: string | null
+  cover_url: string | null
+  status: string // "ongoing" | "completed" | "paused" | "error"
+  total_chapters: number
+  last_checked_at: string | null
+  last_error: string | null
+  created_at: string
+  series_id: number | null
+}
+
+export interface SerialChapter {
+  id: number
+  serial_id: number
+  chapter_number: number
+  title: string | null
+  source_url: string
+  publish_date: string | null
+  word_count: number | null
+  fetched_at: string | null
+  has_content: boolean
+}
+
+export interface SerialVolume {
+  id: number
+  serial_id: number
+  book_id: string | null
+  volume_number: number
+  name: string | null
+  cover_path: string | null
+  chapter_start: number
+  chapter_end: number
+  generated_at: string | null
+  is_stale: boolean
+}
