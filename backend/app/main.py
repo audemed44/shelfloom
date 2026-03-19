@@ -126,6 +126,7 @@ def create_app() -> FastAPI:
         kosync,
         organizer,
         reading,
+        serials,
         series,
         shelves,
         stats,
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
     application.include_router(shelves.router, prefix="/api")
     application.include_router(books.router, prefix="/api")
     application.include_router(series.router, prefix="/api")
+    application.include_router(serials.router, prefix="/api")
     application.include_router(organizer.router, prefix="/api")
     application.include_router(tags.router, prefix="/api")
     application.include_router(import_.router, prefix="/api")
