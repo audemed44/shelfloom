@@ -8,6 +8,7 @@ from app.models.reading import (  # noqa: F401
     UnmatchedKOReaderEntry,
     UnmatchedSession,
 )
+from app.models.serial import SerialChapter, SerialVolume, WebSerial  # noqa: F401
 from app.models.series import (
     BookSeries as BookSeries,
 )
