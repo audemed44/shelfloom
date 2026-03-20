@@ -12,6 +12,7 @@ from .base import (
     absolute_url,
     build_client,
     count_words,
+    extract_date_from_url,
     normalize_chapter_list,
     rate_limited_sleep,
     strip_html_entities,
@@ -113,7 +114,7 @@ class WordpressAdapter:
                     parsed.path
                 )
                 if parsed.hostname == base_host and looks_like_chapter:
-                    links.append((abs_href, text))
+                    links.append((abs_href, text, extract_date_from_url(abs_href)))
             except Exception:
                 continue
 

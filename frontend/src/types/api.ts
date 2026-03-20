@@ -327,4 +327,6 @@ export interface SerialVolume {
   chapter_end: number
   generated_at: string | null
   is_stale: boolean
+  estimated_pages: number | null
+  total_words: number | null
 }

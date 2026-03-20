@@ -91,11 +91,11 @@ def build_client() -> httpx.AsyncClient:
 
 def normalize_chapter_list(
     base_url: str,
-    links: list[tuple[str | None, str]],  # (href, text)
+    links: list[tuple[str | None, str, datetime | None]],  # (href, text, publish_date)
 ) -> list[ChapterInfo]:
     seen: dict[str, ChapterInfo] = {}
     chapter_number = 1
-    for href, text in links:
+    for href, text, publish_date in links:
         url = absolute_url(base_url, href)
         if not url or url in seen:
             continue
@@ -104,10 +104,26 @@ def normalize_chapter_list(
             chapter_number=chapter_number,
             title=title,
             source_url=url,
-            publish_date=None,
+            publish_date=publish_date,
         )
         chapter_number += 1
     return list(seen.values())
+
+
+_URL_DATE_RE = re.compile(r"/(\d{4})/(\d{2})/(\d{2})/")
+
+
+def extract_date_from_url(url: str | None) -> datetime | None:
+    """Extract a YYYY/MM/DD date from a URL path, if present."""
+    if not url:
+        return None
+    m = _URL_DATE_RE.search(url)
+    if not m:
+        return None
+    try:
+        return datetime(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return None
 
 
 def count_words(html_content: str) -> int:
