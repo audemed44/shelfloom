@@ -20,6 +20,7 @@ from app.schemas.serial import (
     VolumeResponse,
     VolumeUpdate,
 )
+from app.scrapers.registry import get_adapter, list_adapter_names
 from app.services.serial_service import (
     ScrapingError,
     SerialAlreadyExists,
@@ -69,6 +70,17 @@ def _enrich_volumes(volumes: list[object], word_counts: dict[int, int]) -> list[
 # ---------------------------------------------------------------------------
 # Serials CRUD
 # ---------------------------------------------------------------------------
+
+
+@router.get("/serials/adapters")
+async def list_adapters_endpoint():
+    return list_adapter_names()
+
+
+@router.get("/serials/detect-adapter")
+async def detect_adapter_endpoint(url: str = Query(...)):
+    adapter = get_adapter(url)
+    return {"adapter": adapter.name if adapter else None}
 
 
 @router.post("/serials", response_model=SerialResponse, status_code=status.HTTP_201_CREATED)

@@ -19,6 +19,7 @@ from app.scrapers.registry import get_adapter, source_name
 from app.scrapers.royalroad import RoyalRoadAdapter
 from app.scrapers.sequential import SequentialNextLinkAdapter
 from app.scrapers.wanderinginn import WanderingInnAdapter
+from app.scrapers.wildbow import WildbowAdapter
 from app.scrapers.wordpress import WordpressAdapter
 
 # ---------------------------------------------------------------------------
@@ -153,6 +154,7 @@ def test_get_adapter_unknown():
 
 def test_source_name():
     assert source_name("https://royalroad.com/fiction/1/title") == "royalroad"
+    assert source_name("https://palewebserial.wordpress.com/toc/") == "wildbow"
 
 
 # ---------------------------------------------------------------------------
@@ -758,3 +760,177 @@ class TestSequentialNextLinkAdapter:
             "https://example.com/ch1", "https://other.com/ch2", "example.com"
         )
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Wildbow adapter
+# ---------------------------------------------------------------------------
+
+_WILDBOW_TOC_HTML = """
+<html><head>
+<meta property="og:site_name" content="Pale" />
+<meta name="description" content="A web serial by Wildbow" />
+<meta property="og:image" content="https://example.com/cover.jpg" />
+</head><body>
+<div class="entry-content">
+<p><strong>Arc 1 – Lost for Words</strong></p>
+<p style="padding-left: 40px">
+  <strong>
+    <a href="https://palewebserial.wordpress.com/2020/05/05/blood-0-0/">
+      0.0
+    </a>
+    – Prologue.
+  </strong>
+</p>
+<p style="padding-left: 40px">
+  <strong>
+    <a href="https://palewebserial.wordpress.com/2020/05/09/lost-1-1/">
+      1.1
+    </a>
+    – Verona
+  </strong>
+</p>
+<p style="padding-left: 40px">
+  <strong>
+    <a href="https://palewebserial.wordpress.com/2020/05/12/lost-1-2/">
+      1.2
+    </a>
+    – Lucy
+  </strong>
+</p>
+<p style="padding-left: 40px">
+  <strong>
+    <a href="https://palewebserial.wordpress.com/2020/05/16/lost-1-z/">
+      1.z
+    </a>
+    – Interlude
+  </strong>
+</p>
+<p>
+  <a href="https://other-site.com/not-a-chapter">External Link</a>
+  <a href="https://palewebserial.wordpress.com/about/">About</a>
+</p>
+</div>
+</body></html>
+"""
+
+_WILDBOW_CHAPTER_HTML = """
+<html><head><title>Blood Run Cold 0.0 | Pale</title></head><body>
+<h1 class="entry-title">Blood Run Cold 0.0</h1>
+<div class="entry-content">
+  <p>The world was ending.</p>
+  <p>Or it felt like it.</p>
+  <div class="sharedaddy">Share this</div>
+  <a rel="next" href="/next">Next</a>
+</div>
+</body></html>
+"""
+
+
+class TestWildbowAdapter:
+    adapter = WildbowAdapter()
+
+    def test_can_handle(self):
+        assert self.adapter.can_handle("https://palewebserial.wordpress.com/table-of-contents/")
+        assert self.adapter.can_handle("https://pactwebserial.wordpress.com/table-of-contents/")
+        assert self.adapter.can_handle("https://parahumans.wordpress.com/table-of-contents/")
+        assert self.adapter.can_handle("https://twigserial.wordpress.com/2015/01/01/ch1/")
+        assert not self.adapter.can_handle("https://example.wordpress.com/")
+        assert not self.adapter.can_handle("https://royalroad.com/fiction/1")
+
+    def test_toc_url(self):
+        assert (
+            self.adapter._toc_url("https://palewebserial.wordpress.com/2020/05/05/blood-0-0/")
+            == "https://palewebserial.wordpress.com/table-of-contents/"
+        )
+        assert (
+            self.adapter._toc_url("https://palewebserial.wordpress.com/table-of-contents/")
+            == "https://palewebserial.wordpress.com/table-of-contents/"
+        )
+
+    @pytest.mark.asyncio
+    async def test_fetch_metadata(self):
+        resp = _make_response(
+            _WILDBOW_TOC_HTML,
+            url="https://palewebserial.wordpress.com/table-of-contents/",
+        )
+        client = _mock_client([resp])
+        with patch("app.scrapers.wildbow.build_client", return_value=client):
+            meta = await self.adapter.fetch_metadata(
+                "https://palewebserial.wordpress.com/table-of-contents/"
+            )
+        assert meta.title == "Pale"
+        assert meta.author == "Wildbow"
+        assert meta.description == "A web serial by Wildbow"
+        assert meta.cover_url == "https://example.com/cover.jpg"
+
+    @pytest.mark.asyncio
+    async def test_fetch_chapter_list(self):
+        resp = _make_response(
+            _WILDBOW_TOC_HTML,
+            url="https://palewebserial.wordpress.com/table-of-contents/",
+        )
+        client = _mock_client([resp])
+        with patch("app.scrapers.wildbow.build_client", return_value=client):
+            chapters = await self.adapter.fetch_chapter_list(
+                "https://palewebserial.wordpress.com/table-of-contents/"
+            )
+
+        assert len(chapters) == 4
+        assert chapters[0].title == "0.0 – Prologue."
+        assert chapters[0].chapter_number == 1
+        assert chapters[0].publish_date is not None
+        assert chapters[0].publish_date.year == 2020
+        assert chapters[0].publish_date.month == 5
+        assert chapters[0].publish_date.day == 5
+
+        assert chapters[1].title == "1.1 – Verona"
+        assert chapters[2].title == "1.2 – Lucy"
+        assert chapters[3].title == "1.z – Interlude"
+
+    @pytest.mark.asyncio
+    async def test_fetch_chapter_list_skips_non_chapter_links(self):
+        """External links and non-chapter-code links (like 'About') are skipped."""
+        resp = _make_response(
+            _WILDBOW_TOC_HTML,
+            url="https://palewebserial.wordpress.com/table-of-contents/",
+        )
+        client = _mock_client([resp])
+        with patch("app.scrapers.wildbow.build_client", return_value=client):
+            chapters = await self.adapter.fetch_chapter_list(
+                "https://palewebserial.wordpress.com/table-of-contents/"
+            )
+        urls = [ch.source_url for ch in chapters]
+        assert not any("other-site.com" in u for u in urls)
+        assert not any("/about/" in u for u in urls)
+
+    @pytest.mark.asyncio
+    async def test_fetch_chapter_content(self):
+        resp = _make_response(
+            _WILDBOW_CHAPTER_HTML,
+            url="https://palewebserial.wordpress.com/2020/05/05/blood-0-0/",
+        )
+        client = _mock_client([resp])
+        with patch("app.scrapers.wildbow.build_client", return_value=client):
+            content = await self.adapter.fetch_chapter_content(
+                "https://palewebserial.wordpress.com/2020/05/05/blood-0-0/"
+            )
+        assert content.title == "Blood Run Cold 0.0"
+        assert "The world was ending." in content.html_content
+        assert "sharedaddy" not in content.html_content
+        assert 'rel="next"' not in content.html_content
+        assert content.word_count > 0
+
+    def test_chapter_code_regex(self):
+        from app.scrapers.wildbow import _CHAPTER_CODE_RE
+
+        assert _CHAPTER_CODE_RE.match("0.0")
+        assert _CHAPTER_CODE_RE.match("1.01")
+        assert _CHAPTER_CODE_RE.match("16.12")
+        assert _CHAPTER_CODE_RE.match("E.6")
+        assert _CHAPTER_CODE_RE.match("1.z")
+        assert _CHAPTER_CODE_RE.match("1.0x")
+        assert _CHAPTER_CODE_RE.match("1.x (Interlude; Danny)")
+        assert not _CHAPTER_CODE_RE.match("About")
+        assert not _CHAPTER_CODE_RE.match("Arc 1")
+        assert not _CHAPTER_CODE_RE.match("Table of Contents")

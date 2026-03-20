@@ -125,7 +125,7 @@ export default function ChapterList({
         </p>
       ) : (
         <div className="border border-white/10">
-          <table className="w-full text-xs">
+          <table className="w-full text-xs table-fixed">
             <thead>
               <tr className="border-b border-white/10">
                 <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 w-16">
@@ -134,13 +134,13 @@ export default function ChapterList({
                 <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40">
                   Title
                 </th>
-                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden sm:table-cell">
+                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden sm:table-cell w-28">
                   Published
                 </th>
-                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden md:table-cell">
+                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden md:table-cell w-28">
                   Fetched
                 </th>
-                <th className="text-center px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 w-16">
+                <th className="text-center pl-2 pr-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 w-14">
                   Status
                 </th>
               </tr>
@@ -154,7 +154,7 @@ export default function ChapterList({
                   <td className="px-4 py-2 font-mono text-white/40">
                     {String(ch.chapter_number).padStart(3, '0')}
                   </td>
-                  <td className="px-4 py-2 text-white/80 normal-case truncate max-w-xs">
+                  <td className="px-4 py-2 text-white/80 normal-case break-words">
                     {ch.title ?? `Chapter ${ch.chapter_number}`}
                   </td>
                   <td className="px-4 py-2 text-white/30 normal-case hidden sm:table-cell">
