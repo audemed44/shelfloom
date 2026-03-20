@@ -8,6 +8,7 @@ import httpx
 import pytest
 
 from app.scrapers.base import (
+    ChapterInfo,
     absolute_url,
     count_words,
     normalize_chapter_list,
@@ -814,6 +815,28 @@ _WILDBOW_TOC_HTML = """
 </body></html>
 """
 
+_WILDBOW_EXTRAS_HTML = """
+<html><body>
+<div class="entry-content">
+<p><strong>[0.0]
+  <a href="https://palewebserial.wordpress.com/2020/05/07/brochure/">
+    The Brochure
+  </a>
+</strong></p>
+<p><strong>[1.2]
+  <a href="https://palewebserial.wordpress.com/2020/05/14/notes-1/">
+    Notes on Others
+  </a>
+</strong></p>
+<p><strong>[99.9]
+  <a href="https://palewebserial.wordpress.com/2020/06/01/orphan/">
+    Orphan Extra
+  </a>
+</strong></p>
+</div>
+</body></html>
+"""
+
 _WILDBOW_CHAPTER_HTML = """
 <html><head><title>Blood Run Cold 0.0 | Pale</title></head><body>
 <h1 class="entry-title">Blood Run Cold 0.0</h1>
@@ -934,3 +957,123 @@ class TestWildbowAdapter:
         assert not _CHAPTER_CODE_RE.match("About")
         assert not _CHAPTER_CODE_RE.match("Arc 1")
         assert not _CHAPTER_CODE_RE.match("Table of Contents")
+
+    @pytest.mark.asyncio
+    async def test_fetch_chapter_list_with_extras(self):
+        """Pale extra materials are interleaved after the referenced chapter."""
+        toc_resp = _make_response(
+            _WILDBOW_TOC_HTML,
+            url="https://palewebserial.wordpress.com/table-of-contents/",
+        )
+        extras_resp = _make_response(
+            _WILDBOW_EXTRAS_HTML,
+            url="https://palewebserial.wordpress.com/extra-material/",
+        )
+        client = _mock_client([toc_resp, extras_resp])
+        with patch("app.scrapers.wildbow.build_client", return_value=client):
+            chapters = await self.adapter.fetch_chapter_list(
+                "https://palewebserial.wordpress.com/table-of-contents/"
+            )
+
+        # 4 main chapters + 2 matched extras (99.9 has no match)
+        assert len(chapters) == 6
+
+        # Chapter 1: 0.0
+        assert chapters[0].title == "0.0 – Prologue."
+        assert chapters[0].chapter_number == 1
+        # Chapter 2: Extra after 0.0
+        assert chapters[1].title == "Extra: The Brochure"
+        assert chapters[1].chapter_number == 2
+        # Chapter 3: 1.1
+        assert chapters[2].title == "1.1 – Verona"
+        assert chapters[2].chapter_number == 3
+        # Chapter 4: 1.2
+        assert chapters[3].title == "1.2 – Lucy"
+        assert chapters[3].chapter_number == 4
+        # Chapter 5: Extra after 1.2
+        assert chapters[4].title == "Extra: Notes on Others"
+        assert chapters[4].chapter_number == 5
+        # Chapter 6: 1.z
+        assert chapters[5].title == "1.z – Interlude"
+        assert chapters[5].chapter_number == 6
+
+    @pytest.mark.asyncio
+    async def test_extras_not_fetched_for_non_pale(self):
+        """Non-Pale Wildbow serials don't fetch extras."""
+        toc_resp = _make_response(
+            _WILDBOW_TOC_HTML.replace(
+                "palewebserial.wordpress.com",
+                "pactwebserial.wordpress.com",
+            ),
+            url="https://pactwebserial.wordpress.com/table-of-contents/",
+        )
+        client = _mock_client([toc_resp])
+        with patch("app.scrapers.wildbow.build_client", return_value=client):
+            chapters = await self.adapter.fetch_chapter_list(
+                "https://pactwebserial.wordpress.com/table-of-contents/"
+            )
+        # Only main chapters, no extras fetch
+        assert len(chapters) == 4
+
+    def test_parse_extras(self):
+        from bs4 import BeautifulSoup
+
+        soup = BeautifulSoup(_WILDBOW_EXTRAS_HTML, "html.parser")
+        extras = self.adapter._parse_extras(
+            soup, "https://palewebserial.wordpress.com/table-of-contents/"
+        )
+        assert len(extras) == 3
+        assert extras[0][0] == "0.0"
+        assert extras[0][1].title == "Extra: The Brochure"
+        assert extras[1][0] == "1.2"
+        assert extras[1][1].title == "Extra: Notes on Others"
+        assert extras[2][0] == "99.9"
+
+    def test_chapter_title_arc_opening(self):
+        """Arc-opening chapters where sibling is a Tag, not NavigableString."""
+        from bs4 import BeautifulSoup, Tag
+
+        # Real Pale structure: <p><a>1.1</a><strong>– Verona<br/>...</strong></p>
+        html = (
+            '<p><a href="https://palewebserial.wordpress.com/1-1/">1.1</a>'
+            "<strong>– Verona<br/>"
+            '<a href="https://palewebserial.wordpress.com/1-2/">1.2</a>'
+            " – Lucy</strong></p>"
+        )
+        soup = BeautifulSoup(html, "html.parser")
+        a_tag = soup.find("a")
+        assert isinstance(a_tag, Tag)
+        title = self.adapter._chapter_title_from_context(a_tag, "1.1")
+        assert title == "1.1 – Verona"
+
+    def test_chapter_title_adjacent_link_no_bleed(self):
+        """Adjacent <a> tags don't bleed titles into each other."""
+        from bs4 import BeautifulSoup
+
+        # Pact structure: <strong><a>1.04</a><a>1.05</a></strong>
+        html = (
+            "<strong>"
+            '<a href="https://pactwebserial.wordpress.com/1-04/">1.04</a>'
+            '<a href="https://pactwebserial.wordpress.com/1-05/">1.05</a>'
+            "</strong>"
+        )
+        soup = BeautifulSoup(html, "html.parser")
+        a_tags = soup.find_all("a")
+        title = self.adapter._chapter_title_from_context(a_tags[0], "1.04")
+        assert title == "1.04"  # No bleed from next chapter
+
+    def test_interleave_extras_orphan_dropped(self):
+        """Extras referencing non-existent chapters are silently dropped."""
+        chapters = [
+            ChapterInfo(1, "0.0 – Prologue", "https://example.com/0-0", None),
+            ChapterInfo(2, "1.1 – Ch 1", "https://example.com/1-1", None),
+        ]
+        extras = [
+            ("0.0", ChapterInfo(0, "Extra: Brochure", "https://example.com/brochure", None)),
+            ("99.9", ChapterInfo(0, "Extra: Orphan", "https://example.com/orphan", None)),
+        ]
+        merged = self.adapter._interleave_extras(chapters, extras)
+        assert len(merged) == 3
+        assert merged[0].title == "0.0 – Prologue"
+        assert merged[1].title == "Extra: Brochure"
+        assert merged[2].title == "1.1 – Ch 1"
