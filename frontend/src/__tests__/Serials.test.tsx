@@ -259,3 +259,97 @@ describe('Serials page', () => {
     expect(card).toHaveAttribute('href', '/serials/1')
   })
 })
+
+// ---------------------------------------------------------------------------
+// EditSerialModal
+// ---------------------------------------------------------------------------
+
+import EditSerialModal from '../components/serials/EditSerialModal'
+import type { WebSerial } from '../types/api'
+
+const SERIAL_FIXTURE: WebSerial = {
+  id: 1,
+  url: 'https://royalroad.com/fiction/1/test',
+  source: 'royalroad',
+  title: 'Test Serial',
+  author: 'Author',
+  description: 'A description',
+  cover_path: null,
+  cover_url: null,
+  status: 'ongoing',
+  total_chapters: 100,
+  last_checked_at: null,
+  last_error: null,
+  created_at: '2026-01-01T00:00:00',
+  series_id: null,
+}
+
+describe('EditSerialModal', () => {
+  it('renders with serial data', () => {
+    render(
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <EditSerialModal
+          serial={SERIAL_FIXTURE}
+          onClose={() => {}}
+          onSaved={() => {}}
+        />
+      </MemoryRouter>
+    )
+    expect(screen.getByTestId('edit-serial-modal')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Test Serial')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Author')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('A description')).toBeInTheDocument()
+  })
+
+  it('submits PATCH on save', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ ...SERIAL_FIXTURE, title: 'Updated' }),
+        }) as Promise<Response>
+    )
+    const onSaved = vi.fn()
+    render(
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <EditSerialModal
+          serial={SERIAL_FIXTURE}
+          onClose={() => {}}
+          onSaved={onSaved}
+        />
+      </MemoryRouter>
+    )
+
+    await userEvent.click(screen.getByText('Save Changes'))
+    await waitFor(() => expect(onSaved).toHaveBeenCalled())
+
+    // Verify PATCH was called
+    const patchCall = fetchSpy.mock.calls.find(
+      (c) => (c[1] as RequestInit)?.method === 'PATCH'
+    )
+    expect(patchCall).toBeTruthy()
+    fetchSpy.mockRestore()
+  })
+
+  it('calls onClose when Cancel is clicked', async () => {
+    const onClose = vi.fn()
+    render(
+      <MemoryRouter
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
+        <EditSerialModal
+          serial={SERIAL_FIXTURE}
+          onClose={onClose}
+          onSaved={() => {}}
+        />
+      </MemoryRouter>
+    )
+    await userEvent.click(screen.getByText('Cancel'))
+    expect(onClose).toHaveBeenCalled()
+  })
+})

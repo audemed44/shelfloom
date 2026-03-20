@@ -135,7 +135,7 @@ class NovelFireAdapter:
     async def _fetch_all_html_chapters(
         self, chapter_listing_url: str, root: str, first_soup: BeautifulSoup
     ) -> list[ChapterInfo]:
-        links: list[tuple[str | None, str]] = []
+        links: list[tuple[str | None, str, None]] = []
         links.extend(self._extract_html_chapter_page(first_soup))
 
         page_urls = self._extract_toc_page_urls(first_soup, chapter_listing_url)
@@ -149,13 +149,13 @@ class NovelFireAdapter:
 
         return normalize_chapter_list(root, links)
 
-    def _extract_html_chapter_page(self, soup: BeautifulSoup) -> list[tuple[str | None, str]]:
-        links: list[tuple[str | None, str]] = []
+    def _extract_html_chapter_page(self, soup: BeautifulSoup) -> list[tuple[str | None, str, None]]:
+        links: list[tuple[str | None, str, None]] = []
         for el in soup.select("ul.chapter-list a"):
             href = el.get("href")
             title_el = el.select_one(".chapter-title")
             text = strip_html_entities((title_el or el).get_text())
-            links.append((str(href) if href else None, text))
+            links.append((str(href) if href else None, text, None))
         return links
 
     def _extract_toc_page_urls(self, soup: BeautifulSoup, chapter_listing_url: str) -> list[str]:

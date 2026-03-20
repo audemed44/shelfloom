@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
   ExternalLink,
+  Pencil,
   RefreshCw,
   Trash2,
   Loader2,
@@ -12,6 +13,7 @@ import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import VolumeList from '../components/serials/VolumeList'
 import ChapterList from '../components/serials/ChapterList'
+import EditSerialModal from '../components/serials/EditSerialModal'
 import type { WebSerial, SerialVolume, Shelf } from '../types/api'
 
 const STATUS_STYLES: Record<string, string> = {
@@ -39,6 +41,7 @@ export default function SerialDetail() {
   const [updating, setUpdating] = useState(false)
   const [updateMsg, setUpdateMsg] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   const { data: serial, loading } = useApi<WebSerial>(
     serialId ? `/api/serials/${serialId}?_k=${refreshKey}` : null
@@ -182,10 +185,10 @@ export default function SerialDetail() {
             <div className="h-8 w-px bg-white/10" />
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-0.5">
-                Last Checked
+                {serial.last_checked_at ? 'Last Checked' : 'Added'}
               </p>
               <p className="text-sm font-medium normal-case">
-                {fmtDate(serial.last_checked_at)}
+                {fmtDate(serial.last_checked_at ?? serial.created_at)}
               </p>
             </div>
             <div className="h-8 w-px bg-white/10" />
@@ -207,6 +210,13 @@ export default function SerialDetail() {
 
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setShowEditModal(true)}
+              className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-white/30 rounded-lg transition-all"
+            >
+              <Pencil size={13} />
+              Edit
+            </button>
             <button
               onClick={handleUpdate}
               disabled={updating}
@@ -296,6 +306,17 @@ export default function SerialDetail() {
           totalChapters={serial.total_chapters}
         />
       </section>
+
+      {showEditModal && (
+        <EditSerialModal
+          serial={serial}
+          onClose={() => setShowEditModal(false)}
+          onSaved={() => {
+            setShowEditModal(false)
+            refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

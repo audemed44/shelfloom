@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import httpx
+from sqlalchemy import func as sa_func
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -17,6 +18,7 @@ from app.schemas.serial import (
     AutoSplitConfig,
     SerialCreate,
     SerialUpdate,
+    SingleVolumeCreate,
     VolumeConfigCreate,
     VolumeRange,
     VolumeUpdate,
@@ -343,16 +345,19 @@ async def configure_volumes(
     existing_result = await session.execute(
         select(SerialVolume).where(SerialVolume.serial_id == serial_id)
     )
+    max_existing = 0
     for vol in existing_result.scalars().all():
         if vol.book_id is None:
             await session.delete(vol)
+        else:
+            max_existing = max(max_existing, vol.volume_number)
     await session.flush()  # ensure deletions are visible before new inserts
 
     volumes: list[SerialVolume] = []
     for idx, split in enumerate(data.splits):
         vol = SerialVolume(
             serial_id=serial_id,
-            volume_number=idx + 1,
+            volume_number=max_existing + idx + 1,
             name=split.name,
             chapter_start=split.start,
             chapter_end=split.end,
@@ -428,6 +433,7 @@ async def generate_volume(
     serial_id: int,
     volume_id: int,
     shelf_id: int | None = None,
+    existing_book_id: str | None = None,
 ) -> SerialVolume:
     from app.services.epub_builder import build_volume_epub
 
@@ -469,19 +475,25 @@ async def generate_volume(
     if not chapters:
         raise VolumeGenerationError(f"No fetched chapters in range {chapter_start}–{chapter_end}")
 
-    # Determine output shelf directory
-    if shelf_id is None:
-        from app.config import get_settings
+    # Determine output shelf
+    from app.models.shelf import Shelf
 
-        output_dir = Path(get_settings().default_shelf_path)
-    else:
-        from app.models.shelf import Shelf
-
+    if shelf_id is not None:
         shelf = await session.scalar(select(Shelf).where(Shelf.id == shelf_id))
         if shelf is None:
             raise VolumeGenerationError(f"Shelf {shelf_id} not found")
-        output_dir = Path(shelf.path)
+    else:
+        from app.config import get_settings
 
+        settings = get_settings()
+        shelf = await session.scalar(select(Shelf).where(Shelf.name == settings.default_shelf_name))
+        if shelf is None:
+            shelf = Shelf(name=settings.default_shelf_name, path=settings.default_shelf_path)
+            session.add(shelf)
+            await session.flush()
+
+    # Always write the EPUB into the shelf's actual path.
+    output_dir = Path(shelf.path)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     log.info(
@@ -491,36 +503,32 @@ async def generate_volume(
         output_dir,
     )
     try:
-        epub_path = await build_volume_epub(serial, vol, chapters, output_dir)
+        epub_path = await build_volume_epub(serial, vol, chapters, output_dir, existing_book_id)
     except Exception as exc:
         log.exception("EPUB generation failed for volume %d: %s", vol_number, exc)
         raise VolumeGenerationError(f"EPUB generation failed: {exc}") from exc
 
     log.info("EPUB written: %s", epub_path)
 
+    # Snapshot shelf scalars before _process_file commits (which expires shelf).
+    shelf_id_snap = shelf.id
+    shelf_path_snap = shelf.path
+
     # Create or update Book row (_process_file commits internally).
     from app.services.import_service import _process_file
-
-    if shelf_id is None:
-        from app.models.shelf import Shelf
-
-        shelf = await session.scalar(select(Shelf).where(Shelf.path == str(output_dir)))
-        if shelf is None:
-            from app.config import get_settings
-
-            settings = get_settings()
-            shelf = Shelf(name=settings.default_shelf_name, path=str(output_dir))
-            session.add(shelf)
-            await session.flush()
 
     covers_dir = _covers_dir()
     await _process_file(session, shelf, epub_path, covers_dir)  # type: ignore[arg-type]
 
-    # Find the book we just created/updated
+    # Find the book we just created/updated.
+    # _process_file stores file_path as relative to shelf.path.
     from app.models.book import Book
 
+    rel_epub_path = str(epub_path.relative_to(shelf_path_snap))
     book = await session.scalar(
-        select(Book).where(Book.file_path == str(epub_path)).order_by(Book.date_added.desc())
+        select(Book)
+        .where(Book.shelf_id == shelf_id_snap, Book.file_path == rel_epub_path)
+        .order_by(Book.date_added.desc())
     )
     if book is None:
         raise VolumeGenerationError("Book record was not created after EPUB import")
@@ -573,13 +581,102 @@ async def generate_all_volumes(
 async def rebuild_volume(session: AsyncSession, serial_id: int, volume_id: int) -> SerialVolume:
     vol = await _get_volume(session, serial_id, volume_id)
     shelf_id: int | None = None
+    existing_book_id: str | None = None
     if vol.book_id is not None:
+        from app.models.book import Book
+
+        existing_book_id = vol.book_id
+        book = await session.scalar(select(Book).where(Book.id == vol.book_id))
+        if book is not None:
+            shelf_id = book.shelf_id
+    return await generate_volume(session, serial_id, volume_id, shelf_id, existing_book_id)
+
+
+# ---------------------------------------------------------------------------
+# Volume deletion & single add
+# ---------------------------------------------------------------------------
+
+
+class VolumeNotFound(Exception):
+    pass
+
+
+async def delete_volume(
+    session: AsyncSession,
+    serial_id: int,
+    volume_id: int,
+    delete_book: bool = False,
+) -> None:
+    vol = await _get_volume(session, serial_id, volume_id)
+    if delete_book and vol.book_id is not None:
         from app.models.book import Book
 
         book = await session.scalar(select(Book).where(Book.id == vol.book_id))
         if book is not None:
-            shelf_id = book.shelf_id
-    return await generate_volume(session, serial_id, volume_id, shelf_id)
+            # Delete file from disk
+            from app.models.shelf import Shelf
+
+            shelf = await session.scalar(select(Shelf).where(Shelf.id == book.shelf_id))
+            if shelf is not None and book.file_path:
+                file_path = Path(shelf.path) / book.file_path
+                try:
+                    file_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            await session.delete(book)
+
+    await session.delete(vol)
+    await session.commit()
+
+
+async def add_single_volume(
+    session: AsyncSession,
+    serial_id: int,
+    data: SingleVolumeCreate,
+) -> SerialVolume:
+    await _require_serial(session, serial_id)
+
+    # Find max existing volume number
+    result = await session.execute(
+        select(sa_func.max(SerialVolume.volume_number)).where(SerialVolume.serial_id == serial_id)
+    )
+    max_num = result.scalar() or 0
+
+    vol = SerialVolume(
+        serial_id=serial_id,
+        volume_number=max_num + 1,
+        name=data.name,
+        chapter_start=data.start,
+        chapter_end=data.end,
+    )
+    session.add(vol)
+    await session.commit()
+    await session.refresh(vol)
+    return vol
+
+
+# ---------------------------------------------------------------------------
+# Word count / page estimation
+# ---------------------------------------------------------------------------
+
+
+async def get_volume_word_counts(session: AsyncSession, serial_id: int) -> dict[int, int]:
+    """Return {volume_id: total_words} for all volumes of the serial."""
+    result = await session.execute(
+        select(
+            SerialVolume.id,
+            sa_func.coalesce(sa_func.sum(SerialChapter.word_count), 0),
+        )
+        .join(
+            SerialChapter,
+            (SerialChapter.serial_id == SerialVolume.serial_id)
+            & (SerialChapter.chapter_number >= SerialVolume.chapter_start)
+            & (SerialChapter.chapter_number <= SerialVolume.chapter_end),
+        )
+        .where(SerialVolume.serial_id == serial_id)
+        .group_by(SerialVolume.id)
+    )
+    return {row[0]: int(row[1]) for row in result.all()}
 
 
 # ---------------------------------------------------------------------------

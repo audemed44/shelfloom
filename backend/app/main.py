@@ -65,13 +65,29 @@ async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
     settings = get_settings()
     import sys
 
-    # Configure the 'app' namespace logger with its own stdout handler so
+    # Import all models so Alembic and SQLAlchemy see them
+    import app.models  # noqa: F401
+
+    # Run DB migrations (creates schema on first run; applies new migrations on upgrades).
+    # IMPORTANT: this must happen BEFORE logger setup because Alembic's fileConfig()
+    # calls logging.config.fileConfig(disable_existing_loggers=True), which wipes
+    # any loggers not listed in alembic.ini.
+    _run_migrations()
+
+    # Re-enable all app.* loggers that Alembic's fileConfig() disabled.
+    # fileConfig(disable_existing_loggers=True) disables every logger not
+    # listed in alembic.ini — our app.* loggers were created at import time.
+    for name in list(logging.Logger.manager.loggerDict):
+        if name == "app" or name.startswith("app."):
+            logging.getLogger(name).disabled = False
+
+    # Configure the 'app' namespace logger with its own stderr handler so
     # it is independent of the root logger level (which uvicorn may reset).
     _fmt = logging.Formatter(
         "%(asctime)s %(levelname)-8s %(name)s %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
-    _handler = logging.StreamHandler(sys.stdout)
+    _handler = logging.StreamHandler(sys.stderr)
     _handler.setFormatter(_fmt)
 
     app_log = logging.getLogger("app")
@@ -79,21 +95,15 @@ async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
     app_log.addHandler(_handler)
     app_log.propagate = False  # don't double-log via root
 
-    # Also set root to INFO for third-party libs (alembic, httpx, etc.)
+    # Also set root to INFO for third-party libs (httpx, etc.)
     logging.basicConfig(
         level=settings.log_level.upper(),
         format="%(asctime)s %(levelname)-8s %(name)s %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
-        stream=sys.stdout,
+        stream=sys.stderr,
         force=True,
     )
     log.info("Shelfloom started (log_level=%s)", settings.log_level.upper())
-
-    # Import all models so Alembic and SQLAlchemy see them
-    import app.models  # noqa: F401
-
-    # Run DB migrations (creates schema on first run; applies new migrations on upgrades)
-    _run_migrations()
 
     # Start background scan scheduler
     from app.database import get_session_factory

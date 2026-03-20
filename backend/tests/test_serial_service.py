@@ -14,6 +14,7 @@ from app.schemas.serial import (
     AutoSplitConfig,
     SerialCreate,
     SerialUpdate,
+    SingleVolumeCreate,
     VolumeConfigCreate,
     VolumeRange,
     VolumeUpdate,
@@ -24,13 +25,16 @@ from app.services.serial_service import (
     SerialNotFound,
     VolumeGenerationError,
     add_serial,
+    add_single_volume,
     auto_split_volumes,
     configure_volumes,
     delete_serial,
+    delete_volume,
     fetch_chapters_content,
     generate_all_volumes,
     generate_volume,
     get_serial,
+    get_volume_word_counts,
     list_chapters,
     list_serials,
     list_volumes,
@@ -1022,12 +1026,13 @@ async def test_generate_volume_success(db_session, tmp_path, configured_serial):
     fake_epub = tmp_path / "volume_1.epub"
     fake_epub.write_bytes(b"fake epub")
 
-    # Create a fake Book that _process_file would have created
+    # Create a fake Book that _process_file would have created.
+    # file_path is stored relative to shelf.path, matching _process_file behaviour.
     book = Book(
         id="test-book-uuid-1",
         title="Test Vol 1",
         format="epub",
-        file_path=str(fake_epub),
+        file_path="volume_1.epub",
         shelf_id=shelf.id,
     )
     db_session.add(book)
@@ -1170,7 +1175,7 @@ async def test_rebuild_volume_success(db_session, tmp_path, configured_serial):
     ) as mock_gen:
         await rebuild_volume(db_session, serial.id, vol.id)
 
-    mock_gen.assert_called_once_with(db_session, serial.id, vol.id, shelf.id)
+    mock_gen.assert_called_once_with(db_session, serial.id, vol.id, shelf.id, "rebuild-book-uuid")
 
 
 @pytest.mark.asyncio
@@ -1207,3 +1212,264 @@ async def test_api_update_from_source(client, tmp_path):
         upd_resp = await client.post(f"/api/serials/{serial_id}/update")
     assert upd_resp.status_code == 200
     assert upd_resp.json()["new_chapters"] == 1
+
+
+# ---------------------------------------------------------------------------
+# delete_volume
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_delete_volume(db_session, serial):
+    vols = await configure_volumes(
+        db_session, serial.id, VolumeConfigCreate(splits=[VolumeRange(start=1, end=3)])
+    )
+    vol_id = vols[0].id
+    await delete_volume(db_session, serial.id, vol_id)
+    remaining = await list_volumes(db_session, serial.id)
+    assert len(remaining) == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_volume_with_book(db_session, tmp_path, serial):
+    from app.models.book import Book
+    from app.models.shelf import Shelf
+
+    shelf = Shelf(name="Library", path=str(tmp_path))
+    db_session.add(shelf)
+    await db_session.flush()
+
+    epub_file = tmp_path / "vol.epub"
+    epub_file.write_bytes(b"fake")
+
+    book = Book(
+        id="del-book-uuid",
+        title="Delete Vol",
+        format="epub",
+        file_path="vol.epub",
+        shelf_id=shelf.id,
+    )
+    db_session.add(book)
+    await db_session.flush()
+
+    vols = await configure_volumes(
+        db_session, serial.id, VolumeConfigCreate(splits=[VolumeRange(start=1, end=3)])
+    )
+    vol = vols[0]
+    vol.book_id = book.id
+    await db_session.commit()
+
+    await delete_volume(db_session, serial.id, vol.id, delete_book=True)
+
+    remaining = await list_volumes(db_session, serial.id)
+    assert len(remaining) == 0
+    assert not epub_file.exists()
+
+    from sqlalchemy import select
+
+    found = await db_session.scalar(select(Book).where(Book.id == "del-book-uuid"))
+    assert found is None
+
+
+@pytest.mark.asyncio
+async def test_delete_volume_not_found(db_session, serial):
+    with pytest.raises(SerialNotFound):
+        await delete_volume(db_session, serial.id, 99999)
+
+
+# ---------------------------------------------------------------------------
+# add_single_volume
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_add_single_volume(db_session, serial):
+    # Add first volume via configure
+    await configure_volumes(
+        db_session, serial.id, VolumeConfigCreate(splits=[VolumeRange(start=1, end=2)])
+    )
+    # Add single volume
+    vol = await add_single_volume(
+        db_session, serial.id, SingleVolumeCreate(start=3, end=3, name="Epilogue")
+    )
+    assert vol.volume_number == 2
+    assert vol.chapter_start == 3
+    assert vol.name == "Epilogue"
+
+
+@pytest.mark.asyncio
+async def test_add_single_volume_empty(db_session, serial):
+    vol = await add_single_volume(db_session, serial.id, SingleVolumeCreate(start=1, end=3))
+    assert vol.volume_number == 1
+
+
+@pytest.mark.asyncio
+async def test_add_single_volume_serial_not_found(db_session):
+    with pytest.raises(SerialNotFound):
+        await add_single_volume(db_session, 99999, SingleVolumeCreate(start=1, end=3))
+
+
+# ---------------------------------------------------------------------------
+# get_volume_word_counts
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_volume_word_counts(db_session, serial_with_content):
+    vols = await configure_volumes(
+        db_session,
+        serial_with_content.id,
+        VolumeConfigCreate(splits=[VolumeRange(start=1, end=3)]),
+    )
+    counts = await get_volume_word_counts(db_session, serial_with_content.id)
+    # Each chapter has word_count=5, 3 chapters total
+    assert counts[vols[0].id] == 15
+
+
+@pytest.mark.asyncio
+async def test_get_volume_word_counts_empty(db_session, serial):
+    """No volumes → empty dict."""
+    counts = await get_volume_word_counts(db_session, serial.id)
+    assert counts == {}
+
+
+# ---------------------------------------------------------------------------
+# API: delete volume, add single volume
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_api_delete_volume(client, tmp_path):
+    from app.scrapers.base import ChapterInfo, SerialMetadata
+
+    mock_adapter = MagicMock()
+    mock_adapter.name = "royalroad"
+    mock_adapter.fetch_metadata = AsyncMock(
+        return_value=SerialMetadata("DelVol", "Auth", None, None, "ongoing")
+    )
+    mock_adapter.fetch_chapter_list = AsyncMock(
+        return_value=[ChapterInfo(i, f"Ch {i}", f"https://r.com/ch/{i}", None) for i in range(1, 4)]
+    )
+
+    with (
+        patch("app.services.serial_service.get_adapter", return_value=mock_adapter),
+        patch("app.services.serial_service._covers_dir", return_value=tmp_path),
+    ):
+        cr = await client.post(
+            "/api/serials", json={"url": "https://royalroad.com/fiction/20/del-vol"}
+        )
+    serial_id = cr.json()["id"]
+
+    # Configure volume
+    vol_resp = await client.post(
+        f"/api/serials/{serial_id}/volumes",
+        json={"splits": [{"start": 1, "end": 3}]},
+    )
+    vol_id = vol_resp.json()[0]["id"]
+
+    # Delete volume
+    del_resp = await client.delete(f"/api/serials/{serial_id}/volumes/{vol_id}")
+    assert del_resp.status_code == 204
+
+    # Verify gone
+    list_resp = await client.get(f"/api/serials/{serial_id}/volumes")
+    assert len(list_resp.json()) == 0
+
+
+@pytest.mark.asyncio
+async def test_api_delete_volume_not_found(client):
+    with patch(
+        "app.routers.serials.delete_volume",
+        new_callable=AsyncMock,
+        side_effect=SerialNotFound("not found"),
+    ):
+        resp = await client.delete("/api/serials/99999/volumes/1")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_add_single_volume(client, tmp_path):
+    from app.scrapers.base import ChapterInfo, SerialMetadata
+
+    mock_adapter = MagicMock()
+    mock_adapter.name = "royalroad"
+    mock_adapter.fetch_metadata = AsyncMock(
+        return_value=SerialMetadata("AddVol", "Auth", None, None, "ongoing")
+    )
+    mock_adapter.fetch_chapter_list = AsyncMock(
+        return_value=[ChapterInfo(i, f"Ch {i}", f"https://r.com/ch/{i}", None) for i in range(1, 6)]
+    )
+
+    with (
+        patch("app.services.serial_service.get_adapter", return_value=mock_adapter),
+        patch("app.services.serial_service._covers_dir", return_value=tmp_path),
+    ):
+        cr = await client.post(
+            "/api/serials", json={"url": "https://royalroad.com/fiction/21/add-vol"}
+        )
+    serial_id = cr.json()["id"]
+
+    resp = await client.post(
+        f"/api/serials/{serial_id}/volumes/add",
+        json={"start": 1, "end": 3, "name": "Part 1"},
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["chapter_start"] == 1
+    assert data["chapter_end"] == 3
+    assert data["name"] == "Part 1"
+    assert data["volume_number"] == 1
+
+
+@pytest.mark.asyncio
+async def test_api_add_single_volume_not_found(client):
+    resp = await client.post(
+        "/api/serials/99999/volumes/add",
+        json={"start": 1, "end": 3},
+    )
+    assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Volume response enrichment
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_api_volumes_include_word_counts(client, tmp_path):
+    from app.scrapers.base import ChapterContent, ChapterInfo, SerialMetadata
+
+    mock_adapter = MagicMock()
+    mock_adapter.name = "royalroad"
+    mock_adapter.fetch_metadata = AsyncMock(
+        return_value=SerialMetadata("WordStory", "Auth", None, None, "ongoing")
+    )
+    mock_adapter.fetch_chapter_list = AsyncMock(
+        return_value=[ChapterInfo(1, "Ch 1", "https://r.com/ch/1", None)]
+    )
+    mock_adapter.fetch_chapter_content = AsyncMock(
+        return_value=ChapterContent(0, "Ch 1", "<p>word</p>", 500)
+    )
+
+    with (
+        patch("app.services.serial_service.get_adapter", return_value=mock_adapter),
+        patch("app.services.serial_service._covers_dir", return_value=tmp_path),
+    ):
+        cr = await client.post(
+            "/api/serials", json={"url": "https://royalroad.com/fiction/22/word-story"}
+        )
+    serial_id = cr.json()["id"]
+
+    # Fetch chapter content
+    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+        await client.post(f"/api/serials/{serial_id}/chapters/fetch", json={"start": 1, "end": 1})
+
+    # Configure volume
+    vol_resp = await client.post(
+        f"/api/serials/{serial_id}/volumes",
+        json={"splits": [{"start": 1, "end": 1}]},
+    )
+    assert vol_resp.status_code == 201
+    data = vol_resp.json()[0]
+    assert data["total_words"] == 500
+    assert data["estimated_pages"] == 2  # 500 / 250 = 2

@@ -88,6 +88,12 @@ class VolumeUpdate(BaseModel):
     name: str | None = None
 
 
+class SingleVolumeCreate(BaseModel):
+    start: int
+    end: int
+    name: str | None = None
+
+
 class VolumeResponse(BaseModel):
     model_config = {"from_attributes": True}
     id: int
@@ -100,3 +106,5 @@ class VolumeResponse(BaseModel):
     chapter_end: int
     generated_at: datetime | None
     is_stale: bool
+    estimated_pages: int | None = None
+    total_words: int | None = None

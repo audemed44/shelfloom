@@ -86,9 +86,9 @@ def test_count_words():
 
 def test_normalize_chapter_list_dedup():
     links = [
-        ("/ch/1", "Chapter 1"),
-        ("/ch/1", "Duplicate"),
-        ("/ch/2", "Chapter 2"),
+        ("/ch/1", "Chapter 1", None),
+        ("/ch/1", "Duplicate", None),
+        ("/ch/2", "Chapter 2", None),
     ]
     chapters = normalize_chapter_list("https://example.com", links)
     assert len(chapters) == 2
@@ -98,7 +98,7 @@ def test_normalize_chapter_list_dedup():
 
 
 def test_normalize_chapter_list_invalid_href():
-    links = [(None, "Chapter 1"), ("javascript:void(0)", "Bad")]
+    links = [(None, "Chapter 1", None), ("javascript:void(0)", "Bad", None)]
     chapters = normalize_chapter_list("https://example.com", links)
     assert len(chapters) == 0
 
@@ -168,8 +168,14 @@ _RR_STORY_HTML = """
 <div class="fiction-info"><div class="description">Great story</div></div>
 <img class="thumbnail" src="https://cdn.royalroad.com/cover.jpg" />
 <table id="chapters">
-  <tr><td><a href="/fiction/1/my-story/chapter/100/ch1">Chapter 1</a></td></tr>
-  <tr><td><a href="/fiction/1/my-story/chapter/101/ch2">Chapter 2</a></td></tr>
+  <tr>
+    <td><a href="/fiction/1/my-story/chapter/100/ch1">Chapter 1</a></td>
+    <td><time datetime="2025-01-15T12:00:00Z">Jan 15</time></td>
+  </tr>
+  <tr>
+    <td><a href="/fiction/1/my-story/chapter/101/ch2">Chapter 2</a></td>
+    <td><time datetime="2025-01-22T12:00:00Z">Jan 22</time></td>
+  </tr>
 </table>
 </body></html>
 """
@@ -227,6 +233,10 @@ class TestRoyalRoadAdapter:
         assert len(chapters) == 2
         assert chapters[0].title == "Chapter 1"
         assert chapters[1].chapter_number == 2
+        assert chapters[0].publish_date is not None
+        assert chapters[0].publish_date.year == 2025
+        assert chapters[0].publish_date.month == 1
+        assert chapters[0].publish_date.day == 15
 
     @pytest.mark.asyncio
     async def test_fetch_chapter_content(self):
