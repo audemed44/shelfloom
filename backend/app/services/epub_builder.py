@@ -70,6 +70,7 @@ def _build_epub_sync(
     volume: SerialVolume,
     chapters: list[SerialChapter],
     output_dir: Path,
+    existing_book_id: str | None = None,
 ) -> Path:
     """Synchronous EPUB construction — call via :func:`build_volume_epub`."""
     title = volume.name or f"{serial.title or 'Untitled'} - Volume {volume.volume_number}"
@@ -77,7 +78,10 @@ def _build_epub_sync(
 
     book = epub.EpubBook()
 
-    shelfloom_id = f"serial-{serial.id}-vol-{volume.volume_number}"
+    if existing_book_id:
+        shelfloom_id = existing_book_id
+    else:
+        shelfloom_id = f"serial-{serial.id}-vol-{volume.volume_number}"
     book.set_identifier(f"{SHELFLOOM_URN_PREFIX}{shelfloom_id}")
     book.set_title(title)
     book.set_language("en")
@@ -131,10 +135,13 @@ async def build_volume_epub(
     volume: SerialVolume,
     chapters: list[SerialChapter],
     output_dir: Path,
+    existing_book_id: str | None = None,
 ) -> Path:
     """Build an EPUB for *volume* and return the path to the generated file.
 
     Offloads the synchronous ebooklib work to a thread so the event loop
     stays unblocked.
     """
-    return await asyncio.to_thread(_build_epub_sync, serial, volume, chapters, output_dir)
+    return await asyncio.to_thread(
+        _build_epub_sync, serial, volume, chapters, output_dir, existing_book_id
+    )

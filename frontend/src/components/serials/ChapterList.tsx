@@ -135,10 +135,13 @@ export default function ChapterList({
                   Title
                 </th>
                 <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden sm:table-cell">
-                  Date
+                  Published
                 </th>
-                <th className="text-center px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 w-20">
+                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden md:table-cell">
                   Fetched
+                </th>
+                <th className="text-center px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 w-16">
+                  Status
                 </th>
               </tr>
             </thead>
@@ -156,6 +159,9 @@ export default function ChapterList({
                   </td>
                   <td className="px-4 py-2 text-white/30 normal-case hidden sm:table-cell">
                     {fmtDate(ch.publish_date)}
+                  </td>
+                  <td className="px-4 py-2 text-white/30 normal-case hidden md:table-cell">
+                    {fmtDate(ch.fetched_at)}
                   </td>
                   <td className="px-4 py-2 text-center">
                     {ch.has_content ? (

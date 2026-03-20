@@ -11,6 +11,7 @@ from .base import (
     SerialMetadata,
     build_client,
     count_words,
+    extract_date_from_url,
     normalize_chapter_list,
     rate_limited_sleep,
     strip_html_entities,
@@ -58,14 +59,17 @@ class WanderingInnAdapter:
             resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        links: list[tuple[str | None, str]] = []
+        from datetime import datetime
+
+        links: list[tuple[str | None, str, datetime | None]] = []
         for el in soup.select("#table-of-contents a"):
             classes = el.get("class") or []
             if any(c in classes for c in ("book-title-num", "volume-book-card")):
                 continue
             href = el.get("href")
+            href_str = str(href) if href else None
             text = strip_html_entities(el.get_text())
-            links.append((str(href) if href else None, text))
+            links.append((href_str, text, extract_date_from_url(href_str)))
 
         chapters = normalize_chapter_list(toc_url, links)
         if not chapters:

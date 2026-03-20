@@ -66,17 +66,30 @@ class RoyalRoadAdapter:
         )
 
     async def fetch_chapter_list(self, url: str) -> list[ChapterInfo]:
+        from datetime import datetime
+
         story_url = self._story_url(url)
         async with build_client() as client:
             resp = await client.get(story_url)
             resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        links: list[tuple[str | None, str]] = []
-        for el in soup.select("table#chapters a[href*='/chapter/']"):
-            href = el.get("href")  # type: ignore[union-attr]
-            text = strip_html_entities(el.get_text())
-            links.append((str(href) if href else None, text))
+        links: list[tuple[str | None, str, datetime | None]] = []
+        for row in soup.select("table#chapters tr"):
+            link_el = row.select_one("a[href*='/chapter/']")
+            if not link_el:
+                continue
+            href = link_el.get("href")  # type: ignore[union-attr]
+            text = strip_html_entities(link_el.get_text())
+            publish_date: datetime | None = None
+            time_el = row.select_one("time[datetime]")
+            if time_el:
+                try:
+                    dt_str = time_el["datetime"]
+                    publish_date = datetime.fromisoformat(str(dt_str).replace("Z", "+00:00"))
+                except (ValueError, KeyError):
+                    pass
+            links.append((str(href) if href else None, text, publish_date))
 
         return normalize_chapter_list(story_url, links)
 
