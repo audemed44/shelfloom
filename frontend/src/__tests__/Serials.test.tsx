@@ -50,6 +50,24 @@ function mockFetch(overrides: Record<string, any> = {}): any {
     const method =
       (opts as RequestInit | undefined)?.method?.toUpperCase() ?? 'GET'
 
+    if (u.includes('/api/serials/adapters') && method === 'GET') {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => [
+          'royalroad',
+          'wordpress-generic',
+          'sequential-next-link',
+        ],
+      }) as Promise<Response>
+    }
+    if (u.includes('/api/serials/detect-adapter') && method === 'GET') {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ adapter: 'royalroad' }),
+      }) as Promise<Response>
+    }
     if (u.includes('/api/serials') && method === 'GET') {
       return Promise.resolve({
         ok: true,

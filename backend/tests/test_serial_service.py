@@ -312,7 +312,7 @@ async def test_fetch_chapters_content(db_session, serial):
         return_value=ChapterContent(0, "Ch Title", "<p>Hello</p>", 1)
     )
 
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         fetched = await fetch_chapters_content(db_session, serial.id, 1, 2)
 
     assert len(fetched) == 2
@@ -325,7 +325,7 @@ async def test_fetch_chapters_already_fetched(db_session, serial_with_content):
     mock_adapter = MagicMock()
     mock_adapter.fetch_chapter_content = AsyncMock()
 
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         fetched = await fetch_chapters_content(db_session, serial_with_content.id, 1, 3)
 
     mock_adapter.fetch_chapter_content.assert_not_called()
@@ -335,7 +335,7 @@ async def test_fetch_chapters_already_fetched(db_session, serial_with_content):
 @pytest.mark.asyncio
 async def test_fetch_chapters_no_adapter(db_session, serial):
     with (
-        patch("app.services.serial_service.get_adapter", return_value=None),
+        patch("app.services.serial_service.get_adapter_by_name", return_value=None),
         pytest.raises(ScrapingError),
     ):
         await fetch_chapters_content(db_session, serial.id, 1, 1)
@@ -375,7 +375,7 @@ async def test_fetch_chapters_marks_volumes_stale(db_session, serial_with_conten
         return_value=ChapterContent(0, "Ch 1", "<p>new</p>", 1)
     )
 
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         await fetch_chapters_content(db_session, serial_with_content.id, 1, 1)
 
     await db_session.refresh(vol)
@@ -400,7 +400,7 @@ async def test_update_from_source_adds_new_chapters(db_session, serial):
     mock_adapter = MagicMock()
     mock_adapter.fetch_chapter_list = AsyncMock(return_value=new_chapters)
 
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         result = await update_from_source(db_session, serial.id)
 
     assert result["new_chapters"] == 1
@@ -413,7 +413,7 @@ async def test_update_from_source_scraping_error(db_session, serial):
     mock_adapter.fetch_chapter_list = AsyncMock(side_effect=RuntimeError("blocked"))
 
     with (
-        patch("app.services.serial_service.get_adapter", return_value=mock_adapter),
+        patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter),
         pytest.raises(ScrapingError),
     ):
         await update_from_source(db_session, serial.id)
@@ -711,7 +711,7 @@ async def test_fetch_chapters_sets_title(db_session, serial):
         return_value=ChapterContent(0, "Scraped Title", "<p>x</p>", 1)
     )
 
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         await fetch_chapters_content(db_session, serial.id, 1, 1)
 
     await db_session.refresh(ch)
@@ -725,7 +725,7 @@ async def test_fetch_chapters_error_sets_status(db_session, serial):
     mock_adapter = MagicMock()
     mock_adapter.fetch_chapter_content = AsyncMock(side_effect=RuntimeError("blocked"))
 
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         await fetch_chapters_content(db_session, serial.id, 1, 1)
 
     await db_session.refresh(serial)
@@ -736,7 +736,7 @@ async def test_fetch_chapters_error_sets_status(db_session, serial):
 @pytest.mark.asyncio
 async def test_update_from_source_no_adapter(db_session, serial):
     with (
-        patch("app.services.serial_service.get_adapter", return_value=None),
+        patch("app.services.serial_service.get_adapter_by_name", return_value=None),
         pytest.raises(ScrapingError, match="No adapter"),
     ):
         await update_from_source(db_session, serial.id)
@@ -756,7 +756,7 @@ async def test_update_from_source_recovers_error_status(db_session, serial):
         ]
     )
 
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         await update_from_source(db_session, serial.id)
 
     await db_session.refresh(serial)
@@ -786,7 +786,7 @@ async def test_update_from_source_marks_volumes_stale(db_session, serial):
         ]
     )
 
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         await update_from_source(db_session, serial.id)
 
     await db_session.refresh(vol)
@@ -1089,7 +1089,7 @@ async def test_generate_volume_no_chapters(db_session, tmp_path, serial):
 
     try:
         with (
-            patch("app.services.serial_service.get_adapter", return_value=mock_adapter),
+            patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter),
             patch("app.services.serial_service._covers_dir", return_value=tmp_path),
             pytest.raises(VolumeGenerationError, match="No fetched chapters"),
         ):
@@ -1208,7 +1208,7 @@ async def test_api_update_from_source(client, tmp_path):
         ]
     )
 
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         upd_resp = await client.post(f"/api/serials/{serial_id}/update")
     assert upd_resp.status_code == 200
     assert upd_resp.json()["new_chapters"] == 1
@@ -1461,7 +1461,7 @@ async def test_api_volumes_include_word_counts(client, tmp_path):
     serial_id = cr.json()["id"]
 
     # Fetch chapter content
-    with patch("app.services.serial_service.get_adapter", return_value=mock_adapter):
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
         await client.post(f"/api/serials/{serial_id}/chapters/fetch", json={"start": 1, "end": 1})
 
     # Configure volume

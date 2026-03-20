@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class SerialCreate(BaseModel):
     url: str
     shelf_id: int | None = None
+    adapter: str | None = None
 
 
 class SerialUpdate(BaseModel):

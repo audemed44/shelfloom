@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Scroll, Plus } from 'lucide-react'
 import { api } from '../../api/client'
 import { useApi } from '../../hooks/useApi'
@@ -15,11 +15,55 @@ export default function AddSerialModal({
   onSaved,
 }: AddSerialModalProps) {
   const [url, setUrl] = useState('')
+  const [adapter, setAdapter] = useState<string>('')
+  const [detectedAdapter, setDetectedAdapter] = useState<string | null>(null)
   const [shelfId, setShelfId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
+  const { data: adapters } = useApi<string[]>('/api/serials/adapters')
+
+  const detectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const userOverrode = useRef(false)
+
+  const detectAdapter = useCallback(
+    async (inputUrl: string) => {
+      const trimmed = inputUrl.trim()
+      if (!trimmed) {
+        setDetectedAdapter(null)
+        if (!userOverrode.current) setAdapter('')
+        return
+      }
+      try {
+        const result = await api.get<{ adapter: string | null }>(
+          `/api/serials/detect-adapter?url=${encodeURIComponent(trimmed)}`
+        )
+        if (result) {
+          setDetectedAdapter(result.adapter)
+          if (!userOverrode.current) {
+            setAdapter(result.adapter ?? '')
+          }
+        }
+      } catch {
+        // ignore detection errors
+      }
+    },
+    [setDetectedAdapter, setAdapter]
+  )
+
+  useEffect(() => {
+    if (detectTimer.current) clearTimeout(detectTimer.current)
+    detectTimer.current = setTimeout(() => detectAdapter(url), 400)
+    return () => {
+      if (detectTimer.current) clearTimeout(detectTimer.current)
+    }
+  }, [url, detectAdapter])
+
+  const handleAdapterChange = (value: string) => {
+    setAdapter(value)
+    userOverrode.current = value !== '' && value !== detectedAdapter
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -34,6 +78,7 @@ export default function AddSerialModal({
       const serial = await api.post<WebSerial>('/api/serials', {
         url: trimmed,
         shelf_id: shelfId ?? undefined,
+        adapter: adapter || undefined,
       })
       if (serial) onSaved(serial)
     } catch (err) {
@@ -95,10 +140,30 @@ export default function AddSerialModal({
               className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
               autoFocus
             />
-            <p className="text-[10px] text-white/30 normal-case">
-              Supports Royal Road, NovelFire, and The Wandering Inn.
-            </p>
           </div>
+
+          {/* Adapter selector */}
+          {adapters && adapters.length > 0 && (
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
+                Parser
+              </label>
+              <select
+                value={adapter}
+                onChange={(e) => handleAdapterChange(e.target.value)}
+                data-testid="adapter-select"
+                className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white normal-case focus:outline-none focus:border-primary transition-colors"
+              >
+                <option value="">Auto-detect</option>
+                {adapters.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                    {a === detectedAdapter ? ' (detected)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Shelf selector */}
           {shelves && shelves.length > 0 && (

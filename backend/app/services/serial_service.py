@@ -23,7 +23,7 @@ from app.schemas.serial import (
     VolumeRange,
     VolumeUpdate,
 )
-from app.scrapers.registry import get_adapter
+from app.scrapers.registry import get_adapter, get_adapter_by_name
 
 log = logging.getLogger(__name__)
 
@@ -88,9 +88,14 @@ async def add_serial(
     if existing is not None:
         raise SerialAlreadyExists(f"Serial with URL {data.url!r} already exists")
 
-    adapter = get_adapter(data.url)
-    if adapter is None:
-        raise ScrapingError(f"No scraping adapter supports URL: {data.url!r}")
+    if data.adapter:
+        adapter = get_adapter_by_name(data.adapter)
+        if adapter is None:
+            raise ScrapingError(f"Unknown adapter: {data.adapter!r}")
+    else:
+        adapter = get_adapter(data.url)
+        if adapter is None:
+            raise ScrapingError(f"No scraping adapter supports URL: {data.url!r}")
 
     # Fetch metadata + chapter list
     try:
@@ -214,9 +219,9 @@ async def fetch_chapters_content(
     end: int,
 ) -> list[SerialChapter]:
     serial = await get_serial(session, serial_id)
-    adapter = get_adapter(serial.url)
+    adapter = get_adapter_by_name(serial.source)
     if adapter is None:
-        raise ScrapingError(f"No adapter for serial URL: {serial.url!r}")
+        raise ScrapingError(f"No adapter named {serial.source!r} for serial URL: {serial.url!r}")
 
     result = await session.execute(
         select(SerialChapter)
@@ -278,9 +283,9 @@ async def fetch_chapters_content(
 
 async def update_from_source(session: AsyncSession, serial_id: int) -> dict:
     serial = await get_serial(session, serial_id)
-    adapter = get_adapter(serial.url)
+    adapter = get_adapter_by_name(serial.source)
     if adapter is None:
-        raise ScrapingError(f"No adapter for serial URL: {serial.url!r}")
+        raise ScrapingError(f"No adapter named {serial.source!r} for serial URL: {serial.url!r}")
 
     try:
         chapters = await adapter.fetch_chapter_list(serial.url)

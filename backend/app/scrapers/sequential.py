@@ -11,6 +11,7 @@ from .base import (
     SerialMetadata,
     build_client,
     count_words,
+    extract_date_from_url,
     normalize_url,
     rate_limited_sleep,
     strip_html_entities,
@@ -139,7 +140,7 @@ class SequentialNextLinkAdapter:
                         chapter_number=len(chapters) + 1,
                         title=title,
                         source_url=current_url,
-                        publish_date=None,
+                        publish_date=extract_date_from_url(current_url),
                     )
                 )
 
