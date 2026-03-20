@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import logging
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
+import httpx
 from bs4 import BeautifulSoup
 from ebooklib import epub
 
 from app.models.serial import SerialChapter, SerialVolume, WebSerial
+
+log = logging.getLogger(__name__)
 
 SHELFLOOM_URN_PREFIX = "urn:shelfloom:"
 
@@ -32,6 +38,17 @@ _VOID_ELEMENTS = frozenset(
     ]
 )
 
+_MEDIA_TYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".ico": "image/x-icon",
+}
+
 
 def _slugify(text: str) -> str:
     """Convert a title to a safe filesystem-friendly stem (max 80 chars)."""
@@ -39,6 +56,32 @@ def _slugify(text: str) -> str:
     text = re.sub(r"[^\w\s-]", "", text)
     text = re.sub(r"[\s_-]+", "-", text)
     return text.strip("-")[:80] or "untitled"
+
+
+def _guess_media_type(url: str, content_type: str | None = None) -> str:
+    """Guess image media type from URL extension or Content-Type header."""
+    if content_type:
+        ct = content_type.split(";")[0].strip().lower()
+        if ct.startswith("image/"):
+            return ct
+
+    path = urlparse(url).path.lower()
+    for ext, mt in _MEDIA_TYPES.items():
+        if path.endswith(ext):
+            return mt
+    return "image/jpeg"
+
+
+def _image_filename(url: str, index: int) -> str:
+    """Generate a unique filename for an image based on URL hash."""
+    url_hash = hashlib.md5(url.encode()).hexdigest()[:10]
+    path = urlparse(url).path.lower()
+    ext = ".jpg"
+    for candidate in _MEDIA_TYPES:
+        if path.endswith(candidate):
+            ext = candidate
+            break
+    return f"images/img_{index:04d}_{url_hash}{ext}"
 
 
 def _clean_chapter_html(raw_html: str) -> str:
@@ -65,12 +108,68 @@ def _clean_chapter_html(raw_html: str) -> str:
     return html
 
 
+def _collect_image_urls(chapters: list[SerialChapter]) -> list[str]:
+    """Extract all unique external image URLs from chapter HTML content."""
+    seen: set[str] = set()
+    urls: list[str] = []
+    for ch in chapters:
+        if not ch.content:
+            continue
+        soup = BeautifulSoup(ch.content, "html.parser")
+        for img in soup.find_all("img", src=True):
+            src = str(img["src"])
+            if src.startswith(("http://", "https://")) and src not in seen:
+                seen.add(src)
+                urls.append(src)
+    return urls
+
+
+async def _download_images(
+    urls: list[str],
+) -> dict[str, tuple[str, bytes, str]]:
+    """Download images and return a map of url → (epub_filename, data, media_type).
+
+    Failures are logged and skipped — missing images won't break the build.
+    """
+    result: dict[str, tuple[str, bytes, str]] = {}
+    if not urls:
+        return result
+
+    async with httpx.AsyncClient(
+        follow_redirects=True, timeout=20.0, limits=httpx.Limits(max_connections=5)
+    ) as client:
+        for i, url in enumerate(urls):
+            try:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                content_type = resp.headers.get("content-type")
+                media_type = _guess_media_type(url, content_type)
+                filename = _image_filename(url, i)
+                result[url] = (filename, resp.content, media_type)
+            except Exception as exc:
+                log.debug("Failed to download image %s: %s", url, exc)
+
+    return result
+
+
+def _rewrite_image_srcs(html_content: str, image_map: dict[str, tuple[str, bytes, str]]) -> str:
+    """Replace external image URLs in HTML with local EPUB paths."""
+    if not image_map:
+        return html_content
+
+    for url, (filename, _, _) in image_map.items():
+        html_content = html_content.replace(url, filename)
+
+    return html_content
+
+
 def _build_epub_sync(
     serial: WebSerial,
     volume: SerialVolume,
     chapters: list[SerialChapter],
     output_dir: Path,
     existing_book_id: str | None = None,
+    image_map: dict[str, tuple[str, bytes, str]] | None = None,
 ) -> Path:
     """Synchronous EPUB construction — call via :func:`build_volume_epub`."""
     title = volume.name or f"{serial.title or 'Untitled'} - Volume {volume.volume_number}"
@@ -102,6 +201,15 @@ def _build_epub_sync(
             cover_name = f"cover{suffix}"
             book.set_cover(cover_name, cover_file.read_bytes(), create_page=False)
 
+    # Embed downloaded images
+    if image_map:
+        for _url, (filename, data, media_type) in image_map.items():
+            img_item = epub.EpubImage()
+            img_item.file_name = filename
+            img_item.media_type = media_type
+            img_item.content = data
+            book.add_item(img_item)
+
     # Build one XHTML item per chapter
     epub_chapters: list[epub.EpubHtml] = []
     toc: list[epub.Link] = []
@@ -111,6 +219,8 @@ def _build_epub_sync(
         ch_title = ch.title or f"Chapter {ch.chapter_number}"
 
         body_html = _clean_chapter_html(ch.content or "")
+        if image_map:
+            body_html = _rewrite_image_srcs(body_html, image_map)
         content = f"<h1>{ch_title}</h1>\n{body_html}"
 
         epub_ch = epub.EpubHtml(title=ch_title, file_name=file_name, lang="en")
@@ -139,9 +249,16 @@ async def build_volume_epub(
 ) -> Path:
     """Build an EPUB for *volume* and return the path to the generated file.
 
-    Offloads the synchronous ebooklib work to a thread so the event loop
-    stays unblocked.
+    Downloads any external images referenced in chapter HTML and embeds them
+    in the EPUB. Offloads the synchronous ebooklib work to a thread so the
+    event loop stays unblocked.
     """
+    # Download images before entering the sync builder
+    image_urls = _collect_image_urls(chapters)
+    image_map = await _download_images(image_urls)
+    if image_map:
+        log.info("Embedded %d images into EPUB for volume %d", len(image_map), volume.volume_number)
+
     return await asyncio.to_thread(
-        _build_epub_sync, serial, volume, chapters, output_dir, existing_book_id
+        _build_epub_sync, serial, volume, chapters, output_dir, existing_book_id, image_map
     )
