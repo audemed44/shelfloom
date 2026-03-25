@@ -43,6 +43,7 @@ def _book_response(
     series_name: str | None = None,
     series_sequence: float | None = None,
     tags: list[dict] | None = None,
+    genres: list[dict] | None = None,
 ) -> BookResponse:
     """Build BookResponse from ORM object without triggering lazy relationship loads."""
     col_data = {
@@ -54,7 +55,40 @@ def _book_response(
     col_data["series_name"] = series_name
     col_data["series_sequence"] = series_sequence
     col_data["tags"] = tags or []
+    col_data["genres"] = genres or []
     return BookResponse.model_validate(col_data)
+
+
+async def _load_book_metadata(
+    session: AsyncSession, book_ids: list[str]
+) -> tuple[dict[str, list[dict]], dict[str, list[dict]]]:
+    tags_map: dict[str, list[dict]] = {}
+    genres_map: dict[str, list[dict]] = {}
+    if not book_ids:
+        return tags_map, genres_map
+
+    from app.models.genre import BookGenre, Genre
+    from app.models.tag import BookTag, Tag
+
+    tag_rows = await session.execute(
+        sa_select(BookTag.book_id, Tag.id, Tag.name)
+        .join(Tag, BookTag.tag_id == Tag.id)
+        .where(BookTag.book_id.in_(book_ids))
+        .order_by(Tag.name)
+    )
+    for row in tag_rows.all():
+        tags_map.setdefault(row[0], []).append({"id": row[1], "name": row[2]})
+
+    genre_rows = await session.execute(
+        sa_select(BookGenre.book_id, Genre.id, Genre.name)
+        .join(Genre, BookGenre.genre_id == Genre.id)
+        .where(BookGenre.book_id.in_(book_ids))
+        .order_by(Genre.name)
+    )
+    for row in genre_rows.all():
+        genres_map.setdefault(row[0], []).append({"id": row[1], "name": row[2]})
+
+    return tags_map, genres_map
 
 
 @router.get("", response_model=BookListResponse)
@@ -87,10 +121,10 @@ async def list_books_endpoint(
     progress_map: dict[str, float] = {}
     series_map: dict[str, tuple[int, str, float | None]] = {}
     tags_map: dict[str, list[dict]] = {}
+    genres_map: dict[str, list[dict]] = {}
     if books:
         from app.models.reading import ReadingProgress
         from app.models.series import BookSeries, Series
-        from app.models.tag import BookTag, Tag
 
         book_ids = [b.id for b in books]
 
@@ -109,14 +143,7 @@ async def list_books_endpoint(
         for row in series_rows.all():
             series_map[row[0]] = (row[1], row[2], row[3])
 
-        tag_rows = await session.execute(
-            sa_select(BookTag.book_id, Tag.id, Tag.name)
-            .join(Tag, BookTag.tag_id == Tag.id)
-            .where(BookTag.book_id.in_(book_ids))
-            .order_by(Tag.name)
-        )
-        for row in tag_rows.all():
-            tags_map.setdefault(row[0], []).append({"id": row[1], "name": row[2]})
+        tags_map, genres_map = await _load_book_metadata(session, book_ids)
 
     items = [
         _book_response(
@@ -126,6 +153,7 @@ async def list_books_endpoint(
             series_name=series_map[b.id][1] if b.id in series_map else None,
             series_sequence=series_map[b.id][2] if b.id in series_map else None,
             tags=tags_map.get(b.id, []),
+            genres=genres_map.get(b.id, []),
         )
         for b in books
     ]
@@ -165,27 +193,11 @@ async def create_manual_book_endpoint(
         description=data.description,
         page_count=data.page_count,
         date_published=data.date_published,
-        genre=data.genre,
     )
     session.add(book)
     await session.commit()
     await session.refresh(book)
     return _book_response(book)
-
-
-@router.get("/genres", response_model=list[str])
-async def list_genres_endpoint(session: AsyncSession = Depends(get_session)):
-    """Return all distinct genre values across all books, split and deduplicated."""
-    from app.models.book import Book
-
-    rows = await session.execute(sa_select(Book.genre).where(Book.genre.isnot(None)))
-    genres: set[str] = set()
-    for (raw,) in rows.all():
-        for part in raw.split(","):
-            g = part.strip()
-            if g:
-                genres.add(g)
-    return sorted(genres, key=str.lower)
 
 
 @router.get("/{book_id}/series", response_model=list[BookSeriesMembership])
@@ -219,18 +231,14 @@ async def get_book_endpoint(book_id: str, session: AsyncSession = Depends(get_se
     )
     last_read = last_read_row.scalar()
 
-    from app.models.tag import BookTag, Tag
-
-    tag_rows = await session.execute(
-        sa_select(Tag.id, Tag.name)
-        .join(BookTag, BookTag.tag_id == Tag.id)
-        .where(BookTag.book_id == book_id)
-        .order_by(Tag.name)
-    )
-    book_tags = [{"id": r[0], "name": r[1]} for r in tag_rows.all()]
+    tags_map, genres_map = await _load_book_metadata(session, [book_id])
 
     return _book_response(
-        book, reading_progress=reading_progress, last_read=last_read, tags=book_tags
+        book,
+        reading_progress=reading_progress,
+        last_read=last_read,
+        tags=tags_map.get(book_id, []),
+        genres=genres_map.get(book_id, []),
     )
 
 
@@ -283,7 +291,8 @@ async def upload_book_endpoint(
     book = result2.scalar_one_or_none()
     if book is None:
         raise HTTPException(status_code=500, detail="Book was imported but could not be found")
-    return _book_response(book)
+    tags_map, genres_map = await _load_book_metadata(session, [book.id])
+    return _book_response(book, tags=tags_map.get(book.id, []), genres=genres_map.get(book.id, []))
 
 
 @router.patch("/{book_id}", response_model=BookResponse)
@@ -296,7 +305,8 @@ async def update_book_endpoint(
         book = await update_book(session, book_id, data)
     except BookNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
-    return _book_response(book)
+    tags_map, genres_map = await _load_book_metadata(session, [book.id])
+    return _book_response(book, tags=tags_map.get(book.id, []), genres=genres_map.get(book.id, []))
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -373,7 +383,8 @@ async def refresh_cover_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
     except (ShelfNotFound, FileOperationError) as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return _book_response(book)
+    tags_map, genres_map = await _load_book_metadata(session, [book.id])
+    return _book_response(book, tags=tags_map.get(book.id, []), genres=genres_map.get(book.id, []))
 
 
 @router.post("/{book_id}/upload-cover", response_model=BookResponse)
@@ -394,7 +405,8 @@ async def upload_cover_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
     except FileOperationError as e:
         raise HTTPException(status_code=422, detail=str(e))
-    return _book_response(book)
+    tags_map, genres_map = await _load_book_metadata(session, [book.id])
+    return _book_response(book, tags=tags_map.get(book.id, []), genres=genres_map.get(book.id, []))
 
 
 @router.post("/{book_id}/move", response_model=BookResponse)
@@ -419,4 +431,5 @@ async def move_book_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
     except FileOperationError as e:
         raise HTTPException(status_code=500, detail=str(e))
-    return _book_response(book)
+    tags_map, genres_map = await _load_book_metadata(session, [book.id])
+    return _book_response(book, tags=tags_map.get(book.id, []), genres=genres_map.get(book.id, []))

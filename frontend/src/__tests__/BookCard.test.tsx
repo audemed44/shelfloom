@@ -21,7 +21,7 @@ const BOOK: Book = {
   description: null,
   created_at: '2024-01-01T00:00:00',
   updated_at: '2024-01-01T00:00:00',
-  genre: null,
+  genres: [],
   reading_progress: null,
   last_read: null,
   series_id: null,

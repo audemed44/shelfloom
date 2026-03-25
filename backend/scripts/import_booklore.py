@@ -45,11 +45,12 @@ from pathlib import Path
 # Add backend/ to sys.path so "from app.xxx" imports work
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import create_engine, inspect, select
+from sqlalchemy import create_engine, func, inspect, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import app.models  # noqa: F401 — registers all models with Base.metadata
 from app.models.book import Book
+from app.models.genre import BookGenre, Genre
 from app.models.series import BookSeries, Series
 from app.models.shelf import Shelf
 from app.models.tag import BookTag, Tag
@@ -239,6 +240,15 @@ async def get_or_create_tag(session: AsyncSession, name: str) -> Tag:
     return t
 
 
+async def get_or_create_genre(session: AsyncSession, name: str) -> Genre:
+    g = await session.scalar(select(Genre).where(func.lower(Genre.name) == name.lower()))
+    if g is None:
+        g = Genre(name=name)
+        session.add(g)
+        await session.flush()
+    return g
+
+
 async def apply_sidecar_to_book(
     session: AsyncSession,
     book: Book,
@@ -289,10 +299,19 @@ async def apply_sidecar_to_book(
                 )
             )
 
-    # Genre: Booklore's "categories" maps to the genre field (e.g. "Science Fiction")
+    # Genres: Booklore's "categories" map to normalized genres.
     categories = [c for c in (m.get("categories") or []) if c]
     if categories:
-        book.genre = ", ".join(categories)
+        for genre_name in sorted({c.strip() for c in categories if c.strip()}, key=str.lower):
+            genre = await get_or_create_genre(session, genre_name)
+            existing_bg = await session.scalar(
+                select(BookGenre).where(
+                    BookGenre.book_id == book.id,
+                    BookGenre.genre_id == genre.id,
+                )
+            )
+            if existing_bg is None:
+                session.add(BookGenre(book_id=book.id, genre_id=genre.id))
 
     # Tags: freeform labels only (e.g. "Web Serial", "Kindle Unlimited")
     all_tags = sorted({t for t in (m.get("tags") or []) if t})

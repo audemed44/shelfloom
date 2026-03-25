@@ -10,6 +10,13 @@ class TagOut(BaseModel):
     name: str
 
 
+class GenreOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: int
+    name: str
+
+
 class BookResponse(BaseModel):
     model_config = {"from_attributes": True}
 
@@ -29,7 +36,7 @@ class BookResponse(BaseModel):
     page_count: int | None
     date_added: datetime
     date_published: str | None
-    genre: str | None
+    genres: list[GenreOut] = []
     reading_progress: float | None = None  # 0–100, max across all devices
     last_read: datetime | None = None
     series_id: int | None = None
@@ -46,7 +53,6 @@ class BookUpdate(BaseModel):
     language: str | None = None
     description: str | None = None
     date_published: str | None = None
-    genre: str | None = None
 
 
 class BookListResponse(BaseModel):
@@ -69,7 +75,6 @@ class ManualBookCreate(BaseModel):
     description: str | None = None
     page_count: int | None = None
     date_published: str | None = None
-    genre: str | None = None
 
 
 class BookMoveRequest(BaseModel):

@@ -2,6 +2,7 @@ export type {
   Shelf,
   Series,
   BookSeries,
+  Genre,
   ReadingSession,
   Highlight,
   ReadingProgress,

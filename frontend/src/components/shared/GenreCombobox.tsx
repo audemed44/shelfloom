@@ -1,48 +1,75 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Plus } from 'lucide-react'
 import { api } from '../../api/client'
+import type { Genre } from '../../types/api'
 
 interface GenreComboboxProps {
-  value: string[]
-  onChange: (genres: string[]) => void
+  value: Genre[]
+  onChange: (genres: Genre[]) => void
 }
 
 export default function GenreCombobox({ value, onChange }: GenreComboboxProps) {
   const [input, setInput] = useState('')
   const [open, setOpen] = useState(false)
-  const [allGenres, setAllGenres] = useState<string[]>([])
+  const [allGenres, setAllGenres] = useState<Genre[]>([])
+  const [busy, setBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    api.get<string[]>('/api/books/genres').then((data) => {
+    api.get<Genre[]>('/api/genres').then((data) => {
       if (Array.isArray(data)) setAllGenres(data)
     })
   }, [])
 
+  const assignedIds = useMemo(() => new Set(value.map((g) => g.id)), [value])
   const suggestions = allGenres.filter(
-    (g) => g.toLowerCase().includes(input.toLowerCase()) && !value.includes(g)
+    (g) =>
+      g.name.toLowerCase().includes(input.toLowerCase()) &&
+      !assignedIds.has(g.id)
   )
   const trimmed = input.trim()
   const showAddNew =
     trimmed.length > 0 &&
-    !value.includes(trimmed) &&
-    !allGenres.some((g) => g.toLowerCase() === trimmed.toLowerCase())
+    !allGenres.some((g) => g.name.toLowerCase() === trimmed.toLowerCase())
 
   const addGenre = useCallback(
-    (genre: string) => {
-      const g = genre.trim()
-      if (!g || value.includes(g)) return
-      onChange([...value, g])
+    (genre: Genre) => {
+      if (assignedIds.has(genre.id)) return
+      onChange([...value, genre].sort((a, b) => a.name.localeCompare(b.name)))
+      setAllGenres((prev) =>
+        prev.some((g) => g.id === genre.id) ? prev : [...prev, genre]
+      )
       setInput('')
       setOpen(false)
       inputRef.current?.focus()
     },
-    [value, onChange]
+    [value, onChange, assignedIds]
   )
 
-  const removeGenre = (genre: string) => {
-    onChange(value.filter((g) => g !== genre))
-  }
+  const createAndAdd = useCallback(
+    async (name: string) => {
+      setBusy(true)
+      try {
+        const created = await api.post<Genre>('/api/genres', { name })
+        if (created) addGenre(created)
+      } catch {
+        const existing = allGenres.find(
+          (g) => g.name.toLowerCase() === name.toLowerCase()
+        )
+        if (existing) addGenre(existing)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [addGenre, allGenres]
+  )
+
+  const removeGenre = useCallback(
+    (genre: Genre) => {
+      onChange(value.filter((g) => g.id !== genre.id))
+    },
+    [value, onChange]
+  )
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -50,10 +77,10 @@ export default function GenreCombobox({ value, onChange }: GenreComboboxProps) {
       if (suggestions.length > 0 && !showAddNew) {
         addGenre(suggestions[0])
       } else if (trimmed) {
-        addGenre(trimmed)
+        createAndAdd(trimmed)
       }
     } else if (e.key === 'Backspace' && !input && value.length > 0) {
-      onChange(value.slice(0, -1))
+      removeGenre(value[value.length - 1])
     } else if (e.key === 'Escape') {
       setOpen(false)
     }
@@ -62,20 +89,19 @@ export default function GenreCombobox({ value, onChange }: GenreComboboxProps) {
   return (
     <div>
       <label className="block text-[10px] font-black tracking-widest uppercase text-white/40 mb-1.5">
-        Genre
+        Genres
       </label>
 
-      {/* Badge list + input */}
       <div
-        className="flex flex-wrap gap-1.5 min-h-[46px] bg-black border border-white/10 px-3 py-2 focus-within:border-primary transition-colors cursor-text"
+        className={`flex flex-wrap gap-1.5 min-h-[46px] bg-black border border-white/10 px-3 py-2 focus-within:border-primary transition-colors cursor-text ${busy ? 'opacity-60 pointer-events-none' : ''}`}
         onClick={() => inputRef.current?.focus()}
       >
         {value.map((g) => (
           <span
-            key={g}
+            key={g.id}
             className="flex items-center gap-1 px-2 py-0.5 bg-primary/15 border border-primary/30 text-[10px] font-black tracking-widest text-primary normal-case"
           >
-            {g}
+            {g.name}
             <button
               type="button"
               onClick={(e) => {
@@ -83,7 +109,7 @@ export default function GenreCombobox({ value, onChange }: GenreComboboxProps) {
                 removeGenre(g)
               }}
               className="text-primary/60 hover:text-primary transition-colors"
-              aria-label={`Remove ${g}`}
+              aria-label={`Remove ${g.name}`}
             >
               <X size={10} />
             </button>
@@ -105,23 +131,22 @@ export default function GenreCombobox({ value, onChange }: GenreComboboxProps) {
         />
       </div>
 
-      {/* Dropdown */}
       {open && input.length > 0 && (suggestions.length > 0 || showAddNew) && (
         <div className="border border-white/10 border-t-0 bg-black max-h-40 overflow-y-auto">
           {suggestions.map((g) => (
             <button
-              key={g}
+              key={g.id}
               type="button"
               onMouseDown={() => addGenre(g)}
               className="w-full text-left px-4 py-2.5 text-sm text-white/70 normal-case hover:bg-white/5 hover:text-white transition-colors"
             >
-              {g}
+              {g.name}
             </button>
           ))}
           {showAddNew && (
             <button
               type="button"
-              onMouseDown={() => addGenre(trimmed)}
+              onMouseDown={() => createAndAdd(trimmed)}
               className="w-full text-left px-4 py-2.5 text-sm text-white/50 normal-case hover:bg-white/5 hover:text-white/80 transition-colors flex items-center gap-2"
             >
               <Plus size={12} className="text-primary shrink-0" />
