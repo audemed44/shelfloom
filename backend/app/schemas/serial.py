@@ -45,11 +45,23 @@ class ChapterResponse(BaseModel):
     source_url: str
     publish_date: datetime | None
     word_count: int | None
+    estimated_pages: int | None = None
+    running_word_count: int = 0
+    running_estimated_pages: int | None = None
+    running_is_partial: bool = False
     fetched_at: datetime | None
     has_content: bool = False
 
     @classmethod
-    def from_orm(cls, obj: object) -> ChapterResponse:
+    def from_orm(
+        cls,
+        obj: object,
+        *,
+        estimated_pages: int | None = None,
+        running_word_count: int = 0,
+        running_estimated_pages: int | None = None,
+        running_is_partial: bool = False,
+    ) -> ChapterResponse:
         from app.models.serial import SerialChapter
 
         assert isinstance(obj, SerialChapter)
@@ -61,6 +73,10 @@ class ChapterResponse(BaseModel):
             source_url=obj.source_url,
             publish_date=obj.publish_date,
             word_count=obj.word_count,
+            estimated_pages=estimated_pages,
+            running_word_count=running_word_count,
+            running_estimated_pages=running_estimated_pages,
+            running_is_partial=running_is_partial,
             fetched_at=obj.fetched_at,
             has_content=obj.content is not None,
         )
@@ -143,3 +159,14 @@ class VolumeResponse(BaseModel):
     is_stale: bool
     estimated_pages: int | None = None
     total_words: int | None = None
+
+
+class VolumePreviewResponse(BaseModel):
+    start: int
+    end: int
+    name: str | None = None
+    chapter_count: int
+    fetched_chapter_count: int
+    total_words: int = 0
+    estimated_pages: int | None = None
+    is_partial: bool = False
