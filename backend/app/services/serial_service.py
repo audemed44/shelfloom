@@ -2,20 +2,25 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 import httpx
 from sqlalchemy import func as sa_func
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from app.models.serial import SerialChapter, SerialVolume, WebSerial
 from app.models.series import BookSeries, Series
 from app.schemas.serial import (
     AutoSplitConfig,
+    ChapterFetchJobResponse,
+    ChapterFetchLogEntry,
+    ChapterFetchStatusResponse,
     SerialCreate,
     SerialUpdate,
     SingleVolumeCreate,
@@ -47,6 +52,168 @@ class ScrapingError(Exception):
 
 class VolumeGenerationError(Exception):
     pass
+
+
+class ChapterFetchAlreadyRunning(Exception):
+    pass
+
+
+_FETCH_JOB_LOG_LIMIT = 100
+_FETCH_JOB_RETENTION_SECONDS = 300
+
+
+@dataclass
+class _ChapterFetchJob:
+    serial_id: int
+    start: int
+    end: int
+    total: int
+    state: str = "running"
+    processed: int = 0
+    fetched: int = 0
+    skipped: int = 0
+    failed: int = 0
+    current_chapter_number: int | None = None
+    current_chapter_title: str | None = None
+    started_at: datetime = field(default_factory=datetime.utcnow)
+    finished_at: datetime | None = None
+    logs: list[ChapterFetchLogEntry] = field(default_factory=list)
+    error: str | None = None
+    task: asyncio.Task[None] | None = field(default=None, repr=False)
+
+    def to_job_response(self) -> ChapterFetchJobResponse:
+        return ChapterFetchJobResponse(
+            serial_id=self.serial_id,
+            state=self.state,
+            start=self.start,
+            end=self.end,
+            total=self.total,
+            started_at=self.started_at,
+        )
+
+    def to_status_response(self) -> ChapterFetchStatusResponse:
+        return ChapterFetchStatusResponse(
+            serial_id=self.serial_id,
+            state=self.state,
+            start=self.start,
+            end=self.end,
+            total=self.total,
+            processed=self.processed,
+            fetched=self.fetched,
+            skipped=self.skipped,
+            failed=self.failed,
+            current_chapter_number=self.current_chapter_number,
+            current_chapter_title=self.current_chapter_title,
+            started_at=self.started_at,
+            finished_at=self.finished_at,
+            logs=list(self.logs),
+            error=self.error,
+        )
+
+
+_chapter_fetch_jobs: dict[int, _ChapterFetchJob] = {}
+_chapter_fetch_jobs_lock = asyncio.Lock()
+
+
+class _ChapterFetchProgressReporter:
+    def __init__(self, job: _ChapterFetchJob):
+        self.job = job
+
+    @staticmethod
+    def _chapter_label(chapter: SerialChapter) -> str:
+        if chapter.title:
+            return f'chapter {chapter.chapter_number} "{chapter.title}"'
+        return f"chapter {chapter.chapter_number}"
+
+    async def _append_log(
+        self, level: str, message: str, chapter_number: int | None = None
+    ) -> None:
+        async with _chapter_fetch_jobs_lock:
+            self.job.logs.append(
+                ChapterFetchLogEntry(
+                    timestamp=datetime.utcnow(),
+                    level=level,
+                    message=message,
+                    chapter_number=chapter_number,
+                )
+            )
+            if len(self.job.logs) > _FETCH_JOB_LOG_LIMIT:
+                del self.job.logs[:-_FETCH_JOB_LOG_LIMIT]
+
+    async def mark_started(self) -> None:
+        await self._append_log(
+            "info",
+            (
+                f"Started fetching chapters {self.job.start}-{self.job.end} "
+                f"for serial {self.job.serial_id}"
+            ),
+        )
+
+    async def mark_chapter_started(self, chapter: SerialChapter) -> None:
+        async with _chapter_fetch_jobs_lock:
+            self.job.current_chapter_number = chapter.chapter_number
+            self.job.current_chapter_title = chapter.title
+        await self._append_log(
+            "info",
+            f"Fetching {self._chapter_label(chapter)}",
+            chapter.chapter_number,
+        )
+
+    async def mark_chapter_skipped(self, chapter: SerialChapter) -> None:
+        async with _chapter_fetch_jobs_lock:
+            self.job.processed += 1
+            self.job.skipped += 1
+            self.job.current_chapter_number = None
+            self.job.current_chapter_title = None
+        await self._append_log(
+            "info",
+            f"Skipped {self._chapter_label(chapter)}; content already present",
+            chapter.chapter_number,
+        )
+
+    async def mark_chapter_fetched(self, chapter: SerialChapter) -> None:
+        async with _chapter_fetch_jobs_lock:
+            self.job.processed += 1
+            self.job.fetched += 1
+            self.job.current_chapter_number = None
+            self.job.current_chapter_title = None
+        await self._append_log(
+            "info",
+            (
+                f"Fetched {self._chapter_label(chapter)}"
+                + (f" ({chapter.word_count} words)" if chapter.word_count is not None else "")
+            ),
+            chapter.chapter_number,
+        )
+
+    async def mark_chapter_failed(self, chapter: SerialChapter, error: str) -> None:
+        async with _chapter_fetch_jobs_lock:
+            self.job.processed += 1
+            self.job.failed += 1
+            self.job.current_chapter_number = None
+            self.job.current_chapter_title = None
+        await self._append_log(
+            "warning",
+            f"Failed to fetch {self._chapter_label(chapter)}: {error}",
+            chapter.chapter_number,
+        )
+
+    async def mark_completed(self) -> None:
+        async with _chapter_fetch_jobs_lock:
+            self.job.state = "completed"
+            self.job.finished_at = datetime.utcnow()
+            self.job.current_chapter_number = None
+            self.job.current_chapter_title = None
+        await self._append_log("info", "Finished fetching requested chapter range")
+
+    async def mark_error(self, error: str) -> None:
+        async with _chapter_fetch_jobs_lock:
+            self.job.state = "error"
+            self.job.error = error
+            self.job.finished_at = datetime.utcnow()
+            self.job.current_chapter_number = None
+            self.job.current_chapter_title = None
+        await self._append_log("error", error)
 
 
 # ---------------------------------------------------------------------------
@@ -212,11 +379,92 @@ async def list_chapters(
     return list(result.scalars().all())
 
 
+async def start_chapter_fetch_job(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    serial_id: int,
+    start: int,
+    end: int,
+) -> ChapterFetchJobResponse:
+    serial = await get_serial(session, serial_id)
+    adapter = get_adapter_by_name(serial.source)
+    if adapter is None:
+        raise ScrapingError(f"No adapter named {serial.source!r} for serial URL: {serial.url!r}")
+
+    total = await session.scalar(
+        select(sa_func.count())
+        .select_from(SerialChapter)
+        .where(
+            SerialChapter.serial_id == serial_id,
+            SerialChapter.chapter_number >= start,
+            SerialChapter.chapter_number <= end,
+        )
+    )
+
+    async with _chapter_fetch_jobs_lock:
+        existing = _chapter_fetch_jobs.get(serial_id)
+        if existing is not None and _job_snapshot_expired(existing):
+            del _chapter_fetch_jobs[serial_id]
+            existing = None
+        if existing is not None and existing.state == "running":
+            raise ChapterFetchAlreadyRunning(
+                f"A chapter fetch is already running for serial {serial_id}"
+            )
+
+        job = _ChapterFetchJob(
+            serial_id=serial_id,
+            start=start,
+            end=end,
+            total=int(total or 0),
+        )
+        _chapter_fetch_jobs[serial_id] = job
+
+    job.task = asyncio.create_task(_run_chapter_fetch_job(session_factory, job))
+    return job.to_job_response()
+
+
+async def get_chapter_fetch_status(
+    session: AsyncSession,
+    serial_id: int,
+) -> ChapterFetchStatusResponse:
+    await _require_serial(session, serial_id)
+
+    async with _chapter_fetch_jobs_lock:
+        job = _chapter_fetch_jobs.get(serial_id)
+        if job is not None and _job_snapshot_expired(job):
+            del _chapter_fetch_jobs[serial_id]
+            job = None
+        if job is None:
+            return ChapterFetchStatusResponse(serial_id=serial_id, state="idle")
+        return job.to_status_response()
+
+
+async def _run_chapter_fetch_job(
+    session_factory: async_sessionmaker[AsyncSession],
+    job: _ChapterFetchJob,
+) -> None:
+    reporter = _ChapterFetchProgressReporter(job)
+    try:
+        async with session_factory() as session:
+            await fetch_chapters_content(
+                session,
+                job.serial_id,
+                job.start,
+                job.end,
+                progress=reporter,
+            )
+        await reporter.mark_completed()
+    except Exception as exc:
+        log.exception("Chapter fetch job failed for serial %d", job.serial_id)
+        await reporter.mark_error(str(exc))
+
+
 async def fetch_chapters_content(
     session: AsyncSession,
     serial_id: int,
     start: int,
     end: int,
+    progress: _ChapterFetchProgressReporter | None = None,
 ) -> list[SerialChapter]:
     serial = await get_serial(session, serial_id)
     adapter = get_adapter_by_name(serial.source)
@@ -242,12 +490,20 @@ async def fetch_chapters_content(
         serial_id,
         len(chapters),
     )
+    if progress is not None:
+        await progress.mark_started()
+
+    newly_fetched_numbers: set[int] = set()
     for chapter in chapters:
         if chapter.content is not None:
             fetched.append(chapter)
+            if progress is not None:
+                await progress.mark_chapter_skipped(chapter)
             continue
         try:
             log.info("Fetching chapter %d: %s", chapter.chapter_number, chapter.source_url)
+            if progress is not None:
+                await progress.mark_chapter_started(chapter)
             content = await adapter.fetch_chapter_content(chapter.source_url)
             chapter.content = content.html_content
             chapter.word_count = content.word_count
@@ -255,24 +511,30 @@ async def fetch_chapters_content(
             if content.title and not chapter.title:
                 chapter.title = content.title
             fetched.append(chapter)
+            newly_fetched_numbers.add(chapter.chapter_number)
+            await session.commit()
+            if progress is not None:
+                await progress.mark_chapter_fetched(chapter)
             log.info("Chapter %d fetched (%d words)", chapter.chapter_number, content.word_count)
         except Exception as exc:
             log.warning("Failed to fetch chapter %d: %s", chapter.chapter_number, exc)
             serial.last_error = str(exc)
             serial.status = "error"
+            await session.commit()
+            if progress is not None:
+                await progress.mark_chapter_failed(chapter, str(exc))
 
     # Mark volumes covering fetched chapters as stale
-    fetched_numbers = {ch.chapter_number for ch in fetched}
-    if fetched_numbers:
+    if newly_fetched_numbers:
         vol_result = await session.execute(
             select(SerialVolume).where(SerialVolume.serial_id == serial_id)
         )
         for vol in vol_result.scalars().all():
-            if any(vol.chapter_start <= n <= vol.chapter_end for n in fetched_numbers):
+            if any(vol.chapter_start <= n <= vol.chapter_end for n in newly_fetched_numbers):
                 if vol.generated_at is not None:
                     vol.is_stale = True
 
-    await session.commit()
+        await session.commit()
     return fetched
 
 
@@ -713,6 +975,21 @@ async def get_volume_word_counts(session: AsyncSession, serial_id: int) -> dict[
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def reset_chapter_fetch_jobs() -> None:
+    for job in _chapter_fetch_jobs.values():
+        if job.task is not None and not job.task.done():
+            job.task.cancel()
+    _chapter_fetch_jobs.clear()
+
+
+def _job_snapshot_expired(job: _ChapterFetchJob) -> bool:
+    return (
+        job.state != "running"
+        and job.finished_at is not None
+        and (datetime.utcnow() - job.finished_at).total_seconds() > _FETCH_JOB_RETENTION_SECONDS
+    )
 
 
 async def _require_serial(session: AsyncSession, serial_id: int) -> None:

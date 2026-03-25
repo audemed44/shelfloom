@@ -316,6 +316,40 @@ export interface SerialChapter {
   has_content: boolean
 }
 
+export interface ChapterFetchLogEntry {
+  timestamp: string
+  level: string
+  message: string
+  chapter_number: number | null
+}
+
+export interface ChapterFetchJobResponse {
+  serial_id: number
+  state: string
+  start: number
+  end: number
+  total: number
+  started_at: string
+}
+
+export interface ChapterFetchStatusResponse {
+  serial_id: number
+  state: string
+  start: number | null
+  end: number | null
+  total: number
+  processed: number
+  fetched: number
+  skipped: number
+  failed: number
+  current_chapter_number: number | null
+  current_chapter_title: string | null
+  started_at: string | null
+  finished_at: string | null
+  logs: ChapterFetchLogEntry[]
+  error: string | null
+}
+
 export interface SerialVolume {
   id: number
   serial_id: number
