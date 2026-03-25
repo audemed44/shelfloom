@@ -276,6 +276,47 @@ describe('Serials page', () => {
     const card = screen.getByTestId('serial-card-1')
     expect(card).toHaveAttribute('href', '/serials/1')
   })
+
+  it('serial cards prefer the uploaded cover when both cover fields exist', async () => {
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({
+      serials: [
+        {
+          ...SERIALS[0],
+          cover_path: '/data/covers/serial_1.jpg',
+          cover_url: 'https://example.com/remote-cover.jpg',
+        },
+      ],
+    })
+    renderSerials()
+    await waitFor(() =>
+      expect(screen.getByTestId('serial-card-1')).toBeInTheDocument()
+    )
+    const cover = screen.getByAltText('The Grand Adventure')
+    expect(cover.getAttribute('src')).toContain('/api/serials/1/cover')
+    expect(cover.getAttribute('src')).toContain('cover=')
+  })
+
+  it('serial cards fall back to cover_url when there is no uploaded cover', async () => {
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({
+      serials: [
+        {
+          ...SERIALS[0],
+          cover_path: null,
+          cover_url: 'https://example.com/remote-cover.jpg',
+        },
+      ],
+    })
+    renderSerials()
+    await waitFor(() =>
+      expect(screen.getByTestId('serial-card-1')).toBeInTheDocument()
+    )
+    const cover = screen.getByAltText('The Grand Adventure')
+    expect(cover.getAttribute('src')).toBe(
+      'https://example.com/remote-cover.jpg'
+    )
+  })
 })
 
 // ---------------------------------------------------------------------------
