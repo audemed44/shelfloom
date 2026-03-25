@@ -415,6 +415,32 @@ async def update_volume(
     return vol
 
 
+async def upload_serial_cover(
+    session: AsyncSession, serial_id: int, image_bytes: bytes, suffix: str
+) -> WebSerial:
+    serial = await get_serial(session, serial_id)
+    dest = _covers_dir() / f"serial_{serial_id}{suffix}"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(image_bytes)
+    serial.cover_path = str(dest)
+    await session.commit()
+    await session.refresh(serial)
+    return serial
+
+
+async def refresh_serial_cover(session: AsyncSession, serial_id: int) -> WebSerial:
+    serial = await get_serial(session, serial_id)
+    if serial.cover_url is None:
+        raise ValueError("Serial has no cover_url to refresh from")
+    suffix = Path(serial.cover_url.split("?")[0]).suffix or ".jpg"
+    dest = _covers_dir() / f"serial_{serial_id}{suffix}"
+    await _download_cover(serial.cover_url, dest)
+    serial.cover_path = str(dest)
+    await session.commit()
+    await session.refresh(serial)
+    return serial
+
+
 async def upload_volume_cover(
     session: AsyncSession, serial_id: int, volume_id: int, image_bytes: bytes, suffix: str
 ) -> SerialVolume:
