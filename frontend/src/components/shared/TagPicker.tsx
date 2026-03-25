@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Plus } from 'lucide-react'
 import { api } from '../../api/client'
 import type { Tag } from '../../types/api'
@@ -26,7 +26,7 @@ export default function TagPicker({ value, onChange }: TagPickerProps) {
     })
   }, [])
 
-  const assignedIds = new Set(value.map((t) => t.id))
+  const assignedIds = useMemo(() => new Set(value.map((t) => t.id)), [value])
   const suggestions = allTags.filter(
     (t) =>
       t.name.toLowerCase().includes(input.toLowerCase()) &&

@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { usePersistedState } from '../hooks/usePersistedState'
 import {
   Search,
@@ -15,7 +15,7 @@ import { useDebounce } from '../hooks/useDebounce'
 import BookCard from '../components/library/BookCard'
 import BookRow from '../components/library/BookRow'
 import { SkeletonCard, SkeletonRow } from '../components/library/SkeletonCard'
-import UploadZone from '../components/library/UploadZone'
+import BulkUploadZone from '../components/library/BulkUploadZone'
 import CreateManualBookModal from '../components/library/CreateManualBookModal'
 import type { Book, Shelf, PaginatedResponse } from '../types'
 
@@ -278,8 +278,6 @@ export default function Library() {
   const [page, setPage] = useState(1)
   const [rev, setRev] = useState(0)
   const [showManualModal, setShowManualModal] = useState(false)
-  const [isDraggingOver, setIsDraggingOver] = useState(false)
-  const dragCounter = useRef(0)
 
   const debouncedSearch = useDebounce(search, 300)
 
@@ -288,20 +286,6 @@ export default function Library() {
   const handleUploadSuccess = useCallback(() => {
     setRev((r) => r + 1)
   }, [])
-
-  // Page-level drag detection to highlight the upload zone
-  const handleDragEnter = () => {
-    dragCounter.current++
-    setIsDraggingOver(true)
-  }
-  const handleDragLeave = () => {
-    dragCounter.current--
-    if (dragCounter.current === 0) setIsDraggingOver(false)
-  }
-  const handlePageDrop = () => {
-    dragCounter.current = 0
-    setIsDraggingOver(false)
-  }
 
   // Shelves for tab bar
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
@@ -366,13 +350,7 @@ export default function Library() {
   }, [books, groupBySeries])
 
   return (
-    <div
-      className="p-4 sm:p-6 lg:p-12"
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDrop={handlePageDrop}
-      onDragOver={(e) => e.preventDefault()}
-    >
+    <div className="p-4 sm:p-6 lg:p-12">
       {/* Header */}
       <header className="mb-6 sm:mb-8">
         <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
@@ -390,10 +368,7 @@ export default function Library() {
       {/* Upload zone + manual book button */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="flex-1">
-          <UploadZone
-            onSuccess={handleUploadSuccess}
-            highlighted={isDraggingOver}
-          />
+          <BulkUploadZone onSuccess={handleUploadSuccess} />
         </div>
         <button
           onClick={() => setShowManualModal(true)}

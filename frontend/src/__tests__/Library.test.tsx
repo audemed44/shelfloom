@@ -397,7 +397,7 @@ describe('Library', () => {
   })
 })
 
-describe('Upload', () => {
+describe('Bulk Upload', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let fetchSpy: any
 
@@ -407,7 +407,24 @@ describe('Upload', () => {
   })
   afterEach(() => fetchSpy.mockRestore())
 
-  it('file drop triggers upload', async () => {
+  it('adds files to list when selected via file input', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getByTestId('upload-zone'))
+
+    const input = screen.getByTestId('file-input')
+    await user.upload(input, [
+      new File(['content'], 'dune.epub', { type: 'application/epub+zip' }),
+      new File(['content'], 'foundation.pdf', { type: 'application/pdf' }),
+    ])
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId('file-row')).toHaveLength(2)
+    )
+    expect(screen.getByTestId('upload-all-button')).toBeInTheDocument()
+  })
+
+  it('file drop adds files to list', async () => {
     renderLibrary()
     await waitFor(() => screen.getByTestId('upload-zone'))
 
@@ -421,72 +438,44 @@ describe('Upload', () => {
     fireEvent(screen.getByTestId('upload-zone'), dropEvent)
 
     await waitFor(() =>
-      expect(fetchSpy).toHaveBeenCalledWith(
-        expect.stringContaining('/api/books'),
-        expect.objectContaining({ method: 'POST' })
-      )
+      expect(screen.getAllByTestId('file-row')).toHaveLength(1)
     )
   })
 
-  it('shows progress spinner during upload', async () => {
-    const user = userEvent.setup()
-    let resolveUpload!: (v: unknown) => void
-    fetchSpy.mockImplementation((url: string, options?: RequestInit) => {
-      const u = url.toString()
-      const method = ((options as RequestInit)?.method ?? 'GET').toUpperCase()
-      if (u.includes('/api/shelves')) {
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: async () => MOCK_SHELVES,
-        }) as Promise<Response>
-      }
-      if (u.includes('/api/books') && method === 'POST') {
-        return new Promise((r) => {
-          resolveUpload = r
-        })
-      }
-      return Promise.resolve({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          items: MOCK_BOOKS,
-          total: MOCK_BOOKS.length,
-          page: 1,
-          per_page: 24,
-        }),
-      }) as Promise<Response>
-    })
-
+  it('ignores invalid file types', async () => {
+    const user = userEvent.setup({ applyAccept: false })
     renderLibrary()
+    await waitFor(() => screen.getByTestId('upload-zone'))
+
+    const input = screen.getByTestId('file-input')
+    await user.upload(input, [
+      new File(['content'], 'notes.txt', { type: 'text/plain' }),
+    ])
+
+    // No file rows should appear for .txt
+    expect(screen.queryByTestId('file-row')).not.toBeInTheDocument()
+  })
+
+  it('uploads all files when Upload All is clicked', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getByTestId('upload-zone'))
+
     const input = screen.getByTestId('file-input')
     await user.upload(
       input,
       new File(['content'], 'dune.epub', { type: 'application/epub+zip' })
     )
 
-    await waitFor(() =>
-      expect(screen.getByTestId('upload-spinner')).toBeInTheDocument()
-    )
-
-    // Resolve so upload doesn't leak into other tests
-    resolveUpload({ ok: true, status: 201, json: async () => MOCK_BOOKS[0] })
-  })
-
-  it('shows error for invalid file type', async () => {
-    // applyAccept: false simulates bypassing the file picker filter (e.g. via drag-and-drop)
-    const user = userEvent.setup({ applyAccept: false })
-    renderLibrary()
-    const input = screen.getByTestId('file-input')
-    await user.upload(
-      input,
-      new File(['content'], 'notes.txt', { type: 'text/plain' })
-    )
+    await waitFor(() => screen.getByTestId('upload-all-button'))
+    await user.click(screen.getByTestId('upload-all-button'))
 
     await waitFor(() =>
-      expect(screen.getByTestId('upload-error')).toBeInTheDocument()
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/api/books'),
+        expect.objectContaining({ method: 'POST' })
+      )
     )
-    expect(screen.getByTestId('upload-error')).toHaveTextContent(/epub.*pdf/i)
   })
 
   it('refreshes book list after successful upload', async () => {
@@ -534,9 +523,9 @@ describe('Upload', () => {
       new File(['content'], 'dune.epub', { type: 'application/epub+zip' })
     )
 
-    await waitFor(() =>
-      expect(screen.queryByTestId('upload-spinner')).not.toBeInTheDocument()
-    )
+    await waitFor(() => screen.getByTestId('upload-all-button'))
+    await user.click(screen.getByTestId('upload-all-button'))
+
     await waitFor(() =>
       expect(screen.getAllByTestId('book-card')).toHaveLength(1)
     )
