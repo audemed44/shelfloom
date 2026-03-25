@@ -26,97 +26,111 @@ export default function BookCard({
   const isInProgress = progress != null && progress > 0 && progress < 100
   const genres = book.genres ?? []
 
-  const cardContent = (
-    <>
-      {/* Cover */}
-      <div
-        className={`aspect-[2/3] bg-white/5 border transition-colors overflow-hidden relative ${
-          isSelected
-            ? 'border-primary'
-            : 'border-white/10 group-hover:border-primary'
-        }`}
-      >
-        <img
-          src={coverSrc}
-          alt={book.title}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
-        {/* Format badge */}
-        <div className="absolute top-2 right-2">
-          <span className="bg-black/70 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white/50">
-            {fmtFormat(book.format)}
-          </span>
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onToggle?.(book.id)
+  }
+
+  const coverContent = (
+    <div
+      className={`aspect-[2/3] bg-white/5 border transition-colors overflow-hidden relative ${
+        isSelected
+          ? 'border-primary'
+          : 'border-white/10 group-hover:border-primary'
+      }`}
+    >
+      <img
+        src={coverSrc}
+        alt={book.title}
+        className="w-full h-full object-cover"
+        onError={(e) => {
+          e.currentTarget.style.display = 'none'
+        }}
+      />
+      {/* Format badge */}
+      <div className="absolute top-2 right-2">
+        <span className="bg-black/70 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white/50">
+          {fmtFormat(book.format)}
+        </span>
+      </div>
+
+      {/* Genre + tag badges */}
+      {(genres.length > 0 || book.tags?.length > 0) && (
+        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
+          {genres.slice(0, 2).map((genre) => (
+            <span
+              key={genre.id}
+              className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
+            >
+              {genre.name}
+            </span>
+          ))}
+          {book.tags?.slice(0, 2).map((t) => (
+            <span
+              key={t.id}
+              className="bg-amber-500/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
+            >
+              {t.name}
+            </span>
+          ))}
         </div>
+      )}
 
-        {/* Genre + tag badges */}
-        {(genres.length > 0 || book.tags?.length > 0) && (
-          <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
-            {genres.slice(0, 2).map((genre) => (
-              <span
-                key={genre.id}
-                className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
-              >
-                {genre.name}
-              </span>
-            ))}
-            {book.tags?.slice(0, 2).map((t) => (
-              <span
-                key={t.id}
-                className="bg-amber-500/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
-              >
-                {t.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Selection checkbox */}
-        {isSelecting && (
-          <div
-            className={`absolute top-2 left-2 size-6 rounded-full flex items-center justify-center shadow-lg ${
-              isSelected ? 'bg-primary' : 'bg-black/60 border border-white/30'
-            }`}
-            data-testid="book-select-checkbox"
-          >
-            {isSelected && (
-              <Check size={12} strokeWidth={3} className="text-white" />
-            )}
-          </div>
-        )}
-
-        {/* Complete checkmark (hidden when selecting) */}
-        {!isSelecting && isComplete && (
-          <div className="absolute top-2 left-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
+      {/* Selection checkbox — visible on hover or when selecting */}
+      {onToggle && (
+        <div
+          className={`absolute top-2 left-2 size-6 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-opacity ${
+            isSelected
+              ? 'bg-primary opacity-100'
+              : isSelecting
+                ? 'bg-black/60 border border-white/30 opacity-100'
+                : 'bg-black/60 border border-white/30 opacity-0 group-hover:opacity-100'
+          }`}
+          onClick={handleCheckboxClick}
+          data-testid="book-select-checkbox"
+        >
+          {isSelected && (
             <Check size={12} strokeWidth={3} className="text-white" />
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
-        {/* Reading progress bar */}
-        {isInProgress && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/60">
-            <div
-              className="h-full bg-primary transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        )}
-      </div>
+      {/* Complete checkmark (hidden when checkbox is shown) */}
+      {!onToggle && isComplete && (
+        <div className="absolute top-2 left-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
+          <Check size={12} strokeWidth={3} className="text-white" />
+        </div>
+      )}
+      {onToggle && !isSelecting && isComplete && (
+        <div className="absolute top-2 left-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg group-hover:opacity-0 transition-opacity">
+          <Check size={12} strokeWidth={3} className="text-white" />
+        </div>
+      )}
 
-      {/* Meta */}
-      <div className="mt-2 px-0.5">
-        <p className="text-sm font-black tracking-tighter leading-tight line-clamp-2">
-          {book.title}
+      {/* Reading progress bar */}
+      {isInProgress && (
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/60">
+          <div
+            className="h-full bg-primary transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+    </div>
+  )
+
+  const metaContent = (
+    <div className="mt-2 px-0.5">
+      <p className="text-sm font-black tracking-tighter leading-tight line-clamp-2">
+        {book.title}
+      </p>
+      {book.author && (
+        <p className="text-xs text-white/40 mt-0.5 normal-case truncate">
+          {book.author}
         </p>
-        {book.author && (
-          <p className="text-xs text-white/40 mt-0.5 normal-case truncate">
-            {book.author}
-          </p>
-        )}
-      </div>
-    </>
+      )}
+    </div>
   )
 
   if (isSelecting) {
@@ -126,7 +140,8 @@ export default function BookCard({
         data-testid="book-card"
         onClick={() => onToggle?.(book.id)}
       >
-        {cardContent}
+        {coverContent}
+        {metaContent}
       </div>
     )
   }
@@ -137,7 +152,8 @@ export default function BookCard({
       className="group block"
       data-testid="book-card"
     >
-      {cardContent}
+      {coverContent}
+      {metaContent}
     </Link>
   )
 }

@@ -678,3 +678,87 @@ describe('Bulk Upload', () => {
     )
   })
 })
+
+describe('Bulk Selection', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let fetchSpy: any
+
+  beforeEach(() => {
+    localStorage.clear()
+    fetchSpy = mockFetch()
+  })
+  afterEach(() => fetchSpy.mockRestore())
+
+  it('does not show bulk toolbar by default', async () => {
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+    expect(screen.queryByTestId('bulk-toolbar')).not.toBeInTheDocument()
+  })
+
+  it('shows bulk toolbar after clicking a book checkbox', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+
+    const checkboxes = screen.getAllByTestId('book-select-checkbox')
+    await user.click(checkboxes[0])
+
+    await waitFor(() =>
+      expect(screen.getByTestId('bulk-toolbar')).toBeInTheDocument()
+    )
+    expect(screen.getByText('1 selected')).toBeInTheDocument()
+  })
+
+  it('clears selection when clear button is clicked', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+
+    // Select a book
+    const checkboxes = screen.getAllByTestId('book-select-checkbox')
+    await user.click(checkboxes[0])
+    await waitFor(() => screen.getByTestId('bulk-toolbar'))
+
+    // Clear selection
+    await user.click(screen.getByTestId('bulk-clear-btn'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('bulk-toolbar')).not.toBeInTheDocument()
+    )
+  })
+
+  it('select all selects all visible books', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+
+    // Select one book first to show toolbar
+    const checkboxes = screen.getAllByTestId('book-select-checkbox')
+    await user.click(checkboxes[0])
+    await waitFor(() => screen.getByTestId('bulk-toolbar'))
+
+    // Click select all
+    await user.click(screen.getByTestId('bulk-select-all'))
+    await waitFor(() =>
+      expect(screen.getByText('3 selected')).toBeInTheDocument()
+    )
+  })
+
+  it('clears selection when search changes', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+
+    // Select a book
+    const checkboxes = screen.getAllByTestId('book-select-checkbox')
+    await user.click(checkboxes[0])
+    await waitFor(() => screen.getByTestId('bulk-toolbar'))
+
+    // Type in search
+    await user.type(screen.getByTestId('search-input'), 'test')
+
+    // Toolbar should disappear (selection cleared after debounce)
+    await waitFor(() =>
+      expect(screen.queryByTestId('bulk-toolbar')).not.toBeInTheDocument()
+    )
+  })
+})

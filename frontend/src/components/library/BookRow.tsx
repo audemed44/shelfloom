@@ -25,12 +25,21 @@ export default function BookRow({
 
   const rowContent = (
     <>
-      {/* Selection checkbox */}
-      {isSelecting && (
+      {/* Selection checkbox — always present when onToggle provided */}
+      {onToggle && (
         <div
-          className={`size-5 rounded-full flex items-center justify-center shrink-0 ${
-            isSelected ? 'bg-primary' : 'border border-white/30'
+          className={`size-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer transition-opacity ${
+            isSelected
+              ? 'bg-primary opacity-100'
+              : isSelecting
+                ? 'border border-white/30 opacity-100'
+                : 'border border-white/30 opacity-0 group-hover:opacity-100'
           }`}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onToggle(book.id)
+          }}
           data-testid="book-select-checkbox"
         >
           {isSelected && (
