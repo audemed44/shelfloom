@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback } from 'react'
+import { usePersistedState } from '../hooks/usePersistedState'
 import {
   Search,
   LayoutGrid,
@@ -262,13 +263,17 @@ function Pagination({ page, totalPages, total, onPage }: PaginationProps) {
 // ---------------------------------------------------------------------------
 
 export default function Library() {
-  const [view, setView] = useState('grid')
+  const [view, setView] = usePersistedState('shelfloom:view', 'grid')
   const [search, setSearch] = useState('')
   const [selectedShelfId, setSelectedShelfId] = useState<number | null>(null)
-  const [sort, setSort] = useState('last_read')
-  const [status, setStatus] = useState<string | null>(null)
-  const [groupBySeries, setGroupBySeries] = useState(
-    () => localStorage.getItem('shelfloom:groupBySeries') === 'true'
+  const [sort, setSort] = usePersistedState('shelfloom:sort', 'last_read')
+  const [status, setStatus] = usePersistedState<string | null>(
+    'shelfloom:status',
+    null
+  )
+  const [groupBySeries, setGroupBySeries] = usePersistedState(
+    'shelfloom:groupBySeries',
+    false
   )
   const [page, setPage] = useState(1)
   const [rev, setRev] = useState(0)
@@ -282,11 +287,6 @@ export default function Library() {
 
   const handleUploadSuccess = useCallback(() => {
     setRev((r) => r + 1)
-  }, [])
-
-  const handleGroupBySeries = useCallback((on: boolean) => {
-    setGroupBySeries(on)
-    localStorage.setItem('shelfloom:groupBySeries', String(on))
   }, [])
 
   // Page-level drag detection to highlight the upload zone
@@ -452,7 +452,7 @@ export default function Library() {
         view={view}
         onView={setView}
         groupBySeries={groupBySeries}
-        onGroupBySeries={handleGroupBySeries}
+        onGroupBySeries={setGroupBySeries}
       />
 
       {/* Content */}
