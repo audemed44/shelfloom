@@ -16,6 +16,9 @@ from app.schemas.book import (
     BookResponse,
     BookSeriesMembership,
     BookUpdate,
+    BulkBookActionResponse,
+    BulkBookMetadataUpdate,
+    BulkBookMoveRequest,
     ManualBookCreate,
 )
 from app.services.book_service import (
@@ -198,6 +201,54 @@ async def create_manual_book_endpoint(
     await session.commit()
     await session.refresh(book)
     return _book_response(book)
+
+
+# ---------------------------------------------------------------------------
+# Bulk actions
+# ---------------------------------------------------------------------------
+
+
+@router.post("/bulk-metadata", response_model=BulkBookActionResponse)
+async def bulk_metadata_endpoint(
+    data: BulkBookMetadataUpdate,
+    session: AsyncSession = Depends(get_session),
+):
+    """Add/remove tags and genres across multiple books."""
+    from app.services.bulk_book_service import bulk_update_metadata
+
+    results = await bulk_update_metadata(
+        session,
+        data.book_ids,
+        add_tag_ids=data.add_tag_ids,
+        remove_tag_ids=data.remove_tag_ids,
+        add_genre_ids=data.add_genre_ids,
+        remove_genre_ids=data.remove_genre_ids,
+    )
+    succeeded = sum(1 for r in results if r["success"])
+    return BulkBookActionResponse(
+        results=results,
+        total=len(results),
+        succeeded=succeeded,
+        failed=len(results) - succeeded,
+    )
+
+
+@router.post("/bulk-move", response_model=BulkBookActionResponse)
+async def bulk_move_endpoint(
+    data: BulkBookMoveRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """Move multiple books to a different shelf."""
+    from app.services.bulk_book_service import bulk_move_books
+
+    results = await bulk_move_books(session, data.book_ids, data.target_shelf_id)
+    succeeded = sum(1 for r in results if r["success"])
+    return BulkBookActionResponse(
+        results=results,
+        total=len(results),
+        succeeded=succeeded,
+        failed=len(results) - succeeded,
+    )
 
 
 @router.get("/{book_id}/series", response_model=list[BookSeriesMembership])
