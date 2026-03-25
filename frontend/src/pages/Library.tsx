@@ -9,15 +9,18 @@ import {
   BookOpen,
   Layers,
   Plus,
+  ChevronDown,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
 import BookCard from '../components/library/BookCard'
 import BookRow from '../components/library/BookRow'
+import SeriesCard from '../components/library/SeriesCard'
+import SeriesRow from '../components/library/SeriesRow'
 import { SkeletonCard, SkeletonRow } from '../components/library/SkeletonCard'
 import BulkUploadZone from '../components/library/BulkUploadZone'
 import CreateManualBookModal from '../components/library/CreateManualBookModal'
-import type { Book, Shelf, PaginatedResponse } from '../types'
+import type { Book, Shelf, PaginatedResponse, SeriesWithCount } from '../types'
 
 const PER_PAGE = 24
 
@@ -278,6 +281,9 @@ export default function Library() {
   const [page, setPage] = useState(1)
   const [rev, setRev] = useState(0)
   const [showManualModal, setShowManualModal] = useState(false)
+  const [expandedSeriesIds, setExpandedSeriesIds] = useState<Set<number>>(
+    new Set()
+  )
 
   const debouncedSearch = useDebounce(search, 300)
 
@@ -309,6 +315,32 @@ export default function Library() {
   const books = useMemo(() => booksData?.items ?? [], [booksData])
   const total = booksData?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
+
+  // Series tree for true book counts (only fetched when grouping is on)
+  const { data: seriesTree } = useApi<SeriesWithCount[]>(
+    groupBySeries ? '/api/series/tree' : null
+  )
+  const seriesCountMap = useMemo(() => {
+    const map = new Map<number, number>()
+    if (seriesTree) {
+      for (const s of seriesTree) {
+        map.set(s.id, s.book_count)
+      }
+    }
+    return map
+  }, [seriesTree])
+
+  const toggleSeriesExpanded = useCallback((seriesId: number) => {
+    setExpandedSeriesIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(seriesId)) {
+        next.delete(seriesId)
+      } else {
+        next.add(seriesId)
+      }
+      return next
+    })
+  }, [])
 
   interface BookGroup {
     seriesId: number | null
@@ -452,45 +484,118 @@ export default function Library() {
         <EmptyState search={debouncedSearch} />
       ) : (
         <div>
-          {bookGroups.map((group, gi) => (
+          {view === 'grid' ? (
             <div
-              key={
-                group.seriesId != null
-                  ? `series-${group.seriesId}`
-                  : `book-${gi}`
-              }
+              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4"
+              data-testid="book-grid"
             >
-              {groupBySeries && group.seriesId != null && (
-                <div
-                  className="flex items-center gap-3 border-b border-white/10 pb-2 mb-4 mt-8 first:mt-0"
-                  data-testid="series-group-header"
-                >
-                  <span className="text-[10px] font-black tracking-widest uppercase text-white/40">
-                    {group.seriesName}
-                  </span>
-                  <span className="text-[10px] font-bold tracking-wider text-white/20">
-                    {group.books.length}
-                  </span>
-                </div>
-              )}
-              {view === 'grid' ? (
-                <div
-                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4"
-                  data-testid="book-grid"
-                >
-                  {group.books.map((book) => (
-                    <BookCard key={book.id} book={book} />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-px" data-testid="book-list">
-                  {group.books.map((book) => (
-                    <BookRow key={book.id} book={book} />
-                  ))}
-                </div>
-              )}
+              {bookGroups.flatMap((group) => {
+                // Collapsed series card
+                if (
+                  groupBySeries &&
+                  group.seriesId != null &&
+                  !expandedSeriesIds.has(group.seriesId)
+                ) {
+                  return [
+                    <SeriesCard
+                      key={`series-${group.seriesId}`}
+                      seriesId={group.seriesId}
+                      seriesName={group.seriesName!}
+                      books={group.books}
+                      totalBookCount={seriesCountMap.get(group.seriesId)}
+                      onExpand={() => toggleSeriesExpanded(group.seriesId!)}
+                    />,
+                  ]
+                }
+                // Expanded series — collapse header + individual books
+                if (
+                  groupBySeries &&
+                  group.seriesId != null &&
+                  expandedSeriesIds.has(group.seriesId)
+                ) {
+                  return [
+                    <div
+                      key={`series-header-${group.seriesId}`}
+                      className="col-span-full"
+                    >
+                      <button
+                        onClick={() => toggleSeriesExpanded(group.seriesId!)}
+                        className="flex items-center gap-3 border-b border-white/10 pb-2 mb-4 mt-4 first:mt-0 w-full bg-transparent p-0 text-left cursor-pointer"
+                        data-testid="series-expanded-header"
+                      >
+                        <ChevronDown size={14} className="text-primary" />
+                        <span className="text-[10px] font-black tracking-widest uppercase text-white/40">
+                          {group.seriesName}
+                        </span>
+                        <span className="text-[10px] font-bold tracking-wider text-white/20">
+                          {group.books.length}
+                        </span>
+                      </button>
+                    </div>,
+                    ...group.books.map((book) => (
+                      <BookCard key={book.id} book={book} />
+                    )),
+                  ]
+                }
+                // Standalone books
+                return group.books.map((book) => (
+                  <BookCard key={book.id} book={book} />
+                ))
+              })}
             </div>
-          ))}
+          ) : (
+            <div className="space-y-px" data-testid="book-list">
+              {bookGroups.flatMap((group) => {
+                // Collapsed series row
+                if (
+                  groupBySeries &&
+                  group.seriesId != null &&
+                  !expandedSeriesIds.has(group.seriesId)
+                ) {
+                  return [
+                    <SeriesRow
+                      key={`series-${group.seriesId}`}
+                      seriesId={group.seriesId}
+                      seriesName={group.seriesName!}
+                      books={group.books}
+                      totalBookCount={seriesCountMap.get(group.seriesId)}
+                      onExpand={() => toggleSeriesExpanded(group.seriesId!)}
+                    />,
+                  ]
+                }
+                // Expanded series
+                if (
+                  groupBySeries &&
+                  group.seriesId != null &&
+                  expandedSeriesIds.has(group.seriesId)
+                ) {
+                  return [
+                    <button
+                      key={`series-header-${group.seriesId}`}
+                      onClick={() => toggleSeriesExpanded(group.seriesId!)}
+                      className="flex items-center gap-3 p-4 bg-white/5 border border-primary/30 w-full text-left cursor-pointer"
+                      data-testid="series-expanded-header"
+                    >
+                      <ChevronDown size={14} className="text-primary" />
+                      <span className="text-[10px] font-black tracking-widest uppercase text-white/60">
+                        {group.seriesName}
+                      </span>
+                      <span className="text-[10px] font-bold tracking-wider text-white/30">
+                        {group.books.length}
+                      </span>
+                    </button>,
+                    ...group.books.map((book) => (
+                      <BookRow key={book.id} book={book} />
+                    )),
+                  ]
+                }
+                // Standalone books
+                return group.books.map((book) => (
+                  <BookRow key={book.id} book={book} />
+                ))
+              })}
+            </div>
+          )}
         </div>
       )}
 
