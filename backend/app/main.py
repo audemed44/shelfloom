@@ -123,6 +123,8 @@ async def lifespan(fastapi_app: FastAPI):  # pragma: no cover
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    from app.database import get_session_factory
+
     application = FastAPI(
         title="Shelfloom",
         description="Self-hosted book library with KOReader integration",
@@ -130,6 +132,7 @@ def create_app() -> FastAPI:
         debug=settings.debug,
         lifespan=lifespan,
     )
+    application.state.serial_fetch_session_factory = get_session_factory()
 
     @application.middleware("http")
     async def log_requests(request: Request, call_next):

@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, Circle, Download, Loader2 } from 'lucide-react'
 import { api } from '../../api/client'
-import { useApi } from '../../hooks/useApi'
-import type { SerialChapter } from '../../types/api'
+import type {
+  ChapterFetchJobResponse,
+  ChapterFetchStatusResponse,
+  SerialChapter,
+} from '../../types/api'
 
 interface ChapterListProps {
   serialId: number
@@ -18,22 +21,146 @@ function fmtDate(iso: string | null): string {
   })
 }
 
+function fmtTime(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
+}
+
+function makePendingStatus(
+  serialId: number,
+  job: ChapterFetchJobResponse
+): ChapterFetchStatusResponse {
+  return {
+    serial_id: serialId,
+    state: job.state,
+    start: job.start,
+    end: job.end,
+    total: job.total,
+    processed: 0,
+    fetched: 0,
+    skipped: 0,
+    failed: 0,
+    current_chapter_number: null,
+    current_chapter_title: null,
+    started_at: job.started_at,
+    finished_at: null,
+    logs: [],
+    error: null,
+  }
+}
+
+function normalizeFetchStatus(
+  serialId: number,
+  status: Partial<ChapterFetchStatusResponse> | null
+): ChapterFetchStatusResponse {
+  return {
+    serial_id: status?.serial_id ?? serialId,
+    state: status?.state ?? 'idle',
+    start: status?.start ?? null,
+    end: status?.end ?? null,
+    total: status?.total ?? 0,
+    processed: status?.processed ?? 0,
+    fetched: status?.fetched ?? 0,
+    skipped: status?.skipped ?? 0,
+    failed: status?.failed ?? 0,
+    current_chapter_number: status?.current_chapter_number ?? null,
+    current_chapter_title: status?.current_chapter_title ?? null,
+    started_at: status?.started_at ?? null,
+    finished_at: status?.finished_at ?? null,
+    logs: status?.logs ?? [],
+    error: status?.error ?? null,
+  }
+}
+
 const LIMIT = 50
 
 export default function ChapterList({
   serialId,
   totalChapters,
 }: ChapterListProps) {
+  const isMountedRef = useRef(true)
   const [offset, setOffset] = useState(0)
-  const [fetchKey, setFetchKey] = useState(0)
+  const [chapters, setChapters] = useState<SerialChapter[] | null>(null)
+  const [loading, setLoading] = useState(true)
   const [fetchStart, setFetchStart] = useState('')
   const [fetchEnd, setFetchEnd] = useState('')
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [fetchStatus, setFetchStatus] =
+    useState<ChapterFetchStatusResponse | null>(null)
 
-  const { data: chapters, loading } = useApi<SerialChapter[]>(
-    `/api/serials/${serialId}/chapters?offset=${offset}&limit=${LIMIT}&_k=${fetchKey}`
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  const loadChapters = useCallback(
+    async (silent: boolean = false) => {
+      if (!silent) {
+        setLoading(true)
+      }
+      try {
+        const data = await api.get<SerialChapter[]>(
+          `/api/serials/${serialId}/chapters?offset=${offset}&limit=${LIMIT}`
+        )
+        if (!isMountedRef.current) return
+        setChapters(data ?? [])
+      } finally {
+        if (isMountedRef.current && !silent) {
+          setLoading(false)
+        }
+      }
+    },
+    [offset, serialId]
   )
+
+  const loadFetchStatus = useCallback(async () => {
+    const data = await api.get<ChapterFetchStatusResponse>(
+      `/api/serials/${serialId}/chapters/fetch-status`
+    )
+    if (!isMountedRef.current) return null
+    const status = normalizeFetchStatus(
+      serialId,
+      (data as Partial<ChapterFetchStatusResponse> | null) ?? null
+    )
+    setFetchStatus(status)
+    return status
+  }, [serialId])
+
+  useEffect(() => {
+    setChapters(null)
+    void loadChapters()
+  }, [loadChapters])
+
+  useEffect(() => {
+    setFetchStatus(null)
+    void loadFetchStatus()
+  }, [loadFetchStatus])
+
+  useEffect(() => {
+    if (fetchStatus?.state !== 'running') {
+      if (
+        fetchStatus?.state === 'completed' ||
+        fetchStatus?.state === 'error'
+      ) {
+        void loadChapters(true)
+      }
+      return
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadFetchStatus()
+      void loadChapters(true)
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [fetchStatus?.state, loadChapters, loadFetchStatus])
 
   const handleFetch = async () => {
     const start = parseInt(fetchStart, 10)
@@ -42,25 +169,36 @@ export default function ChapterList({
       setFetchError('Enter a valid range (start ≤ end)')
       return
     }
+
     setFetching(true)
     setFetchError(null)
+
     try {
-      await api.post(`/api/serials/${serialId}/chapters/fetch`, { start, end })
-      setFetchKey((k) => k + 1)
+      const job = await api.post<ChapterFetchJobResponse>(
+        `/api/serials/${serialId}/chapters/fetch`,
+        { start, end }
+      )
+      if (!isMountedRef.current || !job) return
+      setFetchStatus(makePendingStatus(serialId, job))
+      await loadFetchStatus()
+      await loadChapters(true)
     } catch (err) {
       const e = err as { data?: { detail?: string } }
       setFetchError(e.data?.detail ?? 'Failed to fetch chapters')
     } finally {
-      setFetching(false)
+      if (isMountedRef.current) {
+        setFetching(false)
+      }
     }
   }
 
+  const displayedStatus = fetchStatus
+  const running = displayedStatus?.state === 'running'
   const fetched = (chapters ?? []).filter((c) => c.has_content).length
   const shown = chapters?.length ?? 0
 
   return (
     <div className="space-y-4">
-      {/* Fetch range controls */}
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
           <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
@@ -92,10 +230,10 @@ export default function ChapterList({
         </div>
         <button
           onClick={handleFetch}
-          disabled={fetching}
+          disabled={fetching || running}
           className="flex items-center gap-2 px-4 py-2 text-xs font-black tracking-widest uppercase bg-white/10 text-white hover:bg-white/20 disabled:opacity-50 transition-colors"
         >
-          {fetching ? (
+          {fetching || running ? (
             <Loader2 size={12} className="animate-spin" />
           ) : (
             <Download size={12} />
@@ -112,7 +250,113 @@ export default function ChapterList({
         )}
       </div>
 
-      {/* Chapter table */}
+      {displayedStatus && displayedStatus.state !== 'idle' && (
+        <div className="border border-white/10 bg-white/[0.03]">
+          <div className="flex flex-wrap items-center gap-3 border-b border-white/10 px-4 py-3">
+            <span
+              className={`text-[10px] font-black tracking-widest uppercase ${
+                displayedStatus.state === 'running'
+                  ? 'text-amber-300'
+                  : displayedStatus.state === 'error'
+                    ? 'text-red-400'
+                    : 'text-green-400'
+              }`}
+            >
+              {displayedStatus.state}
+            </span>
+            <span className="text-[10px] tracking-widest uppercase text-white/40">
+              {displayedStatus.processed}/{displayedStatus.total} processed
+            </span>
+            <span className="text-[10px] tracking-widest uppercase text-white/40">
+              {displayedStatus.fetched} fetched
+            </span>
+            <span className="text-[10px] tracking-widest uppercase text-white/40">
+              {displayedStatus.skipped} skipped
+            </span>
+            <span className="text-[10px] tracking-widest uppercase text-white/40">
+              {displayedStatus.failed} failed
+            </span>
+            {displayedStatus.start !== null && displayedStatus.end !== null && (
+              <span className="text-[10px] tracking-widest uppercase text-white/25 ml-auto">
+                range {displayedStatus.start}–{displayedStatus.end}
+              </span>
+            )}
+          </div>
+
+          <div className="grid gap-3 px-4 py-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
+                Active Chapter
+              </p>
+              <p className="text-xs text-white/70 normal-case">
+                {displayedStatus.current_chapter_number !== null
+                  ? `${String(displayedStatus.current_chapter_number).padStart(
+                      3,
+                      '0'
+                    )} ${displayedStatus.current_chapter_title ?? ''}`.trim()
+                  : 'Waiting for next update'}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
+                Timing
+              </p>
+              <p className="text-xs text-white/70 normal-case">
+                Started {fmtTime(displayedStatus.started_at)}
+                {displayedStatus.finished_at
+                  ? ` • Finished ${fmtTime(displayedStatus.finished_at)}`
+                  : ''}
+              </p>
+            </div>
+          </div>
+
+          {displayedStatus.error && (
+            <div className="border-t border-white/10 px-4 py-3">
+              <p className="text-xs text-red-400 normal-case">
+                {displayedStatus.error}
+              </p>
+            </div>
+          )}
+
+          <div className="border-t border-white/10 px-4 py-3">
+            <p className="mb-2 text-[10px] font-black tracking-widest uppercase text-white/40">
+              Fetch Log
+            </p>
+            {displayedStatus.logs.length === 0 ? (
+              <p className="text-xs text-white/30 normal-case">
+                Waiting for log output.
+              </p>
+            ) : (
+              <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                {displayedStatus.logs.map((entry, index) => (
+                  <div
+                    key={`${entry.timestamp}-${index}`}
+                    className="flex gap-3 text-xs normal-case"
+                  >
+                    <span className="shrink-0 font-mono text-white/30">
+                      {fmtTime(entry.timestamp)}
+                    </span>
+                    <span
+                      className={`shrink-0 font-black uppercase tracking-widest text-[10px] ${
+                        entry.level === 'error'
+                          ? 'text-red-400'
+                          : entry.level === 'warning'
+                            ? 'text-amber-300'
+                            : 'text-white/40'
+                      }`}
+                    >
+                      {entry.level}
+                    </span>
+                    <span className="text-white/70">{entry.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="space-y-1">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -180,7 +424,6 @@ export default function ChapterList({
         </div>
       )}
 
-      {/* Pagination */}
       {totalChapters > LIMIT && (
         <div className="flex items-center justify-between pt-1">
           <button

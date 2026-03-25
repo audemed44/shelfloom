@@ -3,14 +3,16 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_session
+from app.database import get_session, get_session_factory
 from app.schemas.serial import (
     AutoSplitConfig,
+    ChapterFetchJobResponse,
     ChapterFetchRequest,
+    ChapterFetchStatusResponse,
     ChapterResponse,
     SerialCreate,
     SerialResponse,
@@ -22,6 +24,7 @@ from app.schemas.serial import (
 )
 from app.scrapers.registry import get_adapter, list_adapter_names
 from app.services.serial_service import (
+    ChapterFetchAlreadyRunning,
     ScrapingError,
     SerialAlreadyExists,
     SerialNotFound,
@@ -32,9 +35,9 @@ from app.services.serial_service import (
     configure_volumes,
     delete_serial,
     delete_volume,
-    fetch_chapters_content,
     generate_all_volumes,
     generate_volume,
+    get_chapter_fetch_status,
     get_serial,
     get_volume_word_counts,
     list_chapters,
@@ -42,6 +45,7 @@ from app.services.serial_service import (
     list_volumes,
     rebuild_volume,
     refresh_serial_cover,
+    start_chapter_fetch_job,
     update_from_source,
     update_serial,
     update_volume,
@@ -209,17 +213,50 @@ async def list_chapters_endpoint(
     return [ChapterResponse.from_orm(ch) for ch in chapters]
 
 
-@router.post("/serials/{serial_id}/chapters/fetch", response_model=list[ChapterResponse])
+@router.post(
+    "/serials/{serial_id}/chapters/fetch",
+    response_model=ChapterFetchJobResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def fetch_chapters_endpoint(
-    serial_id: int, body: ChapterFetchRequest, session: AsyncSession = Depends(get_session)
+    serial_id: int,
+    body: ChapterFetchRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
 ):
     try:
-        chapters = await fetch_chapters_content(session, serial_id, body.start, body.end)
+        session_factory = getattr(
+            request.app.state,
+            "serial_fetch_session_factory",
+            get_session_factory(),
+        )
+        job = await start_chapter_fetch_job(
+            session,
+            session_factory,
+            serial_id,
+            body.start,
+            body.end,
+        )
+    except ChapterFetchAlreadyRunning as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except ScrapingError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-    return [ChapterResponse.from_orm(ch) for ch in chapters]
+    return job
+
+
+@router.get(
+    "/serials/{serial_id}/chapters/fetch-status",
+    response_model=ChapterFetchStatusResponse,
+)
+async def fetch_chapters_status_endpoint(
+    serial_id: int, session: AsyncSession = Depends(get_session)
+):
+    try:
+        return await get_chapter_fetch_status(session, serial_id)
+    except SerialNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 
 
 # ---------------------------------------------------------------------------
