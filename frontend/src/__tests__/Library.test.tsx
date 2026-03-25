@@ -153,6 +153,7 @@ describe('Library', () => {
   let fetchSpy: any
 
   beforeEach(() => {
+    localStorage.clear()
     fetchSpy = mockFetch()
   })
   afterEach(() => fetchSpy.mockRestore())
@@ -401,6 +402,7 @@ describe('Upload', () => {
   let fetchSpy: any
 
   beforeEach(() => {
+    localStorage.clear()
     fetchSpy = mockFetch({ uploadResponse: MOCK_BOOKS[0] })
   })
   afterEach(() => fetchSpy.mockRestore())
