@@ -60,6 +60,11 @@ export interface Tag {
   name: string
 }
 
+export interface Genre {
+  id: number
+  name: string
+}
+
 export interface ReadingSession {
   id: number
   book_id: string
@@ -94,7 +99,7 @@ export interface Book {
   language: string | null
   isbn: string | null
   date_published: string | null
-  genre: string | null
+  genres: Genre[]
   description: string | null
   page_count: number | null
   shelf_id: number
@@ -276,7 +281,6 @@ export interface ManualBookCreate {
   description?: string | null
   page_count?: number | null
   date_published?: string | null
-  genre?: string | null
 }
 
 export interface ManualSessionCreate {

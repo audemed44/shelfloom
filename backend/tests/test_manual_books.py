@@ -78,13 +78,12 @@ async def test_create_manual_book_full_fields(client, db_session):
         "description": "A great book.",
         "page_count": 662,
         "date_published": "2007-03-27",
-        "genre": "Fantasy",
     }
     resp = await client.post("/api/books/manual", json=payload)
     assert resp.status_code == 201
     data = resp.json()
     assert data["page_count"] == 662
-    assert data["genre"] == "Fantasy"
+    assert data["genres"] == []
 
 
 async def test_create_manual_book_auto_creates_shelf(client, db_session):

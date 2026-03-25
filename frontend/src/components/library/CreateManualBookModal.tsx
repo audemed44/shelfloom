@@ -3,6 +3,8 @@ import { X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { Book } from '../../types'
+import type { Genre } from '../../types/api'
+import GenreCombobox from '../shared/GenreCombobox'
 
 interface Props {
   onClose: () => void
@@ -20,7 +22,7 @@ export default function CreateManualBookModal({ onClose }: Props) {
   const [language, setLanguage] = useState('')
   const [isbn, setIsbn] = useState('')
   const [datePublished, setDatePublished] = useState('')
-  const [genre, setGenre] = useState('')
+  const [genres, setGenres] = useState<Genre[]>([])
   const [pageCount, setPageCount] = useState('')
   const [description, setDescription] = useState('')
 
@@ -41,11 +43,13 @@ export default function CreateManualBookModal({ onClose }: Props) {
         language: language.trim() || null,
         isbn: isbn.trim() || null,
         date_published: datePublished.trim() || null,
-        genre: genre.trim() || null,
         page_count: pageCount ? parseInt(pageCount, 10) : null,
         description: description.trim() || null,
       })
       if (book) {
+        for (const genre of genres) {
+          await api.post(`/api/books/${book.id}/genres/${genre.id}`, {})
+        }
         navigate(`/books/${book.id}`)
       }
     } catch (err) {
@@ -194,15 +198,7 @@ export default function CreateManualBookModal({ onClose }: Props) {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black tracking-widest uppercase text-white/40 mb-2">
-                  Genre
-                </label>
-                <input
-                  type="text"
-                  value={genre}
-                  onChange={(e) => setGenre(e.target.value)}
-                  className={inputClass}
-                />
+                <GenreCombobox value={genres} onChange={setGenres} />
               </div>
               <div>
                 <label className="block text-[10px] font-black tracking-widest uppercase text-white/40 mb-2">
