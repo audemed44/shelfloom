@@ -93,3 +93,34 @@ class BookSeriesMembership(BaseModel):
     sequence: float | None
     prev_book: BookSeriesNeighbour | None
     next_book: BookSeriesNeighbour | None
+
+
+# ---------------------------------------------------------------------------
+# Bulk action schemas
+# ---------------------------------------------------------------------------
+
+
+class BulkBookMetadataUpdate(BaseModel):
+    book_ids: list[str]
+    add_tag_ids: list[int] = []
+    remove_tag_ids: list[int] = []
+    add_genre_ids: list[int] = []
+    remove_genre_ids: list[int] = []
+
+
+class BulkBookMoveRequest(BaseModel):
+    book_ids: list[str]
+    target_shelf_id: int
+
+
+class BulkBookActionResult(BaseModel):
+    book_id: str
+    success: bool
+    error: str | None = None
+
+
+class BulkBookActionResponse(BaseModel):
+    results: list[BulkBookActionResult]
+    total: int
+    succeeded: int
+    failed: int
