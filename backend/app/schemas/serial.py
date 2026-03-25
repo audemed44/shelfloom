@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SerialCreate(BaseModel):
@@ -69,6 +69,40 @@ class ChapterResponse(BaseModel):
 class ChapterFetchRequest(BaseModel):
     start: int
     end: int
+
+
+class ChapterFetchLogEntry(BaseModel):
+    timestamp: datetime
+    level: str
+    message: str
+    chapter_number: int | None = None
+
+
+class ChapterFetchJobResponse(BaseModel):
+    serial_id: int
+    state: str
+    start: int
+    end: int
+    total: int
+    started_at: datetime
+
+
+class ChapterFetchStatusResponse(BaseModel):
+    serial_id: int
+    state: str
+    start: int | None = None
+    end: int | None = None
+    total: int = 0
+    processed: int = 0
+    fetched: int = 0
+    skipped: int = 0
+    failed: int = 0
+    current_chapter_number: int | None = None
+    current_chapter_title: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    logs: list[ChapterFetchLogEntry] = Field(default_factory=list)
+    error: str | None = None
 
 
 class VolumeRange(BaseModel):

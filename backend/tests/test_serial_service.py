@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -50,6 +51,18 @@ from app.services.serial_service import (
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+async def _wait_for_fetch_state(client, serial_id: int, target_state: str, timeout: float = 1.0):
+    deadline = asyncio.get_running_loop().time() + timeout
+    while True:
+        resp = await client.get(f"/api/serials/{serial_id}/chapters/fetch-status")
+        data = resp.json()
+        if data["state"] == target_state:
+            return data
+        if asyncio.get_running_loop().time() >= deadline:
+            raise AssertionError(f"Timed out waiting for fetch state {target_state!r}: {data}")
+        await asyncio.sleep(0.01)
 
 
 @pytest.fixture
@@ -637,6 +650,12 @@ async def test_api_generate_all_not_found(client):
 @pytest.mark.asyncio
 async def test_api_fetch_chapters_not_found(client):
     resp = await client.post("/api/serials/99999/chapters/fetch", json={"start": 1, "end": 5})
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_fetch_chapter_status_not_found(client):
+    resp = await client.get("/api/serials/99999/chapters/fetch-status")
     assert resp.status_code == 404
 
 
@@ -1464,7 +1483,12 @@ async def test_api_volumes_include_word_counts(client, tmp_path):
 
     # Fetch chapter content
     with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
-        await client.post(f"/api/serials/{serial_id}/chapters/fetch", json={"start": 1, "end": 1})
+        fetch_resp = await client.post(
+            f"/api/serials/{serial_id}/chapters/fetch",
+            json={"start": 1, "end": 1},
+        )
+        assert fetch_resp.status_code == 202
+        await _wait_for_fetch_state(client, serial_id, "completed")
 
     # Configure volume
     vol_resp = await client.post(
@@ -1475,6 +1499,89 @@ async def test_api_volumes_include_word_counts(client, tmp_path):
     data = vol_resp.json()[0]
     assert data["total_words"] == 500
     assert data["estimated_pages"] == 2  # 500 / 250 = 2
+
+
+@pytest.mark.asyncio
+async def test_api_fetch_chapters_status_updates_while_job_runs(client, serial):
+    from app.scrapers.base import ChapterContent
+
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_fetch(_url: str):
+        started.set()
+        await release.wait()
+        return ChapterContent(0, "Fetched Title", "<p>Hello</p>", 42)
+
+    mock_adapter = MagicMock()
+    mock_adapter.fetch_chapter_content = AsyncMock(side_effect=slow_fetch)
+
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
+        resp = await client.post(
+            f"/api/serials/{serial.id}/chapters/fetch",
+            json={"start": 1, "end": 1},
+        )
+        assert resp.status_code == 202
+        assert resp.json()["state"] == "running"
+
+        await asyncio.wait_for(started.wait(), timeout=1)
+
+        status_resp = await client.get(f"/api/serials/{serial.id}/chapters/fetch-status")
+        assert status_resp.status_code == 200
+        status_data = status_resp.json()
+        assert status_data["state"] == "running"
+        assert status_data["current_chapter_number"] == 1
+        assert any(
+            'Fetching chapter 1 "Chapter 1"' in entry["message"] for entry in status_data["logs"]
+        )
+
+        chapters_resp = await client.get(f"/api/serials/{serial.id}/chapters")
+        chapters_data = chapters_resp.json()
+        assert chapters_data[0]["has_content"] is False
+
+        release.set()
+        final_status = await _wait_for_fetch_state(client, serial.id, "completed")
+        assert final_status["processed"] == 1
+        assert final_status["fetched"] == 1
+
+        chapters_resp = await client.get(f"/api/serials/{serial.id}/chapters")
+        chapters_data = chapters_resp.json()
+        assert chapters_data[0]["has_content"] is True
+        assert chapters_data[0]["word_count"] == 42
+
+
+@pytest.mark.asyncio
+async def test_api_fetch_chapters_rejects_parallel_job(client, serial):
+    from app.scrapers.base import ChapterContent
+
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_fetch(_url: str):
+        started.set()
+        await release.wait()
+        return ChapterContent(0, "Fetched Title", "<p>Hello</p>", 42)
+
+    mock_adapter = MagicMock()
+    mock_adapter.fetch_chapter_content = AsyncMock(side_effect=slow_fetch)
+
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
+        first = await client.post(
+            f"/api/serials/{serial.id}/chapters/fetch",
+            json={"start": 1, "end": 1},
+        )
+        assert first.status_code == 202
+
+        await asyncio.wait_for(started.wait(), timeout=1)
+
+        second = await client.post(
+            f"/api/serials/{serial.id}/chapters/fetch",
+            json={"start": 1, "end": 1},
+        )
+        assert second.status_code == 409
+
+        release.set()
+        await _wait_for_fetch_state(client, serial.id, "completed")
 
 
 # ---------------------------------------------------------------------------

@@ -35,15 +35,20 @@ async def client(db_engine):
 
     application = create_app()
     application.dependency_overrides[get_session] = override_get_session
+    application.state.serial_fetch_session_factory = factory
 
     # Attach a fresh scheduler so import endpoints work without a real lifespan
     from app.services.scheduler import Scheduler
+    from app.services.serial_service import reset_chapter_fetch_jobs
 
     application.state.scheduler = Scheduler()
+    reset_chapter_fetch_jobs()
 
     async with AsyncClient(transport=ASGITransport(app=application), base_url="http://test") as ac:
         ac.app = application  # expose app for tests that need app.state
         yield ac
+
+    reset_chapter_fetch_jobs()
 
 
 @pytest.fixture
