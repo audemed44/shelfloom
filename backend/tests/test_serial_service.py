@@ -39,9 +39,11 @@ from app.services.serial_service import (
     list_serials,
     list_volumes,
     rebuild_volume,
+    refresh_serial_cover,
     update_from_source,
     update_serial,
     update_volume,
+    upload_serial_cover,
     upload_volume_cover,
 )
 
@@ -1473,3 +1475,99 @@ async def test_api_volumes_include_word_counts(client, tmp_path):
     data = vol_resp.json()[0]
     assert data["total_words"] == 500
     assert data["estimated_pages"] == 2  # 500 / 250 = 2
+
+
+# ---------------------------------------------------------------------------
+# Serial cover upload / refresh
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_upload_serial_cover(db_session, tmp_path, serial):
+    with patch("app.services.serial_service._covers_dir", return_value=tmp_path):
+        updated = await upload_serial_cover(db_session, serial.id, b"coverdata", ".jpg")
+    assert updated.cover_path is not None
+    assert Path(updated.cover_path).exists()
+    assert Path(updated.cover_path).read_bytes() == b"coverdata"
+
+
+@pytest.mark.asyncio
+async def test_upload_serial_cover_not_found(db_session, tmp_path):
+    with patch("app.services.serial_service._covers_dir", return_value=tmp_path):
+        with pytest.raises(SerialNotFound):
+            await upload_serial_cover(db_session, 99999, b"data", ".jpg")
+
+
+@pytest.mark.asyncio
+async def test_refresh_serial_cover(db_session, tmp_path, serial):
+    serial.cover_url = "https://example.com/cover.jpg"
+    await db_session.commit()
+
+    with (
+        patch("app.services.serial_service._covers_dir", return_value=tmp_path),
+        patch(
+            "app.services.serial_service._download_cover",
+            new=AsyncMock(side_effect=lambda url, dest: dest.write_bytes(b"refreshed") or True),
+        ),
+    ):
+        updated = await refresh_serial_cover(db_session, serial.id)
+
+    assert updated.cover_path is not None
+    assert Path(updated.cover_path).exists()
+
+
+@pytest.mark.asyncio
+async def test_refresh_serial_cover_no_url(db_session, serial):
+    with pytest.raises(ValueError, match="no cover_url"):
+        await refresh_serial_cover(db_session, serial.id)
+
+
+@pytest.mark.asyncio
+async def test_api_upload_serial_cover(client, db_session, tmp_path, serial):
+    with patch("app.services.serial_service._covers_dir", return_value=tmp_path):
+        resp = await client.post(
+            f"/api/serials/{serial.id}/upload-cover",
+            files={"file": ("cover.jpg", b"imgbytes", "image/jpeg")},
+        )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["id"] == serial.id
+
+
+@pytest.mark.asyncio
+async def test_api_upload_serial_cover_not_found(client, tmp_path):
+    with patch("app.services.serial_service._covers_dir", return_value=tmp_path):
+        resp = await client.post(
+            "/api/serials/99999/upload-cover",
+            files={"file": ("cover.jpg", b"imgbytes", "image/jpeg")},
+        )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_refresh_serial_cover(client, db_session, tmp_path, serial):
+    serial.cover_url = "https://example.com/cover.jpg"
+    await db_session.commit()
+
+    with (
+        patch("app.services.serial_service._covers_dir", return_value=tmp_path),
+        patch(
+            "app.services.serial_service._download_cover",
+            new=AsyncMock(side_effect=lambda url, dest: dest.write_bytes(b"refreshed") or True),
+        ),
+    ):
+        resp = await client.post(f"/api/serials/{serial.id}/refresh-cover")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == serial.id
+
+
+@pytest.mark.asyncio
+async def test_api_refresh_serial_cover_no_url(client, serial):
+    resp = await client.post(f"/api/serials/{serial.id}/refresh-cover")
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_api_refresh_serial_cover_not_found(client):
+    resp = await client.post("/api/serials/99999/refresh-cover")
+    assert resp.status_code == 404
