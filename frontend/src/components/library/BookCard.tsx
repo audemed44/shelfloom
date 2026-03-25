@@ -16,6 +16,7 @@ export default function BookCard({ book }: BookCardProps) {
   const progress = book.reading_progress
   const isComplete = progress != null && progress >= 100
   const isInProgress = progress != null && progress > 0 && progress < 100
+  const genres = book.genres ?? []
 
   return (
     <Link
@@ -41,9 +42,9 @@ export default function BookCard({ book }: BookCardProps) {
         </div>
 
         {/* Genre + tag badges */}
-        {(book.genres.length > 0 || book.tags?.length > 0) && (
+        {(genres.length > 0 || book.tags?.length > 0) && (
           <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
-            {book.genres.slice(0, 2).map((genre) => (
+            {genres.slice(0, 2).map((genre) => (
               <span
                 key={genre.id}
                 className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
