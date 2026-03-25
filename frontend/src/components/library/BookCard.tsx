@@ -41,22 +41,16 @@ export default function BookCard({ book }: BookCardProps) {
         </div>
 
         {/* Genre + tag badges */}
-        {(book.genre || book.tags?.length > 0) && (
+        {(book.genres.length > 0 || book.tags?.length > 0) && (
           <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
-            {book.genre &&
-              book.genre
-                .split(',')
-                .map((g) => g.trim())
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((g) => (
-                  <span
-                    key={g}
-                    className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
-                  >
-                    {g}
-                  </span>
-                ))}
+            {book.genres.slice(0, 2).map((genre) => (
+              <span
+                key={genre.id}
+                className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
+              >
+                {genre.name}
+              </span>
+            ))}
             {book.tags?.slice(0, 2).map((t) => (
               <span
                 key={t.id}

@@ -35,7 +35,6 @@ class Book(Base):
         DateTime, server_default=func.now(), nullable=False
     )
     date_published: Mapped[str | None] = mapped_column(Text, nullable=True)
-    genre: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_raw: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON
 
     shelf: Mapped["Shelf"] = relationship("Shelf", back_populates="books")  # type: ignore[name-defined]  # noqa: F821
@@ -47,6 +46,9 @@ class Book(Base):
     )
     tags: Mapped[list["BookTag"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "BookTag", back_populates="book", cascade="all, delete-orphan"
+    )
+    genres: Mapped[list["BookGenre"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
+        "BookGenre", back_populates="book", cascade="all, delete-orphan"
     )
     reading_progress: Mapped[list["ReadingProgress"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
         "ReadingProgress", back_populates="book", cascade="all, delete-orphan"

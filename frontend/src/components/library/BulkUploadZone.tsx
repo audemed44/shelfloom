@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { api } from '../../api/client'
 import type { Book } from '../../types'
-import type { Tag } from '../../types/api'
+import type { Genre, Tag } from '../../types/api'
 import GenreCombobox from '../shared/GenreCombobox'
 import TagPicker from '../shared/TagPicker'
 import SeriesPicker from '../shared/SeriesPicker'
@@ -28,7 +28,7 @@ interface BulkFile {
 
 interface SharedMeta {
   author: string
-  genres: string[]
+  genres: Genre[]
   tags: Tag[]
   seriesId: number | null
 }
@@ -153,18 +153,22 @@ export default function BulkUploadZone({ onSuccess }: BulkUploadZoneProps) {
       try {
         const patch: Record<string, string | null> = {}
         if (meta.author.trim()) patch.author = meta.author.trim()
-        if (meta.genres.length > 0) patch.genre = meta.genres.join(', ')
 
         if (Object.keys(patch).length > 0) {
           await api.patch(`/api/books/${bookId}`, patch)
         }
 
-        // Step 3: Assign tags
+        // Step 3: Assign genres
+        for (const genre of meta.genres) {
+          await api.post(`/api/books/${bookId}/genres/${genre.id}`, {})
+        }
+
+        // Step 4: Assign tags
         for (const tag of meta.tags) {
           await api.post(`/api/books/${bookId}/tags/${tag.id}`, {})
         }
 
-        // Step 4: Assign series
+        // Step 5: Assign series
         if (meta.seriesId) {
           const qs =
             bulkFile.sequence != null

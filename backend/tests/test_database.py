@@ -44,6 +44,8 @@ async def test_tables_created(db_engine):
         "reading_order_entries",
         "tags",
         "book_tags",
+        "genres",
+        "book_genres",
         "reading_progress",
         "reading_sessions",
         "highlights",
