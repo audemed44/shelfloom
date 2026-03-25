@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { usePersistedState } from '../hooks/usePersistedState'
 import {
   Search,
@@ -285,9 +285,41 @@ export default function Library() {
     new Set()
   )
 
+  // Selection state for bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const isSelecting = selectedIds.size > 0
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
   const debouncedSearch = useDebounce(search, 300)
 
   const resetPage = () => setPage(1)
+
+  // Clear selection when filters/page/grouping change
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    clearSelection()
+  }, [
+    debouncedSearch,
+    selectedShelfId,
+    sort,
+    status,
+    page,
+    groupBySeries,
+    clearSelection,
+  ])
 
   const handleUploadSuccess = useCallback(() => {
     setRev((r) => r + 1)
@@ -533,13 +565,25 @@ export default function Library() {
                       </button>
                     </div>,
                     ...group.books.map((book) => (
-                      <BookCard key={book.id} book={book} />
+                      <BookCard
+                        key={book.id}
+                        book={book}
+                        isSelecting={isSelecting}
+                        isSelected={selectedIds.has(book.id)}
+                        onToggle={toggleSelection}
+                      />
                     )),
                   ]
                 }
                 // Standalone books
                 return group.books.map((book) => (
-                  <BookCard key={book.id} book={book} />
+                  <BookCard
+                    key={book.id}
+                    book={book}
+                    isSelecting={isSelecting}
+                    isSelected={selectedIds.has(book.id)}
+                    onToggle={toggleSelection}
+                  />
                 ))
               })}
             </div>
@@ -585,13 +629,25 @@ export default function Library() {
                       </span>
                     </button>,
                     ...group.books.map((book) => (
-                      <BookRow key={book.id} book={book} />
+                      <BookRow
+                        key={book.id}
+                        book={book}
+                        isSelecting={isSelecting}
+                        isSelected={selectedIds.has(book.id)}
+                        onToggle={toggleSelection}
+                      />
                     )),
                   ]
                 }
                 // Standalone books
                 return group.books.map((book) => (
-                  <BookRow key={book.id} book={book} />
+                  <BookRow
+                    key={book.id}
+                    book={book}
+                    isSelecting={isSelecting}
+                    isSelected={selectedIds.has(book.id)}
+                    onToggle={toggleSelection}
+                  />
                 ))
               })}
             </div>

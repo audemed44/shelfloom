@@ -9,20 +9,44 @@ function fmtFormat(format: string | null | undefined): string {
 
 interface BookRowProps {
   book: Book
+  isSelecting?: boolean
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }
 
-export default function BookRow({ book }: BookRowProps) {
+export default function BookRow({
+  book,
+  isSelecting,
+  isSelected,
+  onToggle,
+}: BookRowProps) {
   const coverSrc = `/api/books/${book.id}/cover`
   const genres = book.genres ?? []
 
-  return (
-    <Link
-      to={`/books/${book.id}`}
-      className="group flex items-center gap-4 p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-      data-testid="book-row"
-    >
+  const rowContent = (
+    <>
+      {/* Selection checkbox */}
+      {isSelecting && (
+        <div
+          className={`size-5 rounded-full flex items-center justify-center shrink-0 ${
+            isSelected ? 'bg-primary' : 'border border-white/30'
+          }`}
+          data-testid="book-select-checkbox"
+        >
+          {isSelected && (
+            <Check size={10} strokeWidth={3} className="text-white" />
+          )}
+        </div>
+      )}
+
       {/* Small cover */}
-      <div className="w-10 h-14 bg-white/10 border border-white/10 group-hover:border-primary transition-colors shrink-0 overflow-hidden">
+      <div
+        className={`w-10 h-14 bg-white/10 border transition-colors shrink-0 overflow-hidden ${
+          isSelected
+            ? 'border-primary'
+            : 'border-white/10 group-hover:border-primary'
+        }`}
+      >
         <img
           src={coverSrc}
           alt=""
@@ -100,6 +124,32 @@ export default function BookRow({ book }: BookRowProps) {
           </div>
         ) : null}
       </div>
+    </>
+  )
+
+  if (isSelecting) {
+    return (
+      <div
+        className={`group flex items-center gap-4 p-4 bg-white/5 border transition-colors cursor-pointer ${
+          isSelected
+            ? 'border-primary bg-primary/5'
+            : 'border-white/10 hover:bg-white/10'
+        }`}
+        data-testid="book-row"
+        onClick={() => onToggle?.(book.id)}
+      >
+        {rowContent}
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      to={`/books/${book.id}`}
+      className="group flex items-center gap-4 p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+      data-testid="book-row"
+    >
+      {rowContent}
     </Link>
   )
 }

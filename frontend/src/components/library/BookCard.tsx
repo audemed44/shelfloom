@@ -9,23 +9,33 @@ function fmtFormat(format: string | null | undefined): string {
 
 interface BookCardProps {
   book: Book
+  isSelecting?: boolean
+  isSelected?: boolean
+  onToggle?: (id: string) => void
 }
 
-export default function BookCard({ book }: BookCardProps) {
+export default function BookCard({
+  book,
+  isSelecting,
+  isSelected,
+  onToggle,
+}: BookCardProps) {
   const coverSrc = `/api/books/${book.id}/cover`
   const progress = book.reading_progress
   const isComplete = progress != null && progress >= 100
   const isInProgress = progress != null && progress > 0 && progress < 100
   const genres = book.genres ?? []
 
-  return (
-    <Link
-      to={`/books/${book.id}`}
-      className="group block"
-      data-testid="book-card"
-    >
+  const cardContent = (
+    <>
       {/* Cover */}
-      <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
+      <div
+        className={`aspect-[2/3] bg-white/5 border transition-colors overflow-hidden relative ${
+          isSelected
+            ? 'border-primary'
+            : 'border-white/10 group-hover:border-primary'
+        }`}
+      >
         <img
           src={coverSrc}
           alt={book.title}
@@ -63,8 +73,22 @@ export default function BookCard({ book }: BookCardProps) {
           </div>
         )}
 
-        {/* Complete checkmark */}
-        {isComplete && (
+        {/* Selection checkbox */}
+        {isSelecting && (
+          <div
+            className={`absolute top-2 left-2 size-6 rounded-full flex items-center justify-center shadow-lg ${
+              isSelected ? 'bg-primary' : 'bg-black/60 border border-white/30'
+            }`}
+            data-testid="book-select-checkbox"
+          >
+            {isSelected && (
+              <Check size={12} strokeWidth={3} className="text-white" />
+            )}
+          </div>
+        )}
+
+        {/* Complete checkmark (hidden when selecting) */}
+        {!isSelecting && isComplete && (
           <div className="absolute top-2 left-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
             <Check size={12} strokeWidth={3} className="text-white" />
           </div>
@@ -92,6 +116,28 @@ export default function BookCard({ book }: BookCardProps) {
           </p>
         )}
       </div>
+    </>
+  )
+
+  if (isSelecting) {
+    return (
+      <div
+        className="group block cursor-pointer"
+        data-testid="book-card"
+        onClick={() => onToggle?.(book.id)}
+      >
+        {cardContent}
+      </div>
+    )
+  }
+
+  return (
+    <Link
+      to={`/books/${book.id}`}
+      className="group block"
+      data-testid="book-card"
+    >
+      {cardContent}
     </Link>
   )
 }
