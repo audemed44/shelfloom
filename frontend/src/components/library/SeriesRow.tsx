@@ -8,6 +8,10 @@ interface SeriesRowProps {
   books: Book[]
   totalBookCount?: number
   onExpand: () => void
+  isSelecting?: boolean
+  isAllSelected?: boolean
+  isPartiallySelected?: boolean
+  onToggleAll?: () => void
 }
 
 export default function SeriesRow({
@@ -16,6 +20,10 @@ export default function SeriesRow({
   books,
   totalBookCount,
   onExpand,
+  isSelecting,
+  isAllSelected,
+  isPartiallySelected,
+  onToggleAll,
 }: SeriesRowProps) {
   const sorted = [...books].sort(
     (a, b) => (a.series_sequence ?? Infinity) - (b.series_sequence ?? Infinity)
@@ -34,6 +42,31 @@ export default function SeriesRow({
       className="group flex items-center gap-4 p-4 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer"
       data-testid="series-row"
     >
+      {/* Selection checkbox */}
+      {onToggleAll && (
+        <div
+          className={`size-5 rounded-full flex items-center justify-center shrink-0 cursor-pointer transition-opacity ${
+            isAllSelected
+              ? 'bg-primary opacity-100'
+              : isPartiallySelected
+                ? 'bg-primary/50 opacity-100'
+                : isSelecting
+                  ? 'border border-white/30 opacity-100'
+                  : 'border border-white/30 opacity-0 group-hover:opacity-100'
+          }`}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onToggleAll()
+          }}
+          data-testid="series-select-checkbox"
+        >
+          {(isAllSelected || isPartiallySelected) && (
+            <Check size={10} strokeWidth={3} className="text-white" />
+          )}
+        </div>
+      )}
+
       <button
         onClick={onExpand}
         className="flex items-center gap-4 flex-1 min-w-0 bg-transparent border-0 p-0 text-left cursor-pointer"

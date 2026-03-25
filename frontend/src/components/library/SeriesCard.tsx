@@ -1,4 +1,4 @@
-import { ExternalLink } from 'lucide-react'
+import { Check, ExternalLink } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Book } from '../../types'
 
@@ -8,6 +8,10 @@ interface SeriesCardProps {
   books: Book[]
   totalBookCount?: number
   onExpand: () => void
+  isSelecting?: boolean
+  isAllSelected?: boolean
+  isPartiallySelected?: boolean
+  onToggleAll?: () => void
 }
 
 export default function SeriesCard({
@@ -16,6 +20,10 @@ export default function SeriesCard({
   books,
   totalBookCount,
   onExpand,
+  isSelecting,
+  isAllSelected,
+  isPartiallySelected,
+  onToggleAll,
 }: SeriesCardProps) {
   // Use first book by sequence for cover
   const sorted = [...books].sort(
@@ -71,12 +79,14 @@ export default function SeriesCard({
             {/* Overlay gradient */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
 
-            {/* Book count badge */}
-            <div className="absolute top-2 left-2">
-              <span className="bg-primary/90 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
-                {count} {count === 1 ? 'BOOK' : 'BOOKS'}
-              </span>
-            </div>
+            {/* Book count badge — hidden when checkbox is present */}
+            {!onToggleAll && (
+              <div className="absolute top-2 left-2">
+                <span className="bg-primary/90 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
+                  {count} {count === 1 ? 'BOOK' : 'BOOKS'}
+                </span>
+              </div>
+            )}
 
             {/* Series link */}
             <Link
@@ -88,6 +98,31 @@ export default function SeriesCard({
             >
               <ExternalLink size={12} />
             </Link>
+
+            {/* Selection checkbox */}
+            {onToggleAll && (
+              <div
+                className={`absolute top-2 left-2 size-6 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-opacity z-10 ${
+                  isAllSelected
+                    ? 'bg-primary opacity-100'
+                    : isPartiallySelected
+                      ? 'bg-primary/50 opacity-100'
+                      : isSelecting
+                        ? 'bg-black/60 border border-white/30 opacity-100'
+                        : 'bg-black/60 border border-white/30 opacity-0 group-hover:opacity-100'
+                }`}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onToggleAll()
+                }}
+                data-testid="series-select-checkbox"
+              >
+                {(isAllSelected || isPartiallySelected) && (
+                  <Check size={12} strokeWidth={3} className="text-white" />
+                )}
+              </div>
+            )}
 
             {/* Bottom info */}
             <div className="absolute bottom-0 left-0 right-0 px-2 py-2">
