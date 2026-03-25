@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import BookCard from '../components/library/BookCard'
 import type { Book } from '../types'
@@ -30,12 +31,19 @@ const BOOK: Book = {
   tags: [],
 }
 
-function renderCard(book: Book = BOOK) {
+function renderCard(
+  book: Book = BOOK,
+  selectionProps?: {
+    isSelecting?: boolean
+    isSelected?: boolean
+    onToggle?: (id: string) => void
+  }
+) {
   return render(
     <MemoryRouter
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
-      <BookCard book={book} />
+      <BookCard book={book} {...selectionProps} />
     </MemoryRouter>
   )
 }
@@ -72,5 +80,29 @@ describe('BookCard', () => {
     renderCard()
     const img = screen.getByRole('img')
     expect(img.getAttribute('src')).toContain('/api/books/test-uuid-1/cover')
+  })
+
+  it('does not show checkbox when not selecting', () => {
+    renderCard()
+    expect(screen.queryByTestId('book-select-checkbox')).not.toBeInTheDocument()
+  })
+
+  it('shows checkbox when isSelecting is true', () => {
+    renderCard(BOOK, { isSelecting: true, onToggle: vi.fn() })
+    expect(screen.getByTestId('book-select-checkbox')).toBeInTheDocument()
+  })
+
+  it('calls onToggle with book id when clicked in selecting mode', async () => {
+    const onToggle = vi.fn()
+    renderCard(BOOK, { isSelecting: true, onToggle })
+    await userEvent.click(screen.getByTestId('book-card'))
+    expect(onToggle).toHaveBeenCalledWith('test-uuid-1')
+  })
+
+  it('renders as div instead of link when selecting', () => {
+    renderCard(BOOK, { isSelecting: true, onToggle: vi.fn() })
+    const card = screen.getByTestId('book-card')
+    expect(card.tagName).toBe('DIV')
+    expect(card.getAttribute('href')).toBeNull()
   })
 })
