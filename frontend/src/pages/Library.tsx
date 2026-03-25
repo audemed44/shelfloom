@@ -416,18 +416,23 @@ export default function Library() {
     return entries
   }, [books, groupBySeries])
 
-  // All selectable book IDs on the current page (leaf books only)
+  // All selectable book IDs on the current page (all books, including collapsed series)
   const selectableIds = useMemo(() => {
-    if (!groupBySeries) return books.map((b) => b.id)
-    const ids: string[] = []
-    for (const group of bookGroups) {
-      if (group.seriesId != null && !expandedSeriesIds.has(group.seriesId)) {
-        continue // collapsed series — not selectable
+    return books.map((b) => b.id)
+  }, [books])
+
+  const toggleSeriesSelection = useCallback((bookIds: string[]) => {
+    setSelectedIds((prev) => {
+      const allSelected = bookIds.every((id) => prev.has(id))
+      const next = new Set(prev)
+      if (allSelected) {
+        for (const id of bookIds) next.delete(id)
+      } else {
+        for (const id of bookIds) next.add(id)
       }
-      for (const book of group.books) ids.push(book.id)
-    }
-    return ids
-  }, [books, bookGroups, groupBySeries, expandedSeriesIds])
+      return next
+    })
+  }, [])
 
   const allSelected =
     selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id))
@@ -561,6 +566,13 @@ export default function Library() {
                   group.seriesId != null &&
                   !expandedSeriesIds.has(group.seriesId)
                 ) {
+                  const seriesBookIds = group.books.map((b) => b.id)
+                  const allSeriesSelected =
+                    seriesBookIds.length > 0 &&
+                    seriesBookIds.every((id) => selectedIds.has(id))
+                  const someSeriesSelected =
+                    !allSeriesSelected &&
+                    seriesBookIds.some((id) => selectedIds.has(id))
                   return [
                     <SeriesCard
                       key={`series-${group.seriesId}`}
@@ -569,6 +581,10 @@ export default function Library() {
                       books={group.books}
                       totalBookCount={seriesCountMap.get(group.seriesId)}
                       onExpand={() => toggleSeriesExpanded(group.seriesId!)}
+                      isSelecting={isSelecting}
+                      isAllSelected={allSeriesSelected}
+                      isPartiallySelected={someSeriesSelected}
+                      onToggleAll={() => toggleSeriesSelection(seriesBookIds)}
                     />,
                   ]
                 }
@@ -629,6 +645,13 @@ export default function Library() {
                   group.seriesId != null &&
                   !expandedSeriesIds.has(group.seriesId)
                 ) {
+                  const seriesBookIds = group.books.map((b) => b.id)
+                  const allSeriesSelected =
+                    seriesBookIds.length > 0 &&
+                    seriesBookIds.every((id) => selectedIds.has(id))
+                  const someSeriesSelected =
+                    !allSeriesSelected &&
+                    seriesBookIds.some((id) => selectedIds.has(id))
                   return [
                     <SeriesRow
                       key={`series-${group.seriesId}`}
@@ -637,6 +660,10 @@ export default function Library() {
                       books={group.books}
                       totalBookCount={seriesCountMap.get(group.seriesId)}
                       onExpand={() => toggleSeriesExpanded(group.seriesId!)}
+                      isSelecting={isSelecting}
+                      isAllSelected={allSeriesSelected}
+                      isPartiallySelected={someSeriesSelected}
+                      onToggleAll={() => toggleSeriesSelection(seriesBookIds)}
                     />,
                   ]
                 }

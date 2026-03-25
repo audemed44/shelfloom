@@ -96,15 +96,15 @@ export default function BookCard({
         </div>
       )}
 
-      {/* Complete checkmark (hidden when checkbox is shown) */}
+      {/* Complete checkmark — moves to bottom-right when checkbox occupies top-left */}
       {!onToggle && isComplete && (
         <div className="absolute top-2 left-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
           <Check size={12} strokeWidth={3} className="text-white" />
         </div>
       )}
-      {onToggle && !isSelecting && isComplete && (
-        <div className="absolute top-2 left-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg group-hover:opacity-0 transition-opacity">
-          <Check size={12} strokeWidth={3} className="text-white" />
+      {onToggle && isComplete && (
+        <div className="absolute bottom-2 right-2 size-5 rounded-full bg-primary flex items-center justify-center shadow-lg">
+          <Check size={10} strokeWidth={3} className="text-white" />
         </div>
       )}
 
