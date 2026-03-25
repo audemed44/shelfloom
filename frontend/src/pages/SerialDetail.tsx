@@ -412,6 +412,7 @@ export default function SerialDetail() {
         <ChapterList
           serialId={displaySerial.id}
           totalChapters={displaySerial.total_chapters}
+          volumes={volumes ?? []}
         />
       </section>
 

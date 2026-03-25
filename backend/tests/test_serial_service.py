@@ -1498,7 +1498,100 @@ async def test_api_volumes_include_word_counts(client, tmp_path):
     assert vol_resp.status_code == 201
     data = vol_resp.json()[0]
     assert data["total_words"] == 500
-    assert data["estimated_pages"] == 2  # 500 / 250 = 2
+    assert data["estimated_pages"] == 1  # 500 // 280 = 1
+
+
+@pytest.mark.asyncio
+async def test_api_chapters_include_running_page_estimates(client, db_session, serial):
+    from sqlalchemy import select
+
+    result = await db_session.execute(
+        select(SerialChapter)
+        .where(SerialChapter.serial_id == serial.id)
+        .order_by(SerialChapter.chapter_number)
+    )
+    chapters = list(result.scalars().all())
+
+    chapters[0].content = "<p>Chapter 1</p>"
+    chapters[0].word_count = 280
+    chapters[0].fetched_at = datetime.utcnow()
+    chapters[1].word_count = None
+    chapters[2].content = "<p>Chapter 3</p>"
+    chapters[2].word_count = 560
+    chapters[2].fetched_at = datetime.utcnow()
+    await db_session.commit()
+
+    resp = await client.get(f"/api/serials/{serial.id}/chapters?offset=1&limit=2")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert len(data) == 2
+    assert data[0]["chapter_number"] == 2
+    assert data[0]["estimated_pages"] is None
+    assert data[0]["running_word_count"] == 280
+    assert data[0]["running_estimated_pages"] == 1
+    assert data[0]["running_is_partial"] is True
+
+    assert data[1]["chapter_number"] == 3
+    assert data[1]["estimated_pages"] == 2
+    assert data[1]["running_word_count"] == 840
+    assert data[1]["running_estimated_pages"] == 3
+    assert data[1]["running_is_partial"] is True
+
+
+@pytest.mark.asyncio
+async def test_api_volume_preview_reports_partial_estimates(client, db_session, serial):
+    from sqlalchemy import select
+
+    result = await db_session.execute(
+        select(SerialChapter)
+        .where(SerialChapter.serial_id == serial.id)
+        .order_by(SerialChapter.chapter_number)
+    )
+    chapters = list(result.scalars().all())
+    chapters[0].word_count = 280
+    chapters[0].content = "<p>Chapter 1</p>"
+    chapters[0].fetched_at = datetime.utcnow()
+    chapters[1].word_count = None
+    chapters[2].word_count = 560
+    chapters[2].content = "<p>Chapter 3</p>"
+    chapters[2].fetched_at = datetime.utcnow()
+    await db_session.commit()
+
+    resp = await client.post(
+        f"/api/serials/{serial.id}/volumes/preview",
+        json={
+            "splits": [
+                {"start": 1, "end": 2, "name": "Alpha"},
+                {"start": 2, "end": 3, "name": "Beta"},
+            ]
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data == [
+        {
+            "start": 1,
+            "end": 2,
+            "name": "Alpha",
+            "chapter_count": 2,
+            "fetched_chapter_count": 1,
+            "total_words": 280,
+            "estimated_pages": 1,
+            "is_partial": True,
+        },
+        {
+            "start": 2,
+            "end": 3,
+            "name": "Beta",
+            "chapter_count": 2,
+            "fetched_chapter_count": 1,
+            "total_words": 560,
+            "estimated_pages": 2,
+            "is_partial": True,
+        },
+    ]
 
 
 @pytest.mark.asyncio

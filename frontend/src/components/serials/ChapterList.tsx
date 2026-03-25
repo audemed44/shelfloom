@@ -5,11 +5,13 @@ import type {
   ChapterFetchJobResponse,
   ChapterFetchStatusResponse,
   SerialChapter,
+  SerialVolume,
 } from '../../types/api'
 
 interface ChapterListProps {
   serialId: number
   totalChapters: number
+  volumes?: SerialVolume[]
 }
 
 function fmtDate(iso: string | null): string {
@@ -28,6 +30,25 @@ function fmtTime(iso: string | null): string {
     minute: '2-digit',
     second: '2-digit',
   })
+}
+
+function fmtWords(wordCount: number | null): string {
+  if (wordCount === null) return '—'
+  if (wordCount >= 1000) {
+    return `${(wordCount / 1000).toFixed(wordCount >= 10000 ? 0 : 1)}k`
+  }
+  return String(wordCount)
+}
+
+function fmtPages(
+  pages: number | null,
+  isPartial: boolean = false,
+  unknownLabel: string = '—'
+): string {
+  if (pages === null) {
+    return isPartial ? `${unknownLabel} partial` : unknownLabel
+  }
+  return isPartial ? `${pages}*` : String(pages)
 }
 
 function makePendingStatus(
@@ -76,11 +97,25 @@ function normalizeFetchStatus(
   }
 }
 
+function getMatchingVolumes(
+  chapterNumber: number,
+  volumes: SerialVolume[]
+): SerialVolume[] {
+  return volumes
+    .filter(
+      (volume) =>
+        volume.chapter_start <= chapterNumber &&
+        volume.chapter_end >= chapterNumber
+    )
+    .sort((a, b) => a.volume_number - b.volume_number)
+}
+
 const LIMIT = 50
 
 export default function ChapterList({
   serialId,
   totalChapters,
+  volumes = [],
 }: ChapterListProps) {
   const isMountedRef = useRef(true)
   const [offset, setOffset] = useState(0)
@@ -368,14 +403,14 @@ export default function ChapterList({
           No chapters yet.
         </p>
       ) : (
-        <div className="border border-white/10">
-          <table className="w-full text-xs table-fixed">
+        <div className="border border-white/10 overflow-x-auto lg:overflow-visible">
+          <table className="w-full min-w-full lg:min-w-[720px] text-xs table-fixed">
             <thead>
               <tr className="border-b border-white/10">
-                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 w-16">
+                <th className="text-left px-3 sm:px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 w-12 sm:w-16">
                   #
                 </th>
-                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40">
+                <th className="text-left px-3 sm:px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 min-w-0">
                   Title
                 </th>
                 <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden sm:table-cell w-28">
@@ -384,41 +419,117 @@ export default function ChapterList({
                 <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden md:table-cell w-28">
                   Fetched
                 </th>
-                <th className="text-center pl-2 pr-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 w-14">
+                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden lg:table-cell w-20">
+                  Words
+                </th>
+                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden lg:table-cell w-16">
+                  Pages
+                </th>
+                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden xl:table-cell w-24">
+                  Running
+                </th>
+                <th className="text-left px-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 hidden lg:table-cell w-36">
+                  Volumes
+                </th>
+                <th className="text-center pl-2 pr-3 sm:pr-4 py-2 text-[10px] font-black tracking-widest uppercase text-white/40 w-12 sm:w-14">
                   Status
                 </th>
               </tr>
             </thead>
             <tbody>
-              {(chapters ?? []).map((ch) => (
-                <tr
-                  key={ch.id}
-                  className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors"
-                >
-                  <td className="px-4 py-2 font-mono text-white/40">
-                    {String(ch.chapter_number).padStart(3, '0')}
-                  </td>
-                  <td className="px-4 py-2 text-white/80 normal-case break-words">
-                    {ch.title ?? `Chapter ${ch.chapter_number}`}
-                  </td>
-                  <td className="px-4 py-2 text-white/30 normal-case hidden sm:table-cell">
-                    {fmtDate(ch.publish_date)}
-                  </td>
-                  <td className="px-4 py-2 text-white/30 normal-case hidden md:table-cell">
-                    {fmtDate(ch.fetched_at)}
-                  </td>
-                  <td className="px-4 py-2 text-center">
-                    {ch.has_content ? (
-                      <CheckCircle2
-                        size={13}
-                        className="text-green-500 inline"
-                      />
-                    ) : (
-                      <Circle size={13} className="text-white/20 inline" />
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {(chapters ?? []).map((chapter) => {
+                const matchingVolumes = getMatchingVolumes(
+                  chapter.chapter_number,
+                  volumes
+                )
+                return (
+                  <tr
+                    key={chapter.id}
+                    className="border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors"
+                  >
+                    <td className="px-3 sm:px-4 py-2 font-mono text-white/40 align-top">
+                      {String(chapter.chapter_number).padStart(3, '0')}
+                    </td>
+                    <td className="px-3 sm:px-4 py-2 align-top min-w-0">
+                      <p className="text-white/80 normal-case break-words">
+                        {chapter.title ?? `Chapter ${chapter.chapter_number}`}
+                      </p>
+                      <div className="mt-1 space-y-1 lg:hidden">
+                        <p className="text-[10px] text-white/35 normal-case">
+                          Published {fmtDate(chapter.publish_date)} · Fetched{' '}
+                          {fmtDate(chapter.fetched_at)}
+                        </p>
+                        <p className="text-[10px] text-white/35 normal-case">
+                          Words {fmtWords(chapter.word_count)} · Pages{' '}
+                          {fmtPages(chapter.estimated_pages)} · Run{' '}
+                          {fmtPages(
+                            chapter.running_estimated_pages,
+                            chapter.running_is_partial
+                          )}
+                        </p>
+                        {matchingVolumes.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {matchingVolumes.map((volume) => (
+                              <span
+                                key={volume.id}
+                                className="text-[9px] font-black tracking-widest px-1.5 py-0.5 bg-primary/10 text-primary"
+                              >
+                                {volume.name ??
+                                  `Volume ${String(volume.volume_number).padStart(2, '0')}`}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-white/30 normal-case hidden sm:table-cell align-top">
+                      {fmtDate(chapter.publish_date)}
+                    </td>
+                    <td className="px-4 py-2 text-white/30 normal-case hidden md:table-cell align-top">
+                      {fmtDate(chapter.fetched_at)}
+                    </td>
+                    <td className="px-4 py-2 text-white/50 normal-case hidden lg:table-cell align-top">
+                      {fmtWords(chapter.word_count)}
+                    </td>
+                    <td className="px-4 py-2 text-white/50 normal-case hidden lg:table-cell align-top">
+                      {fmtPages(chapter.estimated_pages)}
+                    </td>
+                    <td className="px-4 py-2 text-white/50 normal-case hidden xl:table-cell align-top">
+                      {fmtPages(
+                        chapter.running_estimated_pages,
+                        chapter.running_is_partial
+                      )}
+                    </td>
+                    <td className="px-4 py-2 hidden lg:table-cell align-top">
+                      {matchingVolumes.length === 0 ? (
+                        <span className="text-white/25">—</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {matchingVolumes.map((volume) => (
+                            <span
+                              key={volume.id}
+                              className="text-[9px] font-black tracking-widest px-1.5 py-0.5 bg-primary/10 text-primary"
+                            >
+                              {volume.name ??
+                                `Volume ${String(volume.volume_number).padStart(2, '0')}`}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-2 sm:px-4 py-2 text-center align-top">
+                      {chapter.has_content ? (
+                        <CheckCircle2
+                          size={13}
+                          className="text-green-500 inline"
+                        />
+                      ) : (
+                        <Circle size={13} className="text-white/20 inline" />
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -446,6 +557,10 @@ export default function ChapterList({
           </button>
         </div>
       )}
+      <p className="text-[10px] text-white/20 normal-case">
+        * Running page totals are based on fetched chapters only and are marked
+        partial when earlier chapters are still missing word counts.
+      </p>
     </div>
   )
 }
