@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import SerialDetail from '../pages/SerialDetail'
@@ -106,7 +106,10 @@ describe('SerialDetail', () => {
   beforeEach(() => {
     fetchSpy = mockFetch()
   })
-  afterEach(() => fetchSpy.mockRestore())
+  afterEach(() => {
+    cleanup()
+    fetchSpy.mockRestore()
+  })
 
   it('renders serial title and author', async () => {
     renderDetail()
