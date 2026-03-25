@@ -9,4 +9,5 @@ export type {
   BookDetail,
   PaginatedResponse,
   ApiError,
+  SeriesWithCount,
 } from './api'

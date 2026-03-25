@@ -93,11 +93,48 @@ const MOCK_BOOKS = [
   },
 ]
 
+const MOCK_SERIES_TREE = [
+  {
+    id: 1,
+    name: 'Dune Saga',
+    description: null,
+    parent_id: null,
+    parent_name: null,
+    sort_order: 0,
+    cover_path: null,
+    book_count: 6,
+    first_book_id: '1',
+  },
+  {
+    id: 2,
+    name: 'Foundation Series',
+    description: null,
+    parent_id: null,
+    parent_name: null,
+    sort_order: 0,
+    cover_path: null,
+    book_count: 7,
+    first_book_id: '2',
+  },
+  {
+    id: 10,
+    name: 'ABC',
+    description: null,
+    parent_id: null,
+    parent_name: null,
+    sort_order: 0,
+    cover_path: null,
+    book_count: 5,
+    first_book_id: '1',
+  },
+]
+
 interface MockFetchOptions {
   books?: Record<string, unknown>[]
   total?: number
   shelves?: typeof MOCK_SHELVES
   uploadResponse?: (typeof MOCK_BOOKS)[0] | null
+  seriesTree?: typeof MOCK_SERIES_TREE
 }
 
 function mockFetch({
@@ -105,6 +142,7 @@ function mockFetch({
   total = MOCK_BOOKS.length,
   shelves = MOCK_SHELVES,
   uploadResponse = null,
+  seriesTree = MOCK_SERIES_TREE,
 }: MockFetchOptions = {}) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => {
     const u = url.toString()
@@ -114,6 +152,13 @@ function mockFetch({
         ok: true,
         status: 200,
         json: async () => shelves,
+      }) as Promise<Response>
+    }
+    if (u.includes('/api/series/tree')) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => seriesTree,
       }) as Promise<Response>
     }
     if (u.includes('/api/books') && method === 'POST') {
@@ -309,7 +354,7 @@ describe('Library', () => {
     })
   })
 
-  it('shows series group headers only for series books when grouping is on', async () => {
+  it('shows series cards instead of individual books when grouping is on', async () => {
     const seriesBooks = [
       {
         ...MOCK_BOOKS[0],
@@ -333,39 +378,56 @@ describe('Library', () => {
     renderLibrary()
 
     await waitFor(() => {
-      // Only 2 headers — series groups only, no header for standalone books
-      expect(screen.getAllByTestId('series-group-header')).toHaveLength(2)
+      expect(screen.getAllByTestId('series-card')).toHaveLength(2)
     })
-    expect(screen.getByText('Dune Saga')).toBeInTheDocument()
-    expect(screen.getByText('Foundation Series')).toBeInTheDocument()
-    expect(screen.queryByText('Ungrouped')).not.toBeInTheDocument()
+    // Standalone book still renders as book-card
+    expect(screen.getAllByTestId('book-card')).toHaveLength(1)
+    expect(screen.getByText('Neuromancer')).toBeInTheDocument()
     localStorage.removeItem('shelfloom:groupBySeries')
   })
 
-  it('collapses series members to the position of the first member', async () => {
-    // Order: A (series 1), D (no series), B (series 1)
-    // With grouping: [A, B] at position 0, D at position 1
+  it('series card shows book count', async () => {
     const seriesBooks = [
       {
         ...MOCK_BOOKS[0],
-        id: 1,
-        title: 'A',
-        series_id: 10,
-        series_name: 'ABC',
+        series_id: 1,
+        series_name: 'Dune Saga',
+        series_sequence: 1,
+      },
+      {
+        ...MOCK_BOOKS[2],
+      },
+    ]
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({ books: seriesBooks, total: 2 })
+    localStorage.setItem('shelfloom:groupBySeries', 'true')
+    renderLibrary()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('series-card')).toBeInTheDocument()
+    })
+    // True book count from series tree (6), not just 1 on page
+    expect(screen.getByText('6 books')).toBeInTheDocument()
+    localStorage.removeItem('shelfloom:groupBySeries')
+  })
+
+  it('clicking series card expands to show individual books', async () => {
+    const user = userEvent.setup()
+    const seriesBooks = [
+      {
+        ...MOCK_BOOKS[0],
+        series_id: 1,
+        series_name: 'Dune Saga',
         series_sequence: 1,
       },
       {
         ...MOCK_BOOKS[1],
-        id: 2,
-        title: 'D',
+        series_id: 1,
+        series_name: 'Dune Saga',
+        series_sequence: 2,
       },
       {
         ...MOCK_BOOKS[2],
-        id: 3,
-        title: 'B',
-        series_id: 10,
-        series_name: 'ABC',
-        series_sequence: 2,
       },
     ]
     fetchSpy.mockRestore()
@@ -374,13 +436,98 @@ describe('Library', () => {
     renderLibrary()
 
     await waitFor(() => {
-      expect(screen.getAllByTestId('series-group-header')).toHaveLength(1)
+      expect(screen.getByTestId('series-card')).toBeInTheDocument()
     })
-    // ABC header with 2 books
-    expect(screen.getByText('ABC')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
-    // All 3 books still rendered
-    expect(screen.getAllByTestId('book-card')).toHaveLength(3)
+    // Only 1 book-card (standalone Neuromancer)
+    expect(screen.getAllByTestId('book-card')).toHaveLength(1)
+
+    // Click to expand
+    await user.click(screen.getByLabelText('Expand Dune Saga'))
+
+    await waitFor(() => {
+      // Now all 3 books visible as book-cards
+      expect(screen.getAllByTestId('book-card')).toHaveLength(3)
+    })
+    expect(screen.getByTestId('series-expanded-header')).toBeInTheDocument()
+    expect(screen.queryByTestId('series-card')).not.toBeInTheDocument()
+    localStorage.removeItem('shelfloom:groupBySeries')
+  })
+
+  it('clicking expanded header collapses back to series card', async () => {
+    const user = userEvent.setup()
+    const seriesBooks = [
+      {
+        ...MOCK_BOOKS[0],
+        series_id: 1,
+        series_name: 'Dune Saga',
+        series_sequence: 1,
+      },
+      {
+        ...MOCK_BOOKS[1],
+        series_id: 1,
+        series_name: 'Dune Saga',
+        series_sequence: 2,
+      },
+    ]
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({ books: seriesBooks, total: 2 })
+    localStorage.setItem('shelfloom:groupBySeries', 'true')
+    renderLibrary()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('series-card')).toBeInTheDocument()
+    })
+
+    // Expand
+    await user.click(screen.getByLabelText('Expand Dune Saga'))
+    await waitFor(() => {
+      expect(screen.getByTestId('series-expanded-header')).toBeInTheDocument()
+    })
+
+    // Collapse
+    await user.click(screen.getByTestId('series-expanded-header'))
+    await waitFor(() => {
+      expect(screen.getByTestId('series-card')).toBeInTheDocument()
+    })
+    expect(
+      screen.queryByTestId('series-expanded-header')
+    ).not.toBeInTheDocument()
+    localStorage.removeItem('shelfloom:groupBySeries')
+  })
+
+  it('series link icon has correct href to /series/{id}', async () => {
+    const seriesBooks = [
+      {
+        ...MOCK_BOOKS[0],
+        series_id: 1,
+        series_name: 'Dune Saga',
+        series_sequence: 1,
+      },
+    ]
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({ books: seriesBooks, total: 1 })
+    localStorage.setItem('shelfloom:groupBySeries', 'true')
+    renderLibrary()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('series-card')).toBeInTheDocument()
+    })
+    const link = screen.getByTestId('series-link')
+    expect(link).toHaveAttribute('href', '/series/1')
+    localStorage.removeItem('shelfloom:groupBySeries')
+  })
+
+  it('standalone books still render as book-card when grouping is on', async () => {
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({ books: MOCK_BOOKS, total: 3 })
+    localStorage.setItem('shelfloom:groupBySeries', 'true')
+    renderLibrary()
+
+    await waitFor(() => {
+      // All standalone — no series cards
+      expect(screen.getAllByTestId('book-card')).toHaveLength(3)
+    })
+    expect(screen.queryByTestId('series-card')).not.toBeInTheDocument()
     localStorage.removeItem('shelfloom:groupBySeries')
   })
 
