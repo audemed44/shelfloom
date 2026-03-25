@@ -341,6 +341,7 @@ export default function BookDetailPage() {
       : null
   const sessions = sessionsData?.items ?? []
   const highlights = highlightsData?.items ?? []
+  const genres = book.genres ?? []
 
   // Breadcrumb — Library → ancestor0 → … → ancestorN (direct series) → Book
   const crumbs: Array<{ to: string | null; label: string }> = [
@@ -393,9 +394,9 @@ export default function BookDetailPage() {
               }}
             />
             {/* Genre + tag overlay at bottom of cover */}
-            {(book.genres.length > 0 || book.tags?.length > 0) && (
+            {(genres.length > 0 || book.tags?.length > 0) && (
               <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-2 bg-gradient-to-t from-black/90 to-transparent pointer-events-none">
-                {book.genres.map((genre) => (
+                {genres.map((genre) => (
                   <span
                     key={genre.id}
                     className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
@@ -746,7 +747,7 @@ export default function BookDetailPage() {
                   : ''}
               </span>
             )}
-            {book.genres.map((genre) => (
+            {genres.map((genre) => (
               <span
                 key={genre.id}
                 className="px-2.5 py-0.5 text-[10px] font-black tracking-widest bg-primary/15 border border-primary/30 text-primary rounded normal-case"
@@ -940,7 +941,7 @@ export default function BookDetailPage() {
         book.publisher ||
         book.language ||
         book.isbn ||
-        book.genres.length > 0 ||
+        genres.length > 0 ||
         book.format) && (
         <footer className="mt-20 pt-8 border-t border-white/10 opacity-70">
           <div className="flex flex-wrap gap-x-12 gap-y-4 text-[10px] font-black uppercase tracking-widest">
@@ -968,11 +969,11 @@ export default function BookDetailPage() {
                 <span>{book.isbn}</span>
               </div>
             )}
-            {book.genres.length > 0 && (
+            {genres.length > 0 && (
               <div className="flex flex-col gap-1">
                 <span className="text-white/30">Genres</span>
                 <div className="flex flex-wrap gap-1">
-                  {book.genres.map((genre) => (
+                  {genres.map((genre) => (
                     <span
                       key={genre.id}
                       className="bg-primary/15 border border-primary/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-primary normal-case"

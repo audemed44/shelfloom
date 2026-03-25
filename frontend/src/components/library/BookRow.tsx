@@ -13,6 +13,7 @@ interface BookRowProps {
 
 export default function BookRow({ book }: BookRowProps) {
   const coverSrc = `/api/books/${book.id}/cover`
+  const genres = book.genres ?? []
 
   return (
     <Link
@@ -40,9 +41,9 @@ export default function BookRow({ book }: BookRowProps) {
             {book.author}
           </p>
         )}
-        {(book.genres.length > 0 || book.tags?.length > 0) && (
+        {(genres.length > 0 || book.tags?.length > 0) && (
           <div className="flex flex-wrap gap-1 mt-1">
-            {book.genres.slice(0, 3).map((genre) => (
+            {genres.slice(0, 3).map((genre) => (
               <span
                 key={genre.id}
                 className="bg-primary/15 border border-primary/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-primary normal-case"
