@@ -19,6 +19,8 @@ import SeriesCard from '../components/library/SeriesCard'
 import SeriesRow from '../components/library/SeriesRow'
 import { SkeletonCard, SkeletonRow } from '../components/library/SkeletonCard'
 import BulkUploadZone from '../components/library/BulkUploadZone'
+import BulkActionToolbar from '../components/library/BulkActionToolbar'
+import BulkEditModal from '../components/library/BulkEditModal'
 import CreateManualBookModal from '../components/library/CreateManualBookModal'
 import type { Book, Shelf, PaginatedResponse, SeriesWithCount } from '../types'
 
@@ -287,6 +289,7 @@ export default function Library() {
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false)
   const isSelecting = selectedIds.size > 0
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
@@ -412,6 +415,36 @@ export default function Library() {
     }
     return entries
   }, [books, groupBySeries])
+
+  // All selectable book IDs on the current page (leaf books only)
+  const selectableIds = useMemo(() => {
+    if (!groupBySeries) return books.map((b) => b.id)
+    const ids: string[] = []
+    for (const group of bookGroups) {
+      if (group.seriesId != null && !expandedSeriesIds.has(group.seriesId)) {
+        continue // collapsed series — not selectable
+      }
+      for (const book of group.books) ids.push(book.id)
+    }
+    return ids
+  }, [books, bookGroups, groupBySeries, expandedSeriesIds])
+
+  const allSelected =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id))
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const all = selectableIds.every((id) => prev.has(id))
+      if (all) return new Set<string>()
+      return new Set(selectableIds)
+    })
+  }, [selectableIds])
+
+  const handleBulkSuccess = useCallback(() => {
+    setShowBulkEditModal(false)
+    clearSelection()
+    setRev((r) => r + 1)
+  }, [clearSelection])
 
   return (
     <div className="p-4 sm:p-6 lg:p-12">
@@ -667,6 +700,28 @@ export default function Library() {
 
       {showManualModal && (
         <CreateManualBookModal onClose={() => setShowManualModal(false)} />
+      )}
+
+      {/* Bulk action toolbar */}
+      {isSelecting && (
+        <BulkActionToolbar
+          selectedCount={selectedIds.size}
+          selectableCount={selectableIds.length}
+          allSelected={allSelected}
+          onToggleSelectAll={toggleSelectAll}
+          onEdit={() => setShowBulkEditModal(true)}
+          onClear={clearSelection}
+        />
+      )}
+
+      {/* Bulk edit modal */}
+      {showBulkEditModal && (
+        <BulkEditModal
+          selectedIds={selectedIds}
+          shelves={shelves ?? []}
+          onClose={() => setShowBulkEditModal(false)}
+          onSuccess={handleBulkSuccess}
+        />
       )}
     </div>
   )
