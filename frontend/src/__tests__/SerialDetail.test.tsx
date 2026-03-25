@@ -3,8 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import SerialDetail from '../pages/SerialDetail'
+import type { WebSerial } from '../types/api'
 
-const SERIAL = {
+const SERIAL: WebSerial = {
   id: 1,
   url: 'https://royalroad.com/fiction/1/test-story',
   source: 'royalroad',
@@ -27,7 +28,7 @@ const SHELVES = [
 ]
 
 function mockFetch(
-  overrides: { serial?: typeof SERIAL; uploadedSerial?: typeof SERIAL } = {}
+  overrides: { serial?: WebSerial; uploadedSerial?: WebSerial } = {}
 ) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation((url, opts) => {
     const u = url.toString()
