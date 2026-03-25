@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import SerialDetail from '../pages/SerialDetail'
 
@@ -25,10 +26,13 @@ const SHELVES = [
   { id: 1, name: 'Library', path: '/shelves/library', is_default: true },
 ]
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mockFetch(): any {
-  return vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+function mockFetch(
+  overrides: { serial?: typeof SERIAL; uploadedSerial?: typeof SERIAL } = {}
+) {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation((url, opts) => {
     const u = url.toString()
+    const method =
+      (opts as RequestInit | undefined)?.method?.toUpperCase() ?? 'GET'
     if (u.match(/\/api\/serials\/\d+\/volumes/))
       return Promise.resolve({
         ok: true,
@@ -41,11 +45,31 @@ function mockFetch(): any {
         status: 200,
         json: async () => [],
       }) as Promise<Response>
+    if (u.match(/\/api\/serials\/\d+\/upload-cover/) && method === 'POST')
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () =>
+          overrides.uploadedSerial ?? {
+            ...SERIAL,
+            cover_path: '/data/covers/serial_1.jpg',
+          },
+      }) as Promise<Response>
+    if (u.match(/\/api\/serials\/\d+\/refresh-cover/) && method === 'POST')
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () =>
+          overrides.uploadedSerial ?? {
+            ...SERIAL,
+            cover_path: '/data/covers/serial_1.jpg',
+          },
+      }) as Promise<Response>
     if (u.match(/\/api\/serials\/\d+(\?|$)/))
       return Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => SERIAL,
+        json: async () => overrides.serial ?? SERIAL,
       }) as Promise<Response>
     if (u.includes('/api/shelves'))
       return Promise.resolve({
@@ -106,5 +130,58 @@ describe('SerialDetail', () => {
     renderDetail()
     await waitFor(() => screen.getByRole('heading', { level: 1 }))
     expect(screen.getByTitle('Refresh cover from source')).toBeInTheDocument()
+  })
+
+  it('prefers the uploaded cover endpoint when both cover_path and cover_url exist', async () => {
+    renderDetail()
+    await waitFor(() => screen.getByRole('heading', { level: 1 }))
+    const cover = screen.getByAltText('Test Story')
+    expect(cover.getAttribute('src')).toContain('/api/serials/1/cover')
+    expect(cover.getAttribute('src')).toContain('cover=')
+  })
+
+  it('falls back to cover_url when no uploaded cover is present', async () => {
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({
+      serial: {
+        ...SERIAL,
+        cover_path: null,
+        cover_url: 'https://example.com/remote-cover.jpg',
+      },
+    })
+    renderDetail()
+    await waitFor(() => screen.getByRole('heading', { level: 1 }))
+    const cover = screen.getByAltText('Test Story')
+    expect(cover.getAttribute('src')).toBe(
+      'https://example.com/remote-cover.jpg'
+    )
+  })
+
+  it('switches to the uploaded cover without waiting for a reload', async () => {
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({
+      serial: {
+        ...SERIAL,
+        cover_path: null,
+      },
+      uploadedSerial: {
+        ...SERIAL,
+        cover_path: '/data/covers/serial_1.jpg',
+      },
+    })
+    renderDetail()
+    await waitFor(() => screen.getByRole('heading', { level: 1 }))
+
+    const uploadInput = document.querySelector(
+      'input[type="file"][accept="image/*"]'
+    ) as HTMLInputElement
+    const file = new File(['cover'], 'cover.jpg', { type: 'image/jpeg' })
+    await userEvent.upload(uploadInput, file)
+
+    await waitFor(() => {
+      const cover = screen.getByAltText('Test Story')
+      expect(cover.getAttribute('src')).toContain('/api/serials/1/cover')
+      expect(cover.getAttribute('src')).toContain('v=1')
+    })
   })
 })

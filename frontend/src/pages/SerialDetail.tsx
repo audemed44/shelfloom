@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
@@ -16,6 +16,7 @@ import VolumeList from '../components/serials/VolumeList'
 import ChapterList from '../components/serials/ChapterList'
 import EditSerialModal from '../components/serials/EditSerialModal'
 import type { WebSerial, SerialVolume, Shelf } from '../types/api'
+import { getSerialCoverSources } from '../utils/serialCover'
 
 const STATUS_STYLES: Record<string, string> = {
   ongoing: 'bg-green-500/20 text-green-400',
@@ -46,6 +47,8 @@ export default function SerialDetail() {
   const [coverKey, setCoverKey] = useState(0)
   const [coverUploading, setCoverUploading] = useState(false)
   const [coverRefreshing, setCoverRefreshing] = useState(false)
+  const [serialOverride, setSerialOverride] = useState<WebSerial | null>(null)
+  const [coverSrc, setCoverSrc] = useState<string | null>(null)
 
   const { data: serial, loading } = useApi<WebSerial>(
     serialId ? `/api/serials/${serialId}?_k=${refreshKey}` : null
@@ -56,6 +59,21 @@ export default function SerialDetail() {
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
 
   const refresh = () => setRefreshKey((k) => k + 1)
+  const activeSerial = serialOverride ?? serial
+
+  useEffect(() => {
+    setSerialOverride(serial ?? null)
+  }, [serial])
+
+  useEffect(() => {
+    if (!activeSerial) {
+      setCoverSrc(null)
+      return
+    }
+    setCoverSrc(
+      getSerialCoverSources(activeSerial, coverKey).primarySrc ?? null
+    )
+  }, [activeSerial, coverKey])
 
   const handleUploadCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -65,7 +83,13 @@ export default function SerialDetail() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      await api.upload(`/api/serials/${serialId}/upload-cover`, formData)
+      const updated = await api.upload<WebSerial>(
+        `/api/serials/${serialId}/upload-cover`,
+        formData
+      )
+      if (updated) {
+        setSerialOverride(updated)
+      }
       setCoverKey((k) => k + 1)
     } catch {
       // silently ignore
@@ -78,7 +102,12 @@ export default function SerialDetail() {
     if (!serialId) return
     setCoverRefreshing(true)
     try {
-      await api.post(`/api/serials/${serialId}/refresh-cover`)
+      const updated = await api.post<WebSerial>(
+        `/api/serials/${serialId}/refresh-cover`
+      )
+      if (updated) {
+        setSerialOverride(updated)
+      }
       setCoverKey((k) => k + 1)
     } catch {
       // silently ignore
@@ -155,8 +184,13 @@ export default function SerialDetail() {
     )
   }
 
+  const displaySerial = activeSerial ?? serial
   const statusClass =
-    STATUS_STYLES[serial.status] ?? 'bg-white/10 text-white/50'
+    STATUS_STYLES[displaySerial.status] ?? 'bg-white/10 text-white/50'
+  const coverFallbackSrc = getSerialCoverSources(
+    displaySerial,
+    coverKey
+  ).fallbackSrc
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -170,7 +204,7 @@ export default function SerialDetail() {
         </Link>
         <ChevronRight size={10} className="text-white/20" />
         <span className="text-white/70 truncate max-w-xs">
-          {serial.title ?? 'Untitled'}
+          {displaySerial.title ?? 'Untitled'}
         </span>
       </nav>
 
@@ -178,14 +212,20 @@ export default function SerialDetail() {
       <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-8 mb-12">
         {/* Cover */}
         <div className="relative group w-40 aspect-[2/3] bg-white/5 border border-white/10 overflow-hidden shrink-0">
-          <img
-            src={`/api/serials/${serial.id}/cover?v=${coverKey}`}
-            alt={serial.title ?? 'Cover'}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none'
-            }}
-          />
+          {coverSrc && (
+            <img
+              src={coverSrc}
+              alt={displaySerial.title ?? 'Cover'}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                if (coverFallbackSrc && coverSrc !== coverFallbackSrc) {
+                  setCoverSrc(coverFallbackSrc)
+                  return
+                }
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+          )}
           <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <label
               title="Upload cover image"
@@ -225,16 +265,16 @@ export default function SerialDetail() {
             <span
               className={`text-[10px] font-black tracking-widest px-2.5 py-1 ${statusClass}`}
             >
-              {serial.status}
+              {displaySerial.status}
             </span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-black tracking-tighter text-white leading-[0.95] uppercase mb-2">
-            {serial.title ?? 'Untitled'}
+            {displaySerial.title ?? 'Untitled'}
           </h1>
-          {serial.author && (
+          {displaySerial.author && (
             <p className="text-lg text-white/50 font-light normal-case mb-4">
-              {serial.author}
+              {displaySerial.author}
             </p>
           )}
 
@@ -244,15 +284,19 @@ export default function SerialDetail() {
               <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-0.5">
                 Chapters
               </p>
-              <p className="text-xl font-black">{serial.total_chapters}</p>
+              <p className="text-xl font-black">
+                {displaySerial.total_chapters}
+              </p>
             </div>
             <div className="h-8 w-px bg-white/10" />
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-0.5">
-                {serial.last_checked_at ? 'Last Checked' : 'Added'}
+                {displaySerial.last_checked_at ? 'Last Checked' : 'Added'}
               </p>
               <p className="text-sm font-medium normal-case">
-                {fmtDate(serial.last_checked_at ?? serial.created_at)}
+                {fmtDate(
+                  displaySerial.last_checked_at ?? displaySerial.created_at
+                )}
               </p>
             </div>
             <div className="h-8 w-px bg-white/10" />
@@ -261,12 +305,12 @@ export default function SerialDetail() {
                 Source
               </p>
               <a
-                href={serial.url}
+                href={displaySerial.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-sm text-primary hover:underline normal-case"
               >
-                {serial.source}
+                {displaySerial.source}
                 <ExternalLink size={11} />
               </a>
             </div>
@@ -311,19 +355,19 @@ export default function SerialDetail() {
               {updateMsg}
             </p>
           )}
-          {serial.last_error && (
+          {displaySerial.last_error && (
             <p className="text-xs text-red-400 normal-case mt-3 border border-red-400/20 bg-red-400/5 px-3 py-2">
-              {serial.last_error}
+              {displaySerial.last_error}
             </p>
           )}
         </div>
       </div>
 
       {/* Description */}
-      {serial.description && (
+      {displaySerial.description && (
         <div className="mb-10">
           <p className="text-sm text-white/60 normal-case leading-relaxed max-w-3xl">
-            {serial.description}
+            {displaySerial.description}
           </p>
         </div>
       )}
@@ -344,9 +388,9 @@ export default function SerialDetail() {
           )}
         </div>
         <VolumeList
-          serialId={serial.id}
+          serialId={displaySerial.id}
           volumes={volumes ?? []}
-          totalChapters={serial.total_chapters}
+          totalChapters={displaySerial.total_chapters}
           shelves={shelves ?? []}
           onRefresh={refresh}
         />
@@ -362,18 +406,18 @@ export default function SerialDetail() {
             Chapters
           </h2>
           <span className="text-[10px] text-white/30 ml-auto">
-            {serial.total_chapters} total
+            {displaySerial.total_chapters} total
           </span>
         </div>
         <ChapterList
-          serialId={serial.id}
-          totalChapters={serial.total_chapters}
+          serialId={displaySerial.id}
+          totalChapters={displaySerial.total_chapters}
         />
       </section>
 
       {showEditModal && (
         <EditSerialModal
-          serial={serial}
+          serial={displaySerial}
           onClose={() => setShowEditModal(false)}
           onSaved={() => {
             setShowEditModal(false)

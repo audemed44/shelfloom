@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Scroll } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { WebSerial } from '../../types/api'
+import { getSerialCoverSources } from '../../utils/serialCover'
 
 const STATUS_STYLES: Record<string, string> = {
   ongoing: 'bg-green-500/20 text-green-400',
@@ -16,6 +18,12 @@ interface SerialCardProps {
 export default function SerialCard({ serial }: SerialCardProps) {
   const statusClass =
     STATUS_STYLES[serial.status] ?? 'bg-white/10 text-white/50'
+  const { primarySrc, fallbackSrc } = getSerialCoverSources(serial)
+  const [coverSrc, setCoverSrc] = useState<string | null>(primarySrc ?? null)
+
+  useEffect(() => {
+    setCoverSrc(primarySrc ?? null)
+  }, [primarySrc])
 
   return (
     <Link
@@ -25,14 +33,20 @@ export default function SerialCard({ serial }: SerialCardProps) {
     >
       {/* Cover */}
       <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
-        <img
-          src={`/api/serials/${serial.id}/cover`}
-          alt={serial.title ?? 'Serial cover'}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
+        {coverSrc && (
+          <img
+            src={coverSrc}
+            alt={serial.title ?? 'Serial cover'}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              if (fallbackSrc && coverSrc !== fallbackSrc) {
+                setCoverSrc(fallbackSrc)
+                return
+              }
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+        )}
 
         {/* Fallback placeholder icon (visible when cover fails to load) */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

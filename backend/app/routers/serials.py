@@ -124,13 +124,26 @@ async def update_serial_endpoint(
 
 @router.get("/serials/{serial_id}/cover")
 async def get_serial_cover_endpoint(serial_id: int, session: AsyncSession = Depends(get_session)):
+    cache_headers = {"Cache-Control": "no-store"}
     try:
         serial = await get_serial(session, serial_id)
     except SerialNotFound as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+            headers=cache_headers,
+        )
     if not serial.cover_path or not Path(serial.cover_path).exists():
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No cover available")
-    return FileResponse(serial.cover_path, media_type="image/jpeg")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No cover available",
+            headers=cache_headers,
+        )
+    return FileResponse(
+        serial.cover_path,
+        media_type="image/jpeg",
+        headers=cache_headers,
+    )
 
 
 @router.post("/serials/{serial_id}/upload-cover", response_model=SerialResponse)

@@ -1535,6 +1535,27 @@ async def test_api_upload_serial_cover(client, db_session, tmp_path, serial):
 
 
 @pytest.mark.asyncio
+async def test_api_get_serial_cover_sets_no_store_header(client, db_session, tmp_path, serial):
+    cover = tmp_path / "serial.jpg"
+    cover.write_bytes(b"coverdata")
+    serial.cover_path = str(cover)
+    await db_session.commit()
+
+    resp = await client.get(f"/api/serials/{serial.id}/cover")
+
+    assert resp.status_code == 200
+    assert resp.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.asyncio
+async def test_api_get_missing_serial_cover_sets_no_store_header(client, serial):
+    resp = await client.get(f"/api/serials/{serial.id}/cover")
+
+    assert resp.status_code == 404
+    assert resp.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.asyncio
 async def test_api_upload_serial_cover_not_found(client, tmp_path):
     with patch("app.services.serial_service._covers_dir", return_value=tmp_path):
         resp = await client.post(
