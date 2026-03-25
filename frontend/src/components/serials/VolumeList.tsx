@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BookOpen,
@@ -10,7 +10,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { api } from '../../api/client'
-import type { SerialVolume, Shelf } from '../../types/api'
+import type { SerialVolume, SerialVolumePreview, Shelf } from '../../types/api'
 
 interface VolumeListProps {
   serialId: number
@@ -34,6 +34,50 @@ function fmtWords(n: number): string {
   return String(n)
 }
 
+function fmtPages(pages: number | null, isPartial: boolean = false): string {
+  if (pages === null) return isPartial ? '— partial' : '—'
+  return isPartial ? `${pages}*` : String(pages)
+}
+
+type DraftVolumeSplit = {
+  start: number
+  end: number
+  name?: string
+}
+
+function getValidCustomSplits(
+  customSplits: Array<{ start: string; end: string; name: string }>
+): DraftVolumeSplit[] {
+  return customSplits
+    .map((split) => ({
+      start: parseInt(split.start, 10),
+      end: parseInt(split.end, 10),
+      name: split.name.trim() || undefined,
+    }))
+    .filter(
+      (split) =>
+        !isNaN(split.start) && !isNaN(split.end) && split.start <= split.end
+    )
+}
+
+function buildAutoSplits(
+  totalChapters: number,
+  chaptersPerVolume: number
+): DraftVolumeSplit[] {
+  if (totalChapters < 1 || chaptersPerVolume < 1) {
+    return []
+  }
+
+  const splits: DraftVolumeSplit[] = []
+  for (let start = 1; start <= totalChapters; start += chaptersPerVolume) {
+    splits.push({
+      start,
+      end: Math.min(totalChapters, start + chaptersPerVolume - 1),
+    })
+  }
+  return splits
+}
+
 export default function VolumeList({
   serialId,
   volumes,
@@ -51,6 +95,9 @@ export default function VolumeList({
   const [generatingId, setGeneratingId] = useState<number | null>(null)
   const [generatingAll, setGeneratingAll] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [preview, setPreview] = useState<SerialVolumePreview[]>([])
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [uploadingId, setUploadingId] = useState<number | null>(null)
@@ -63,6 +110,48 @@ export default function VolumeList({
   const [addEnd, setAddEnd] = useState('')
   const [addName, setAddName] = useState('')
   const [adding, setAdding] = useState(false)
+
+  useEffect(() => {
+    const splits =
+      configMode === 'auto'
+        ? buildAutoSplits(totalChapters, parseInt(chaptersPerVolume, 10))
+        : getValidCustomSplits(customSplits)
+
+    if (splits.length === 0) {
+      setPreview([])
+      setPreviewLoading(false)
+      setPreviewError(null)
+      return
+    }
+
+    let cancelled = false
+    setPreviewLoading(true)
+    setPreviewError(null)
+
+    void api
+      .post<SerialVolumePreview[]>(`/api/serials/${serialId}/volumes/preview`, {
+        splits,
+      })
+      .then((data) => {
+        if (cancelled) return
+        setPreview(data ?? [])
+      })
+      .catch((err) => {
+        if (cancelled) return
+        const e = err as { data?: { detail?: string } }
+        setPreview([])
+        setPreviewError(e.data?.detail ?? 'Failed to load volume preview')
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPreviewLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [chaptersPerVolume, configMode, customSplits, serialId, totalChapters])
 
   const handleAutoSplit = async () => {
     const n = parseInt(chaptersPerVolume, 10)
@@ -86,13 +175,7 @@ export default function VolumeList({
   }
 
   const handleCustomSplit = async () => {
-    const splits = customSplits
-      .map((s) => ({
-        start: parseInt(s.start, 10),
-        end: parseInt(s.end, 10),
-        name: s.name.trim() || undefined,
-      }))
-      .filter((s) => !isNaN(s.start) && !isNaN(s.end) && s.start <= s.end)
+    const splits = getValidCustomSplits(customSplits)
 
     if (splits.length === 0) {
       setError('Enter at least one valid chapter range')
@@ -380,6 +463,63 @@ export default function VolumeList({
           </div>
         )}
       </div>
+
+      {(previewLoading || preview.length > 0 || previewError) && (
+        <div className="border border-white/10 bg-white/[0.03]">
+          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+            <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
+              Preview
+            </p>
+            <p className="text-[10px] tracking-widest uppercase text-white/25">
+              280 words/page
+            </p>
+          </div>
+
+          {previewError ? (
+            <p className="px-4 py-3 text-xs text-red-400 normal-case">
+              {previewError}
+            </p>
+          ) : preview.length === 0 && previewLoading ? (
+            <p className="px-4 py-3 text-xs text-white/40 normal-case">
+              Calculating preview...
+            </p>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {preview.map((item, index) => (
+                <div
+                  key={`${item.start}-${item.end}-${index}`}
+                  className="flex flex-wrap items-center gap-3 px-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black tracking-tighter normal-case text-white/90">
+                      {item.name ??
+                        `Volume ${String(index + 1).padStart(2, '0')}`}
+                    </p>
+                    <p className="mt-0.5 text-[10px] tracking-widest uppercase text-white/35">
+                      Ch {item.start}–{item.end}
+                    </p>
+                  </div>
+                  <div className="text-right text-[10px] tracking-widest uppercase text-white/35">
+                    <p>
+                      ~{fmtPages(item.estimated_pages, item.is_partial)} pages
+                    </p>
+                    <p>{fmtWords(item.total_words)} words</p>
+                    <p>
+                      {item.fetched_chapter_count}/{item.chapter_count} fetched
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="border-t border-white/10 px-4 py-3 text-[10px] text-white/30 normal-case">
+            Preview totals use fetched chapter word counts only. Entries marked
+            with `*` are partial because some chapters in the range still need
+            content.
+          </p>
+        </div>
+      )}
 
       {/* Generate All row */}
       {volumes.length > 0 && (

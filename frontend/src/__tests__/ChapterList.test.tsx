@@ -1,7 +1,11 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ChapterList from '../components/serials/ChapterList'
-import type { ChapterFetchStatusResponse, SerialChapter } from '../types/api'
+import type {
+  ChapterFetchStatusResponse,
+  SerialChapter,
+  SerialVolume,
+} from '../types/api'
 
 function makeChapter(
   chapterNumber: number,
@@ -15,6 +19,10 @@ function makeChapter(
     source_url: `https://example.com/ch/${chapterNumber}`,
     publish_date: null,
     word_count: null,
+    estimated_pages: null,
+    running_word_count: 0,
+    running_estimated_pages: null,
+    running_is_partial: false,
     fetched_at: null,
     has_content: false,
     ...overrides,
@@ -186,5 +194,49 @@ describe('ChapterList', () => {
       expect(screen.getByText('completed')).toBeInTheDocument()
     )
     expect(screen.getByRole('button', { name: 'Fetch Content' })).toBeEnabled()
+  })
+
+  it('renders chapter word counts, running pages, and matching volumes', async () => {
+    chapters = [
+      makeChapter(1, {
+        word_count: 280,
+        estimated_pages: 1,
+        running_word_count: 280,
+        running_estimated_pages: 1,
+      }),
+      makeChapter(2, {
+        running_word_count: 280,
+        running_estimated_pages: 1,
+        running_is_partial: true,
+      }),
+    ]
+
+    const volumes: SerialVolume[] = [
+      {
+        id: 10,
+        serial_id: 1,
+        book_id: null,
+        volume_number: 1,
+        name: 'Arc One',
+        cover_path: null,
+        chapter_start: 1,
+        chapter_end: 1,
+        generated_at: null,
+        is_stale: false,
+        estimated_pages: 1,
+        total_words: 280,
+      },
+    ]
+
+    render(<ChapterList serialId={1} totalChapters={2} volumes={volumes} />)
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('Words 280 · Pages 1 · Run 1')
+      ).toBeInTheDocument()
+    )
+
+    expect(screen.getByText('Words — · Pages — · Run 1*')).toBeInTheDocument()
+    expect(screen.getAllByText('Arc One').length).toBeGreaterThan(0)
   })
 })

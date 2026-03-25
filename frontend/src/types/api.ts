@@ -312,6 +312,10 @@ export interface SerialChapter {
   source_url: string
   publish_date: string | null
   word_count: number | null
+  estimated_pages: number | null
+  running_word_count: number
+  running_estimated_pages: number | null
+  running_is_partial: boolean
   fetched_at: string | null
   has_content: boolean
 }
@@ -363,4 +367,15 @@ export interface SerialVolume {
   is_stale: boolean
   estimated_pages: number | null
   total_words: number | null
+}
+
+export interface SerialVolumePreview {
+  start: number
+  end: number
+  name: string | null
+  chapter_count: number
+  fetched_chapter_count: number
+  total_words: number
+  estimated_pages: number | null
+  is_partial: boolean
 }

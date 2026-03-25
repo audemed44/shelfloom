@@ -19,6 +19,7 @@ from app.schemas.serial import (
     SerialUpdate,
     SingleVolumeCreate,
     VolumeConfigCreate,
+    VolumePreviewResponse,
     VolumeResponse,
     VolumeUpdate,
 )
@@ -40,9 +41,10 @@ from app.services.serial_service import (
     get_chapter_fetch_status,
     get_serial,
     get_volume_word_counts,
-    list_chapters,
+    list_chapter_responses,
     list_serials,
     list_volumes,
+    preview_volume_ranges,
     rebuild_volume,
     refresh_serial_cover,
     start_chapter_fetch_job,
@@ -57,7 +59,7 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["serials"])
 
-WORDS_PER_PAGE = 250
+WORDS_PER_PAGE = 280
 
 
 def _enrich_volumes(volumes: list[object], word_counts: dict[int, int]) -> list[VolumeResponse]:
@@ -207,10 +209,15 @@ async def list_chapters_endpoint(
     session: AsyncSession = Depends(get_session),
 ):
     try:
-        chapters = await list_chapters(session, serial_id, offset=offset, limit=limit)
+        chapters = await list_chapter_responses(
+            session,
+            serial_id,
+            offset=offset,
+            limit=limit,
+        )
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    return [ChapterResponse.from_orm(ch) for ch in chapters]
+    return chapters
 
 
 @router.post(
@@ -255,6 +262,21 @@ async def fetch_chapters_status_endpoint(
 ):
     try:
         return await get_chapter_fetch_status(session, serial_id)
+    except SerialNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.post(
+    "/serials/{serial_id}/volumes/preview",
+    response_model=list[VolumePreviewResponse],
+)
+async def preview_volumes_endpoint(
+    serial_id: int,
+    body: VolumeConfigCreate,
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        return await preview_volume_ranges(session, serial_id, body.splits)
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 

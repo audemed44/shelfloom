@@ -21,10 +21,12 @@ from app.schemas.serial import (
     ChapterFetchJobResponse,
     ChapterFetchLogEntry,
     ChapterFetchStatusResponse,
+    ChapterResponse,
     SerialCreate,
     SerialUpdate,
     SingleVolumeCreate,
     VolumeConfigCreate,
+    VolumePreviewResponse,
     VolumeRange,
     VolumeUpdate,
 )
@@ -60,6 +62,7 @@ class ChapterFetchAlreadyRunning(Exception):
 
 _FETCH_JOB_LOG_LIMIT = 100
 _FETCH_JOB_RETENTION_SECONDS = 300
+_WORDS_PER_PAGE = 280
 
 
 @dataclass
@@ -377,6 +380,45 @@ async def list_chapters(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def list_chapter_responses(
+    session: AsyncSession,
+    serial_id: int,
+    offset: int = 0,
+    limit: int = 100,
+) -> list[ChapterResponse]:
+    await _require_serial(session, serial_id)
+
+    result = await session.execute(
+        select(SerialChapter)
+        .where(SerialChapter.serial_id == serial_id)
+        .order_by(SerialChapter.chapter_number)
+        .limit(offset + limit)
+    )
+    chapters = list(result.scalars().all())
+
+    running_word_count = 0
+    running_is_partial = False
+    responses: list[ChapterResponse] = []
+
+    for chapter in chapters:
+        if chapter.word_count is None:
+            running_is_partial = True
+        else:
+            running_word_count += chapter.word_count
+
+        responses.append(
+            ChapterResponse.from_orm(
+                chapter,
+                estimated_pages=_estimate_pages(chapter.word_count),
+                running_word_count=running_word_count,
+                running_estimated_pages=_estimate_pages(running_word_count),
+                running_is_partial=running_is_partial,
+            )
+        )
+
+    return responses[offset : offset + limit]
 
 
 async def start_chapter_fetch_job(
@@ -972,9 +1014,70 @@ async def get_volume_word_counts(session: AsyncSession, serial_id: int) -> dict[
     return {row[0]: int(row[1]) for row in result.all()}
 
 
+async def preview_volume_ranges(
+    session: AsyncSession,
+    serial_id: int,
+    splits: list[VolumeRange],
+) -> list[VolumePreviewResponse]:
+    await _require_serial(session, serial_id)
+
+    if not splits:
+        return []
+
+    min_chapter = min(split.start for split in splits)
+    max_chapter = max(split.end for split in splits)
+    result = await session.execute(
+        select(SerialChapter.chapter_number, SerialChapter.word_count)
+        .where(
+            SerialChapter.serial_id == serial_id,
+            SerialChapter.chapter_number >= min_chapter,
+            SerialChapter.chapter_number <= max_chapter,
+        )
+        .order_by(SerialChapter.chapter_number)
+    )
+    chapter_word_counts = {int(row[0]): row[1] for row in result.all()}
+
+    previews: list[VolumePreviewResponse] = []
+    for split in splits:
+        chapter_numbers = range(split.start, split.end + 1)
+        total_words = 0
+        fetched_chapter_count = 0
+        is_partial = False
+
+        for chapter_number in chapter_numbers:
+            word_count = chapter_word_counts.get(chapter_number)
+            if word_count is None:
+                is_partial = True
+                continue
+            fetched_chapter_count += 1
+            total_words += int(word_count)
+
+        chapter_count = max(0, split.end - split.start + 1)
+        previews.append(
+            VolumePreviewResponse(
+                start=split.start,
+                end=split.end,
+                name=split.name,
+                chapter_count=chapter_count,
+                fetched_chapter_count=fetched_chapter_count,
+                total_words=total_words,
+                estimated_pages=_estimate_pages(total_words),
+                is_partial=is_partial,
+            )
+        )
+
+    return previews
+
+
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+def _estimate_pages(word_count: int | None) -> int | None:
+    if word_count is None or word_count <= 0:
+        return None
+    return max(1, word_count // _WORDS_PER_PAGE)
 
 
 def reset_chapter_fetch_jobs() -> None:
