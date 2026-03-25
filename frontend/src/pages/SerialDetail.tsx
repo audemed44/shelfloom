@@ -8,6 +8,7 @@ import {
   Trash2,
   Loader2,
   AlertTriangle,
+  Upload,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
@@ -42,6 +43,9 @@ export default function SerialDetail() {
   const [updateMsg, setUpdateMsg] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  const [coverKey, setCoverKey] = useState(0)
+  const [coverUploading, setCoverUploading] = useState(false)
+  const [coverRefreshing, setCoverRefreshing] = useState(false)
 
   const { data: serial, loading } = useApi<WebSerial>(
     serialId ? `/api/serials/${serialId}?_k=${refreshKey}` : null
@@ -52,6 +56,36 @@ export default function SerialDetail() {
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
 
   const refresh = () => setRefreshKey((k) => k + 1)
+
+  const handleUploadCover = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !serialId) return
+    e.target.value = ''
+    setCoverUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      await api.upload(`/api/serials/${serialId}/upload-cover`, formData)
+      setCoverKey((k) => k + 1)
+    } catch {
+      // silently ignore
+    } finally {
+      setCoverUploading(false)
+    }
+  }
+
+  const handleRefreshCover = async () => {
+    if (!serialId) return
+    setCoverRefreshing(true)
+    try {
+      await api.post(`/api/serials/${serialId}/refresh-cover`)
+      setCoverKey((k) => k + 1)
+    } catch {
+      // silently ignore
+    } finally {
+      setCoverRefreshing(false)
+    }
+  }
 
   const handleUpdate = async () => {
     if (!serialId) return
@@ -143,15 +177,45 @@ export default function SerialDetail() {
       {/* Header */}
       <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-8 mb-12">
         {/* Cover */}
-        <div className="w-40 aspect-[2/3] bg-white/5 border border-white/10 overflow-hidden shrink-0">
+        <div className="relative group w-40 aspect-[2/3] bg-white/5 border border-white/10 overflow-hidden shrink-0">
           <img
-            src={`/api/serials/${serial.id}/cover`}
+            src={`/api/serials/${serial.id}/cover?v=${coverKey}`}
             alt={serial.title ?? 'Cover'}
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.style.display = 'none'
             }}
           />
+          <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <label
+              title="Upload cover image"
+              className={`p-2 bg-black/60 border border-white/10 text-white/50 hover:text-white hover:border-white/30 rounded-lg transition-all cursor-pointer ${coverUploading ? 'opacity-40 pointer-events-none' : ''}`}
+            >
+              {coverUploading ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Upload size={13} />
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleUploadCover}
+              />
+            </label>
+            <button
+              onClick={handleRefreshCover}
+              disabled={coverRefreshing}
+              title="Refresh cover from source"
+              className="p-2 bg-black/60 border border-white/10 text-white/50 hover:text-white hover:border-white/30 rounded-lg transition-all disabled:opacity-40"
+            >
+              {coverRefreshing ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <RefreshCw size={13} />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Meta */}

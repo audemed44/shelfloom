@@ -41,9 +41,11 @@ from app.services.serial_service import (
     list_serials,
     list_volumes,
     rebuild_volume,
+    refresh_serial_cover,
     update_from_source,
     update_serial,
     update_volume,
+    upload_serial_cover,
     upload_volume_cover,
 )
 
@@ -129,6 +131,38 @@ async def get_serial_cover_endpoint(serial_id: int, session: AsyncSession = Depe
     if not serial.cover_path or not Path(serial.cover_path).exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No cover available")
     return FileResponse(serial.cover_path, media_type="image/jpeg")
+
+
+@router.post("/serials/{serial_id}/upload-cover", response_model=SerialResponse)
+async def upload_serial_cover_endpoint(
+    serial_id: int,
+    file: UploadFile = File(...),
+    session: AsyncSession = Depends(get_session),
+):
+    content = await file.read()
+    if file.filename and "." in file.filename:
+        suffix = f".{file.filename.rsplit('.', 1)[-1]}"
+    else:
+        suffix = ".jpg"
+    try:
+        serial = await upload_serial_cover(session, serial_id, content, suffix)
+    except SerialNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    return SerialResponse.model_validate(serial)
+
+
+@router.post("/serials/{serial_id}/refresh-cover", response_model=SerialResponse)
+async def refresh_serial_cover_endpoint(
+    serial_id: int,
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        serial = await refresh_serial_cover(session, serial_id)
+    except SerialNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return SerialResponse.model_validate(serial)
 
 
 @router.delete("/serials/{serial_id}", status_code=status.HTTP_204_NO_CONTENT)
