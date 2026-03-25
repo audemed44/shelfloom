@@ -82,13 +82,13 @@ describe('BookCard', () => {
     expect(img.getAttribute('src')).toContain('/api/books/test-uuid-1/cover')
   })
 
-  it('does not show checkbox when not selecting', () => {
+  it('does not show checkbox when onToggle is not provided', () => {
     renderCard()
     expect(screen.queryByTestId('book-select-checkbox')).not.toBeInTheDocument()
   })
 
-  it('shows checkbox when isSelecting is true', () => {
-    renderCard(BOOK, { isSelecting: true, onToggle: vi.fn() })
+  it('shows checkbox when onToggle is provided', () => {
+    renderCard(BOOK, { onToggle: vi.fn() })
     expect(screen.getByTestId('book-select-checkbox')).toBeInTheDocument()
   })
 

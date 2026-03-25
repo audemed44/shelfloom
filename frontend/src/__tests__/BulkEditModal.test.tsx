@@ -12,6 +12,13 @@ const SHELVES: Shelf[] = [
     path: '/shelves/library',
     is_default: true,
     is_sync_target: false,
+    device_name: null,
+    koreader_stats_db_path: null,
+    auto_organize: false,
+    created_at: '2024-01-01T00:00:00',
+    book_count: 10,
+    organize_template: null,
+    seq_pad: 0,
   },
   {
     id: 2,
@@ -19,6 +26,13 @@ const SHELVES: Shelf[] = [
     path: '/shelves/archive',
     is_default: false,
     is_sync_target: false,
+    device_name: null,
+    koreader_stats_db_path: null,
+    auto_organize: false,
+    created_at: '2024-01-01T00:00:00',
+    book_count: 5,
+    organize_template: null,
+    seq_pad: 0,
   },
 ]
 
