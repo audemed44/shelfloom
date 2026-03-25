@@ -65,6 +65,19 @@ export interface Genre {
   name: string
 }
 
+export interface BulkBookActionResult {
+  book_id: string
+  success: boolean
+  error: string | null
+}
+
+export interface BulkBookActionResponse {
+  results: BulkBookActionResult[]
+  total: number
+  succeeded: number
+  failed: number
+}
+
 export interface ReadingSession {
   id: number
   book_id: string
