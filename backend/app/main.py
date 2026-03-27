@@ -150,6 +150,7 @@ def create_app() -> FastAPI:
         return response
 
     from app.routers import (
+        authors,
         books,
         data_mgmt,
         fs,
@@ -167,6 +168,7 @@ def create_app() -> FastAPI:
     )
 
     application.include_router(health.router, prefix="/api")
+    application.include_router(authors.router, prefix="/api")
     application.include_router(shelves.router, prefix="/api")
     application.include_router(books.router, prefix="/api")
     application.include_router(genres.router, prefix="/api")
