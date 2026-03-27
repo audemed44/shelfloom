@@ -91,6 +91,40 @@ async def test_list_books_page_2(client, db_session, tmp_path):
     assert len(resp.json()["items"]) == 2
 
 
+async def test_list_books_grouped_series_paginates_by_visible_entries(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    series = Series(name="Collected")
+    db_session.add(series)
+    await db_session.commit()
+    await db_session.refresh(series)
+
+    for i in range(3):
+        book = await _create_book(db_session, shelf.id, f"00 Series Book {i + 1}")
+        db_session.add(BookSeries(book_id=book.id, series_id=series.id, sequence=float(i + 1)))
+
+    for i in range(25):
+        await _create_book(db_session, shelf.id, f"{i + 1:02d} Standalone")
+
+    await db_session.commit()
+
+    resp = await client.get("/api/books?sort=title&group_by_series=true&per_page=25")
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["total"] == 28
+    assert data["pages"] == 2
+    assert len(data["items"]) == 27
+    assert [item["title"] for item in data["items"][:3]] == [
+        "00 Series Book 1",
+        "00 Series Book 2",
+        "00 Series Book 3",
+    ]
+
+    resp_page_2 = await client.get("/api/books?sort=title&group_by_series=true&per_page=25&page=2")
+    assert resp_page_2.status_code == 200
+    assert [item["title"] for item in resp_page_2.json()["items"]] == ["25 Standalone"]
+
+
 async def test_list_books_search_title(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)
     await _create_book(db_session, shelf.id, "Dune", "Frank Herbert")

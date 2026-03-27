@@ -1,5 +1,3 @@
-import math
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -59,7 +57,7 @@ async def get_lens_endpoint(lens_id: int, session: AsyncSession = Depends(get_se
     from app.services.lens_service import _fs_to_kwargs
 
     kwargs = _fs_to_kwargs(fs)
-    books, total = await list_books(session, per_page=1, **kwargs)
+    books, total, _pages = await list_books(session, per_page=1, **kwargs)
     return LensResponse(
         id=lens.id,
         name=lens.name,
@@ -75,14 +73,21 @@ async def get_lens_endpoint(lens_id: int, session: AsyncSession = Depends(get_se
 async def get_lens_books_endpoint(
     lens_id: int,
     page: int = Query(1, ge=1),
-    per_page: int = Query(24, ge=1, le=200),
+    per_page: int = Query(25, ge=1, le=200),
     sort: str = Query("created_at"),
     search: str | None = Query(None),
+    group_by_series: bool = Query(False),
     session: AsyncSession = Depends(get_session),
 ):
     try:
-        books, total = await get_lens_books(
-            session, lens_id, page=page, per_page=per_page, sort=sort, search=search
+        books, total, pages = await get_lens_books(
+            session,
+            lens_id,
+            page=page,
+            per_page=per_page,
+            sort=sort,
+            search=search,
+            group_by_series=group_by_series,
         )
     except LensNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -137,7 +142,7 @@ async def get_lens_books_endpoint(
         total=total,
         page=page,
         per_page=per_page,
-        pages=max(1, math.ceil(total / per_page)),
+        pages=pages,
     )
 
 
@@ -159,7 +164,7 @@ async def update_lens_endpoint(
     from app.services.lens_service import _fs_to_kwargs
 
     kwargs = _fs_to_kwargs(fs)
-    books, total = await list_books(session, per_page=1, **kwargs)
+    books, total, _pages = await list_books(session, per_page=1, **kwargs)
     return LensResponse(
         id=lens.id,
         name=lens.name,

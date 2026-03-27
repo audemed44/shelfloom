@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import shutil
 from pathlib import Path
@@ -99,8 +100,9 @@ async def list_books(
     status: str | None = None,
     sort: str = "created_at",
     filter_mode: str = "and",
-) -> tuple[list[Book], int]:
-    """Return (books, total_count)."""
+    group_by_series: bool = False,
+) -> tuple[list[Book], int, int]:
+    """Return (books, total_count, total_pages)."""
     query = select(Book)
 
     if search:
@@ -197,8 +199,6 @@ async def list_books(
     count_result = await session.execute(select(func.count()).select_from(query.subquery()))
     total = count_result.scalar_one()
 
-    # Sort
-    offset = (page - 1) * per_page
     if sort == "title":
         query = query.order_by(Book.title)
     elif sort == "author":
@@ -222,9 +222,57 @@ async def list_books(
     else:  # created_at (default)
         query = query.order_by(Book.date_added.desc())
 
+    if group_by_series:
+        from app.models.series import BookSeries, Series
+
+        ordered_result = await session.execute(query)
+        ordered_books = ordered_result.scalars().all()
+
+        pages = max(1, math.ceil(total / per_page))
+        if not ordered_books:
+            return [], total, pages
+
+        book_ids = [book.id for book in ordered_books]
+        series_rows = await session.execute(
+            select(BookSeries.book_id, Series.id, Series.name, BookSeries.sequence)
+            .join(Series, BookSeries.series_id == Series.id)
+            .where(BookSeries.book_id.in_(book_ids))
+            .order_by(BookSeries.book_id, BookSeries.sequence.nulls_last(), Series.name)
+        )
+
+        series_map: dict[str, tuple[int, str, float | None]] = {}
+        for row in series_rows.all():
+            series_map.setdefault(row[0], (row[1], row[2], row[3]))
+
+        grouped_entries: list[list[Book]] = []
+        series_index_map: dict[int, int] = {}
+
+        for book in ordered_books:
+            series_info = series_map.get(book.id)
+            if series_info is None:
+                grouped_entries.append([book])
+                continue
+
+            series_idx = series_index_map.get(series_info[0])
+            if series_idx is None:
+                series_index_map[series_info[0]] = len(grouped_entries)
+                grouped_entries.append([book])
+                continue
+
+            grouped_entries[series_idx].append(book)
+
+        visible_total = len(grouped_entries)
+        pages = max(1, math.ceil(visible_total / per_page))
+        offset = (page - 1) * per_page
+        page_entries = grouped_entries[offset : offset + per_page]
+        paged_books = [book for entry in page_entries for book in entry]
+        return paged_books, total, pages
+
+    offset = (page - 1) * per_page
     query = query.offset(offset).limit(per_page)
     result = await session.execute(query)
-    return result.scalars().all(), total  # type: ignore[return-value]
+    pages = max(1, math.ceil(total / per_page))
+    return result.scalars().all(), total, pages  # type: ignore[return-value]
 
 
 async def get_book(session: AsyncSession, book_id: str) -> Book:

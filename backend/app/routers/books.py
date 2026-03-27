@@ -1,4 +1,3 @@
-import math
 import os
 from pathlib import Path
 
@@ -108,9 +107,10 @@ async def list_books_endpoint(
     status: str | None = Query(None),
     sort: str = Query("created_at"),
     filter_mode: str = Query("and"),
+    group_by_series: bool = Query(False),
     session: AsyncSession = Depends(get_session),
 ):
-    books, total = await list_books(
+    books, total, pages = await list_books(
         session,
         page=page,
         per_page=per_page,
@@ -124,6 +124,7 @@ async def list_books_endpoint(
         status=status,
         sort=sort,
         filter_mode=filter_mode,
+        group_by_series=group_by_series,
     )
 
     # Batch-fetch max reading progress per book (single query)
@@ -172,7 +173,7 @@ async def list_books_endpoint(
         total=total,
         page=page,
         per_page=per_page,
-        pages=max(1, math.ceil(total / per_page)),
+        pages=pages,
     )
 
 
