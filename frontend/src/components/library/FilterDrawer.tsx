@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { X, ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { X, ChevronDown, ChevronRight, Search, Telescope } from 'lucide-react'
 import { api } from '../../api/client'
 import type {
   Genre,
@@ -9,7 +9,9 @@ import type {
   Author,
   FilterState,
   FilterLabels,
+  Lens,
 } from '../../types/api'
+import SaveLensModal from '../lenses/SaveLensModal'
 
 interface FilterDrawerProps {
   open: boolean
@@ -215,6 +217,9 @@ export default function FilterDrawer({
   const [draft, setDraft] = useState<FilterState>(filters)
   const [draftShelf, setDraftShelf] = useState<number | null>(shelfId)
   const [draftStatus, setDraftStatus] = useState<string | null>(status)
+
+  // Save as Lens
+  const [saveLensOpen, setSaveLensOpen] = useState(false)
 
   // Fetched filter options
   const [genres, setGenres] = useState<Genre[]>([])
@@ -481,6 +486,14 @@ export default function FilterDrawer({
             Clear All
           </button>
           <button
+            onClick={() => setSaveLensOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors"
+            data-testid="save-as-lens-btn"
+          >
+            <Telescope size={12} />
+            Save as Lens
+          </button>
+          <button
             onClick={handleApply}
             className="px-6 py-2 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/90 transition-colors"
             data-testid="filter-apply"
@@ -489,6 +502,24 @@ export default function FilterDrawer({
           </button>
         </div>
       </div>
+
+      {/* Save as Lens modal */}
+      {saveLensOpen && (
+        <SaveLensModal
+          filterState={{
+            genres: draft.genres,
+            tags: draft.tags,
+            seriesIds: draft.seriesIds,
+            authors: draft.authors,
+            formats: draft.formats,
+            mode: draft.mode,
+            shelfId: draftShelf,
+            status: draftStatus,
+          }}
+          onClose={() => setSaveLensOpen(false)}
+          onSaved={(_lens: Lens) => setSaveLensOpen(false)}
+        />
+      )}
     </div>
   )
 }

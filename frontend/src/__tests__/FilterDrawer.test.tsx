@@ -239,6 +239,19 @@ describe('FilterDrawer', () => {
     expect(screen.queryByText('Mystery')).not.toBeInTheDocument()
   })
 
+  it('shows Save as Lens button in footer', () => {
+    render(<FilterDrawer {...defaultProps} />)
+    expect(screen.getByTestId('save-as-lens-btn')).toBeInTheDocument()
+  })
+
+  it('opens SaveLensModal when Save as Lens is clicked', async () => {
+    const user = userEvent.setup()
+    render(<FilterDrawer {...defaultProps} />)
+
+    await user.click(screen.getByTestId('save-as-lens-btn'))
+    expect(screen.getByTestId('save-lens-modal')).toBeInTheDocument()
+  })
+
   it('shows selected count in accordion header', async () => {
     render(
       <FilterDrawer
