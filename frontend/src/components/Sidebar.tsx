@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { Settings, type LucideIcon } from 'lucide-react'
-import { NAV_ITEMS } from './nav/navItems'
+import { type LucideIcon } from 'lucide-react'
+import { NAV_ITEMS, MORE_ITEMS } from './nav/navItems'
 
 interface NavItemProps {
   to: string
@@ -57,9 +57,14 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Settings — pinned at bottom */}
-      <div className="p-4 mt-auto border-t border-white/10">
-        <NavItem to="/settings" icon={Settings} label="Settings" />
+      {/* More section */}
+      <div className="px-4 pb-4 mt-2 border-t border-white/10 pt-4 space-y-2">
+        <p className="hidden lg:block text-[9px] font-black tracking-widest text-white/20 px-4 pb-1">
+          MORE
+        </p>
+        {MORE_ITEMS.map((item) => (
+          <NavItem key={item.to} {...item} />
+        ))}
       </div>
     </aside>
   )

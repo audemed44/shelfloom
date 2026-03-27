@@ -207,6 +207,27 @@ export interface SeriesBook {
   cover_path: string | null
 }
 
+export interface LensFilterState {
+  genres: number[]
+  tags: number[]
+  seriesIds: number[]
+  authors: string[]
+  formats: string[]
+  mode: 'and' | 'or'
+  shelfId: number | null
+  status: string | null
+}
+
+export interface Lens {
+  id: number
+  name: string
+  filter_state: LensFilterState
+  book_count: number
+  cover_book_id: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface BackfillCoversResponse {
   refreshed: number
   failed: number

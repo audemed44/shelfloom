@@ -175,6 +175,17 @@ function mockFetch({
         json: async () => ({ detail: 'Upload failed' }),
       }) as Promise<Response>
     }
+    if (
+      u.includes('/api/genres') ||
+      u.includes('/api/tags') ||
+      u.includes('/api/authors')
+    ) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      }) as Promise<Response>
+    }
     return Promise.resolve({
       ok: true,
       status: 200,
@@ -760,5 +771,90 @@ describe('Bulk Selection', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('bulk-toolbar')).not.toBeInTheDocument()
     )
+  })
+
+  it('shows Save as Lens button in FilterDrawer', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+
+    await user.click(screen.getByTestId('filters-button'))
+    expect(await screen.findByTestId('save-as-lens-btn')).toBeInTheDocument()
+  })
+
+  it('opens SaveLensModal from Save as Lens button in FilterDrawer', async () => {
+    const user = userEvent.setup()
+    // Add lenses mock to fetch
+    fetchSpy.mockRestore()
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const u = url.toString()
+      if (u.includes('/api/lenses')) {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            id: 1,
+            name: 'Test',
+            book_count: 0,
+            cover_book_id: null,
+            filter_state: {
+              genres: [],
+              tags: [],
+              series_ids: [],
+              authors: [],
+              formats: [],
+              mode: 'and',
+              shelf_id: null,
+              status: null,
+            },
+            created_at: '',
+            updated_at: '',
+          }),
+        }) as Promise<Response>
+      }
+      if (u.includes('/api/shelves')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_SHELVES,
+        }) as Promise<Response>
+      }
+      if (u.includes('/api/series/tree')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_SERIES_TREE,
+        }) as Promise<Response>
+      }
+      if (
+        u.includes('/api/genres') ||
+        u.includes('/api/tags') ||
+        u.includes('/api/authors')
+      ) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [],
+        }) as Promise<Response>
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: MOCK_BOOKS,
+          total: MOCK_BOOKS.length,
+          page: 1,
+          per_page: 24,
+        }),
+      }) as Promise<Response>
+    })
+
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+
+    await user.click(screen.getByTestId('filters-button'))
+    await user.click(await screen.findByTestId('save-as-lens-btn'))
+
+    expect(screen.getByTestId('save-lens-modal')).toBeInTheDocument()
   })
 })
