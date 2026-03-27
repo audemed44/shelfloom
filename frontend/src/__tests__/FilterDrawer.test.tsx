@@ -240,7 +240,6 @@ describe('FilterDrawer', () => {
   })
 
   it('shows selected count in accordion header', async () => {
-    const user = userEvent.setup()
     render(
       <FilterDrawer
         {...defaultProps}
