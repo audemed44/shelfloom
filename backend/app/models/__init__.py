@@ -1,6 +1,7 @@
 from app.models.book import Book, BookHash  # noqa: F401
 from app.models.genre import BookGenre, Genre  # noqa: F401
 from app.models.kosync import KoSyncProgress, KoSyncUser  # noqa: F401
+from app.models.lens import Lens  # noqa: F401
 from app.models.organize import RenameLog  # noqa: F401
 from app.models.reading import (  # noqa: F401
     Highlight,
