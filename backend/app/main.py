@@ -158,6 +158,7 @@ def create_app() -> FastAPI:
         health,
         import_,
         kosync,
+        lenses,
         organizer,
         reading,
         serials,
@@ -169,6 +170,7 @@ def create_app() -> FastAPI:
 
     application.include_router(health.router, prefix="/api")
     application.include_router(authors.router, prefix="/api")
+    application.include_router(lenses.router, prefix="/api")
     application.include_router(shelves.router, prefix="/api")
     application.include_router(books.router, prefix="/api")
     application.include_router(genres.router, prefix="/api")
