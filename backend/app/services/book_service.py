@@ -93,9 +93,12 @@ async def list_books(
     shelf_id: int | None = None,
     format: str | None = None,
     tag: str | None = None,
+    genre: str | None = None,
+    author: str | None = None,
     series_id: int | None = None,
     status: str | None = None,
     sort: str = "created_at",
+    filter_mode: str = "and",
 ) -> tuple[list[Book], int]:
     """Return (books, total_count)."""
     query = select(Book)
@@ -105,22 +108,79 @@ async def list_books(
         query = query.where(Book.title.ilike(pattern) | Book.author.ilike(pattern))
     if shelf_id is not None:
         query = query.where(Book.shelf_id == shelf_id)
+
+    # Format filter — supports comma-separated values
     if format is not None:
-        query = query.where(Book.format == format)
+        formats = [f.strip() for f in format.split(",") if f.strip()]
+        if formats:
+            query = query.where(Book.format.in_(formats))
+
+    # Series filter — supports comma-separated IDs
     if series_id is not None:
         from app.models.series import BookSeries
 
-        query = query.join(BookSeries, Book.id == BookSeries.book_id).where(
-            BookSeries.series_id == series_id
-        )
+        series_ids = [int(s.strip()) for s in str(series_id).split(",") if s.strip()]
+        if series_ids:
+            if filter_mode == "and":
+                for sid in series_ids:
+                    subq = select(BookSeries.book_id).where(
+                        BookSeries.series_id == sid, BookSeries.book_id == Book.id
+                    )
+                    query = query.where(subq.exists())
+            else:
+                subq = select(BookSeries.book_id).where(
+                    BookSeries.series_id.in_(series_ids),
+                    BookSeries.book_id == Book.id,
+                )
+                query = query.where(subq.exists())
+
+    # Tag filter — supports comma-separated names
     if tag is not None:
         from app.models.tag import BookTag, Tag
 
-        query = (
-            query.join(BookTag, Book.id == BookTag.book_id)
-            .join(Tag, BookTag.tag_id == Tag.id)
-            .where(Tag.name == tag)
-        )
+        tag_names = [t.strip() for t in tag.split(",") if t.strip()]
+        if tag_names:
+            if filter_mode == "and":
+                for tname in tag_names:
+                    subq = (
+                        select(BookTag.book_id)
+                        .join(Tag, BookTag.tag_id == Tag.id)
+                        .where(Tag.name == tname, BookTag.book_id == Book.id)
+                    )
+                    query = query.where(subq.exists())
+            else:
+                subq = (
+                    select(BookTag.book_id)
+                    .join(Tag, BookTag.tag_id == Tag.id)
+                    .where(Tag.name.in_(tag_names), BookTag.book_id == Book.id)
+                )
+                query = query.where(subq.exists())
+
+    # Genre filter — supports comma-separated IDs
+    if genre is not None:
+        from app.models.genre import BookGenre
+
+        genre_ids = [int(g.strip()) for g in genre.split(",") if g.strip()]
+        if genre_ids:
+            if filter_mode == "and":
+                for gid in genre_ids:
+                    subq = select(BookGenre.book_id).where(
+                        BookGenre.genre_id == gid, BookGenre.book_id == Book.id
+                    )
+                    query = query.where(subq.exists())
+            else:
+                subq = select(BookGenre.book_id).where(
+                    BookGenre.genre_id.in_(genre_ids),
+                    BookGenre.book_id == Book.id,
+                )
+                query = query.where(subq.exists())
+
+    # Author filter — supports comma-separated names
+    if author is not None:
+        author_names = [a.strip() for a in author.split(",") if a.strip()]
+        if author_names:
+            query = query.where(Book.author.in_(author_names))
+
     if status is not None:
         from app.models.reading import ReadingProgress as RP
 
