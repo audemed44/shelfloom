@@ -9,15 +9,10 @@ import {
   BookOpen,
   Layers,
   Plus,
-  ChevronDown,
   SlidersHorizontal,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
-import BookCard from '../components/library/BookCard'
-import BookRow from '../components/library/BookRow'
-import SeriesCard from '../components/library/SeriesCard'
-import SeriesRow from '../components/library/SeriesRow'
 import { SkeletonCard, SkeletonRow } from '../components/library/SkeletonCard'
 import BulkUploadZone from '../components/library/BulkUploadZone'
 import BulkActionToolbar from '../components/library/BulkActionToolbar'
@@ -25,16 +20,16 @@ import BulkEditModal from '../components/library/BulkEditModal'
 import CreateManualBookModal from '../components/library/CreateManualBookModal'
 import FilterDrawer from '../components/library/FilterDrawer'
 import ActiveFilterChips from '../components/library/ActiveFilterChips'
+import GroupedBookContent from '../components/shared/GroupedBookContent'
 import type {
   Book,
   Shelf,
   PaginatedResponse,
-  SeriesWithCount,
   FilterState,
   FilterLabels,
 } from '../types'
 
-const PER_PAGE = 24
+const PER_PAGE = 25
 
 const SORT_OPTIONS = [
   { value: 'last_read', label: 'Last Read' },
@@ -389,6 +384,7 @@ export default function Library() {
       per_page: String(PER_PAGE),
       sort,
     })
+    if (groupBySeries) params.set('group_by_series', 'true')
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (selectedShelfId) params.set('shelf_id', String(selectedShelfId))
     if (status) params.set('status', status)
@@ -403,27 +399,23 @@ export default function Library() {
     if (filters.mode !== 'and') params.set('filter_mode', filters.mode)
     if (rev > 0) params.set('_rev', String(rev))
     return `/api/books?${params}`
-  }, [page, debouncedSearch, selectedShelfId, sort, status, filters, rev])
+  }, [
+    page,
+    debouncedSearch,
+    selectedShelfId,
+    sort,
+    status,
+    filters,
+    rev,
+    groupBySeries,
+  ])
 
   const { data: booksData, loading } =
     useApi<PaginatedResponse<Book>>(booksPath)
   const books = useMemo(() => booksData?.items ?? [], [booksData])
   const total = booksData?.total ?? 0
-  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE))
-
-  // Series tree for true book counts (only fetched when grouping is on)
-  const { data: seriesTree } = useApi<SeriesWithCount[]>(
-    groupBySeries ? '/api/series/tree' : null
-  )
-  const seriesCountMap = useMemo(() => {
-    const map = new Map<number, number>()
-    if (seriesTree) {
-      for (const s of seriesTree) {
-        map.set(s.id, s.book_count)
-      }
-    }
-    return map
-  }, [seriesTree])
+  const totalPages =
+    booksData?.pages ?? Math.max(1, Math.ceil(total / PER_PAGE))
 
   const toggleSeriesExpanded = useCallback((seriesId: number) => {
     setExpandedSeriesIds((prev) => {
@@ -436,45 +428,6 @@ export default function Library() {
       return next
     })
   }, [])
-
-  interface BookGroup {
-    seriesId: number | null
-    seriesName: string | null
-    books: Book[]
-  }
-
-  const bookGroups = useMemo<BookGroup[]>(() => {
-    if (!groupBySeries) return [{ seriesId: null, seriesName: null, books }]
-    const entries: BookGroup[] = []
-    const seriesIndexMap = new Map<number, number>()
-    for (const book of books) {
-      if (book.series_id != null && book.series_name) {
-        const existingIdx = seriesIndexMap.get(book.series_id)
-        if (existingIdx != null) {
-          // Add to existing group, keep sorted by sequence
-          const group = entries[existingIdx]
-          group.books.push(book)
-          group.books.sort((a, b) => {
-            const sa = a.series_sequence ?? Infinity
-            const sb = b.series_sequence ?? Infinity
-            return sa - sb
-          })
-        } else {
-          // First time seeing this series — create group at this position
-          seriesIndexMap.set(book.series_id, entries.length)
-          entries.push({
-            seriesId: book.series_id,
-            seriesName: book.series_name,
-            books: [book],
-          })
-        }
-      } else {
-        // Standalone book — no header needed
-        entries.push({ seriesId: null, seriesName: null, books: [book] })
-      }
-    }
-    return entries
-  }, [books, groupBySeries])
 
   // All selectable book IDs on the current page (all books, including collapsed series)
   const selectableIds = useMemo(() => {
@@ -634,7 +587,10 @@ export default function Library() {
         view={view}
         onView={setView}
         groupBySeries={groupBySeries}
-        onGroupBySeries={setGroupBySeries}
+        onGroupBySeries={(v) => {
+          setGroupBySeries(v)
+          resetPage()
+        }}
         activeFilterCount={activeFilterCount}
         onFiltersClick={() => setDrawerOpen(true)}
       />
@@ -669,169 +625,22 @@ export default function Library() {
         <EmptyState search={debouncedSearch} />
       ) : (
         <div>
-          {view === 'grid' ? (
-            <div
-              className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4"
-              data-testid="book-grid"
-            >
-              {bookGroups.flatMap((group) => {
-                // Collapsed series card
-                if (
-                  groupBySeries &&
-                  group.seriesId != null &&
-                  !expandedSeriesIds.has(group.seriesId)
-                ) {
-                  const seriesBookIds = group.books.map((b) => b.id)
-                  const allSeriesSelected =
-                    seriesBookIds.length > 0 &&
-                    seriesBookIds.every((id) => selectedIds.has(id))
-                  const someSeriesSelected =
-                    !allSeriesSelected &&
-                    seriesBookIds.some((id) => selectedIds.has(id))
-                  return [
-                    <SeriesCard
-                      key={`series-${group.seriesId}`}
-                      seriesId={group.seriesId}
-                      seriesName={group.seriesName!}
-                      books={group.books}
-                      totalBookCount={seriesCountMap.get(group.seriesId)}
-                      onExpand={() => toggleSeriesExpanded(group.seriesId!)}
-                      isSelecting={isSelecting}
-                      isAllSelected={allSeriesSelected}
-                      isPartiallySelected={someSeriesSelected}
-                      onToggleAll={() => toggleSeriesSelection(seriesBookIds)}
-                    />,
-                  ]
-                }
-                // Expanded series — collapse header + individual books
-                if (
-                  groupBySeries &&
-                  group.seriesId != null &&
-                  expandedSeriesIds.has(group.seriesId)
-                ) {
-                  return [
-                    <div
-                      key={`series-header-${group.seriesId}`}
-                      className="col-span-full"
-                    >
-                      <button
-                        onClick={() => toggleSeriesExpanded(group.seriesId!)}
-                        className="flex items-center gap-3 border-b border-white/10 pb-2 mb-4 mt-4 first:mt-0 w-full bg-transparent p-0 text-left cursor-pointer"
-                        data-testid="series-expanded-header"
-                      >
-                        <ChevronDown size={14} className="text-primary" />
-                        <span className="text-[10px] font-black tracking-widest uppercase text-white/40">
-                          {group.seriesName}
-                        </span>
-                        <span className="text-[10px] font-bold tracking-wider text-white/20">
-                          {group.books.length}
-                        </span>
-                      </button>
-                    </div>,
-                    ...group.books.map((book) => (
-                      <BookCard
-                        key={book.id}
-                        book={book}
-                        isSelecting={isSelecting}
-                        isSelected={selectedIds.has(book.id)}
-                        onToggle={toggleSelection}
-                      />
-                    )),
-                  ]
-                }
-                // Standalone books
-                return group.books.map((book) => (
-                  <BookCard
-                    key={book.id}
-                    book={book}
-                    isSelecting={isSelecting}
-                    isSelected={selectedIds.has(book.id)}
-                    onToggle={toggleSelection}
-                  />
-                ))
-              })}
-            </div>
-          ) : (
-            <div className="space-y-px" data-testid="book-list">
-              {bookGroups.flatMap((group) => {
-                // Collapsed series row
-                if (
-                  groupBySeries &&
-                  group.seriesId != null &&
-                  !expandedSeriesIds.has(group.seriesId)
-                ) {
-                  const seriesBookIds = group.books.map((b) => b.id)
-                  const allSeriesSelected =
-                    seriesBookIds.length > 0 &&
-                    seriesBookIds.every((id) => selectedIds.has(id))
-                  const someSeriesSelected =
-                    !allSeriesSelected &&
-                    seriesBookIds.some((id) => selectedIds.has(id))
-                  return [
-                    <SeriesRow
-                      key={`series-${group.seriesId}`}
-                      seriesId={group.seriesId}
-                      seriesName={group.seriesName!}
-                      books={group.books}
-                      totalBookCount={seriesCountMap.get(group.seriesId)}
-                      onExpand={() => toggleSeriesExpanded(group.seriesId!)}
-                      isSelecting={isSelecting}
-                      isAllSelected={allSeriesSelected}
-                      isPartiallySelected={someSeriesSelected}
-                      onToggleAll={() => toggleSeriesSelection(seriesBookIds)}
-                    />,
-                  ]
-                }
-                // Expanded series
-                if (
-                  groupBySeries &&
-                  group.seriesId != null &&
-                  expandedSeriesIds.has(group.seriesId)
-                ) {
-                  return [
-                    <button
-                      key={`series-header-${group.seriesId}`}
-                      onClick={() => toggleSeriesExpanded(group.seriesId!)}
-                      className="flex items-center gap-3 p-4 bg-white/5 border border-primary/30 w-full text-left cursor-pointer"
-                      data-testid="series-expanded-header"
-                    >
-                      <ChevronDown size={14} className="text-primary" />
-                      <span className="text-[10px] font-black tracking-widest uppercase text-white/60">
-                        {group.seriesName}
-                      </span>
-                      <span className="text-[10px] font-bold tracking-wider text-white/30">
-                        {group.books.length}
-                      </span>
-                    </button>,
-                    ...group.books.map((book) => (
-                      <BookRow
-                        key={book.id}
-                        book={book}
-                        isSelecting={isSelecting}
-                        isSelected={selectedIds.has(book.id)}
-                        onToggle={toggleSelection}
-                      />
-                    )),
-                  ]
-                }
-                // Standalone books
-                return group.books.map((book) => (
-                  <BookRow
-                    key={book.id}
-                    book={book}
-                    isSelecting={isSelecting}
-                    isSelected={selectedIds.has(book.id)}
-                    onToggle={toggleSelection}
-                  />
-                ))
-              })}
-            </div>
-          )}
+          <GroupedBookContent
+            books={books}
+            view={view as 'grid' | 'list'}
+            groupBySeries={groupBySeries}
+            expandedSeriesIds={expandedSeriesIds}
+            onToggleSeriesExpanded={toggleSeriesExpanded}
+            isSelecting={isSelecting}
+            selectedIds={selectedIds}
+            onToggleSelection={toggleSelection}
+            onToggleSeriesSelection={toggleSeriesSelection}
+          />
         </div>
       )}
 
       {/* Pagination */}
-      {!loading && total > PER_PAGE && (
+      {!loading && totalPages > 1 && (
         <Pagination
           page={page}
           totalPages={totalPages}

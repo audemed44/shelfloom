@@ -4,6 +4,7 @@ import uuid
 
 from app.models.book import Book
 from app.models.genre import BookGenre, Genre
+from app.models.series import BookSeries, Series
 from app.models.shelf import Shelf
 from app.models.tag import BookTag, Tag
 
@@ -345,6 +346,53 @@ async def test_get_lens_books_pagination(client, db_session):
     resp = await client.get(f"/api/lenses/{lid}/books?page=1&per_page=2")
     assert resp.json()["total"] == 5
     assert len(resp.json()["items"]) == 2
+
+
+async def test_get_lens_books_grouped_series_paginates_by_visible_entries(client, db_session):
+    shelf = await _make_shelf(db_session)
+    series = Series(name="Collected Lens")
+    db_session.add(series)
+    await db_session.commit()
+    await db_session.refresh(series)
+
+    for i in range(3):
+        book = await _make_book(db_session, shelf.id, title=f"00 Lens Series {i + 1}")
+        db_session.add(BookSeries(book_id=book.id, series_id=series.id, sequence=float(i + 1)))
+
+    for i in range(25):
+        await _make_book(db_session, shelf.id, title=f"{i + 1:02d} Lens Standalone")
+
+    await db_session.commit()
+
+    create = await client.post(
+        "/api/lenses",
+        json={
+            "name": "All",
+            "filter_state": {
+                "genres": [],
+                "tags": [],
+                "series_ids": [],
+                "authors": [],
+                "formats": ["epub"],
+                "mode": "and",
+            },
+        },
+    )
+    lid = create.json()["id"]
+
+    resp = await client.get(f"/api/lenses/{lid}/books?sort=title&group_by_series=true&per_page=25")
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["total"] == 28
+    assert data["pages"] == 2
+    assert len(data["items"]) == 27
+
+    resp_page_2 = await client.get(
+        f"/api/lenses/{lid}/books?sort=title&group_by_series=true&per_page=25&page=2"
+    )
+    assert resp_page_2.status_code == 200
+    assert [item["title"] for item in resp_page_2.json()["items"]] == ["25 Lens Standalone"]
 
 
 async def test_get_lens_books_not_found(client):

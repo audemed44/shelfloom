@@ -62,7 +62,7 @@ async def list_lenses(session: AsyncSession) -> list[dict]:
     for lens in lenses:
         fs = LensFilterState.model_validate(json.loads(lens.filter_state))
         kwargs = _fs_to_kwargs(fs)
-        books, total = await list_books(session, per_page=1, **kwargs)
+        books, total, _pages = await list_books(session, per_page=1, **kwargs)
         cover_book_id = books[0].id if books else None
         out.append(
             {
@@ -112,10 +112,11 @@ async def get_lens_books(
     session: AsyncSession,
     lens_id: int,
     page: int = 1,
-    per_page: int = 24,
+    per_page: int = 25,
     sort: str = "created_at",
     search: str | None = None,
-) -> tuple[list[Book], int]:
+    group_by_series: bool = False,
+) -> tuple[list[Book], int, int]:
     """Return paginated books matching the lens's saved filters."""
     lens = await get_lens(session, lens_id)
     fs = LensFilterState.model_validate(json.loads(lens.filter_state))
@@ -126,5 +127,6 @@ async def get_lens_books(
         per_page=per_page,
         sort=sort,
         search=search,
+        group_by_series=group_by_series,
         **kwargs,
     )

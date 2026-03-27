@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import LensDetail from '../pages/LensDetail'
 
@@ -50,7 +51,8 @@ const MOCK_BOOKS = {
   ],
   total: 1,
   page: 1,
-  per_page: 24,
+  per_page: 25,
+  pages: 1,
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,7 +123,6 @@ describe('LensDetail', () => {
   })
 
   it('opens edit modal when edit button is clicked', async () => {
-    const { default: userEvent } = await import('@testing-library/user-event')
     const user = userEvent.setup()
     renderDetail()
 
@@ -137,5 +138,68 @@ describe('LensDetail', () => {
 
     renderDetail('999')
     expect(await screen.findByText('Lens not found')).toBeInTheDocument()
+  })
+
+  it('renders group-by-series toggle and requests grouped books when enabled', async () => {
+    const groupedBooks = {
+      items: [
+        {
+          ...MOCK_BOOKS.items[0],
+          id: 10,
+          title: 'The Final Empire',
+          series_id: 9,
+          series_name: 'Mistborn',
+          series_sequence: 1,
+        },
+        {
+          ...MOCK_BOOKS.items[0],
+          id: 11,
+          title: 'The Well of Ascension',
+          series_id: 9,
+          series_name: 'Mistborn',
+          series_sequence: 2,
+        },
+      ],
+      total: 2,
+      page: 1,
+      per_page: 25,
+      pages: 1,
+    }
+
+    globalThis.fetch = vi.fn((url: string | URL | Request) => {
+      const u = url.toString()
+      if (u.includes('/api/lenses/1/books')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => groupedBooks,
+        })
+      }
+      if (u.includes('/api/lenses/1')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_LENS,
+        })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => null })
+    }) as unknown as typeof fetch
+
+    const user = userEvent.setup()
+    renderDetail()
+    await screen.findByText('Fantasy Reads')
+
+    await user.click(screen.getByTestId('group-by-series-toggle'))
+
+    await waitFor(() => {
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.some(([url]) =>
+            url.toString().includes('group_by_series=true')
+          )
+      ).toBe(true)
+    })
+    expect(await screen.findByTestId('series-card')).toBeInTheDocument()
   })
 })
