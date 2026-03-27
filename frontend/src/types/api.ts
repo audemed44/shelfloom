@@ -65,6 +65,25 @@ export interface Genre {
   name: string
 }
 
+export interface Author {
+  name: string
+}
+
+export interface FilterState {
+  genres: number[]
+  tags: number[]
+  seriesIds: number[]
+  authors: string[]
+  formats: string[]
+  mode: 'and' | 'or'
+}
+
+export interface FilterLabels {
+  genres: Record<number, string>
+  tags: Record<number, string>
+  series: Record<number, string>
+}
+
 export interface BulkBookActionResult {
   book_id: string
   success: boolean
