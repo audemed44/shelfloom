@@ -161,14 +161,9 @@ async def test_list_books_filter_tag(client, db_session, tmp_path):
     db_session.add(BookTag(book_id=book.id, tag_id=tag.id))
     await db_session.commit()
 
-    resp = await client.get("/api/books?tag=fantasy")
+    resp = await client.get(f"/api/books?tag={tag.id}")
     assert resp.status_code == 200
     assert resp.json()["total"] == 1
-
-    # Also works by tag ID
-    resp2 = await client.get(f"/api/books?tag={tag.id}")
-    assert resp2.status_code == 200
-    assert resp2.json()["total"] == 1
 
 
 async def test_list_books_filter_series(client, db_session, tmp_path):
@@ -736,7 +731,7 @@ async def test_list_books_filter_multiple_tags_or(client, db_session, tmp_path):
     db_session.add(BookTag(book_id=book2.id, tag_id=t2.id))
     await db_session.commit()
 
-    resp = await client.get("/api/books?tag=tag-a,tag-b&filter_mode=or")
+    resp = await client.get(f"/api/books?tag={t1.id},{t2.id}&filter_mode=or")
     assert resp.status_code == 200
     assert resp.json()["total"] == 2
 
@@ -754,7 +749,7 @@ async def test_list_books_filter_multiple_tags_and(client, db_session, tmp_path)
     db_session.add(BookTag(book_id=book2.id, tag_id=t1.id))
     await db_session.commit()
 
-    resp = await client.get("/api/books?tag=tag-a,tag-b&filter_mode=and")
+    resp = await client.get(f"/api/books?tag={t1.id},{t2.id}&filter_mode=and")
     assert resp.status_code == 200
     assert resp.json()["total"] == 1
     assert resp.json()["items"][0]["title"] == "Both Tags"
@@ -803,7 +798,7 @@ async def test_list_books_cross_category_and(client, db_session, tmp_path):
     db_session.add(BookTag(book_id=book3.id, tag_id=tag.id))
     await db_session.commit()
 
-    resp = await client.get(f"/api/books?genre={genre.id}&tag=favorites")
+    resp = await client.get(f"/api/books?genre={genre.id}&tag={tag.id}")
     assert resp.status_code == 200
     assert resp.json()["total"] == 1
     assert resp.json()["items"][0]["title"] == "Has Both"
