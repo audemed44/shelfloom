@@ -11,6 +11,8 @@ import SeriesList from './pages/SeriesList'
 import SeriesDetail from './pages/SeriesDetail'
 import Settings from './pages/Settings'
 import DataManagement from './pages/DataManagement'
+import Lenses from './pages/Lenses'
+import LensDetail from './pages/LensDetail'
 import NotFound from './pages/NotFound'
 import SetupWizard from './components/SetupWizard'
 
@@ -49,6 +51,8 @@ export default function App() {
           <Route path="serials/:id" element={<SerialDetail />} />
           <Route path="series" element={<SeriesList />} />
           <Route path="series/:id" element={<SeriesDetail />} />
+          <Route path="lenses" element={<Lenses />} />
+          <Route path="lenses/:id" element={<LensDetail />} />
           <Route path="settings" element={<Settings />} />
           <Route path="data-management" element={<DataManagement />} />
           <Route path="*" element={<NotFound />} />

@@ -7,6 +7,8 @@ export type {
   Author,
   FilterState,
   FilterLabels,
+  LensFilterState,
+  Lens,
   ReadingSession,
   Highlight,
   ReadingProgress,
