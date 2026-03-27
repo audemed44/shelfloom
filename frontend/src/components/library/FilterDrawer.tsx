@@ -509,11 +509,11 @@ export default function FilterDrawer({
           filterState={{
             genres: draft.genres,
             tags: draft.tags,
-            seriesIds: draft.seriesIds,
+            series_ids: draft.seriesIds,
             authors: draft.authors,
             formats: draft.formats,
             mode: draft.mode,
-            shelfId: draftShelf,
+            shelf_id: draftShelf,
             status: draftStatus,
           }}
           onClose={() => setSaveLensOpen(false)}

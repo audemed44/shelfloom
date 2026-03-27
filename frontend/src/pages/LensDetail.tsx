@@ -71,11 +71,12 @@ export default function LensDetail() {
         const parts: string[] = []
         if (fs.genres.length > 0) parts.push(`${fs.genres.length} genre(s)`)
         if (fs.tags.length > 0) parts.push(`${fs.tags.length} tag(s)`)
-        if (fs.seriesIds.length > 0) parts.push(`${fs.seriesIds.length} series`)
+        if (fs.series_ids.length > 0)
+          parts.push(`${fs.series_ids.length} series`)
         if (fs.authors.length > 0) parts.push(`${fs.authors.length} author(s)`)
         if (fs.formats.length > 0)
           parts.push(fs.formats.map((f) => f.toUpperCase()).join(', '))
-        if (fs.shelfId != null) parts.push('shelf filter')
+        if (fs.shelf_id != null) parts.push('shelf filter')
         if (fs.status != null) parts.push(`status: ${fs.status}`)
         return parts.length > 0 ? parts.join(' · ') : 'All books'
       })()

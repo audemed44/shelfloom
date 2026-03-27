@@ -210,11 +210,11 @@ export interface SeriesBook {
 export interface LensFilterState {
   genres: number[]
   tags: number[]
-  seriesIds: number[]
+  series_ids: number[]
   authors: string[]
   formats: string[]
   mode: 'and' | 'or'
-  shelfId: number | null
+  shelf_id: number | null
   status: string | null
 }
 
