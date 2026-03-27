@@ -31,6 +31,8 @@ function NavItem({ to, icon: Icon, label, end }: NavItemProps) {
 }
 
 export default function Sidebar() {
+  const sidebarItems = [...NAV_ITEMS, ...MORE_ITEMS]
+
   return (
     <aside
       className="hidden sm:flex w-20 lg:w-64 fixed top-0 left-0 h-full flex-col bg-black border-r border-white/10 z-40"
@@ -52,20 +54,10 @@ export default function Sidebar() {
 
       {/* Primary nav */}
       <nav className="flex-1 px-4 space-y-2 mt-4">
-        {NAV_ITEMS.map((item) => (
+        {sidebarItems.map((item) => (
           <NavItem key={item.to} {...item} />
         ))}
       </nav>
-
-      {/* More section */}
-      <div className="px-4 pb-4 mt-2 border-t border-white/10 pt-4 space-y-2">
-        <p className="hidden lg:block text-[9px] font-black tracking-widest text-white/20 px-4 pb-1">
-          MORE
-        </p>
-        {MORE_ITEMS.map((item) => (
-          <NavItem key={item.to} {...item} />
-        ))}
-      </div>
     </aside>
   )
 }
