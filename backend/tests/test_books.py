@@ -6,6 +6,7 @@ from pathlib import Path
 from ebooklib import epub
 
 from app.models.book import Book
+from app.models.genre import BookGenre, Genre
 from app.models.series import BookSeries, Series
 from app.models.shelf import Shelf
 from app.models.tag import BookTag, Tag
@@ -658,3 +659,146 @@ async def test_refresh_cover_epub_with_cover(client, db_session, tmp_path, monke
     assert resp.status_code == 200
     data = resp.json()
     assert data["cover_path"] is not None
+
+
+# ── multi-value filter tests ─────────────────────────────────────────────────
+
+
+async def test_list_books_filter_genre(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "Fantasy Book")
+    await _create_book(db_session, shelf.id, "Other Book")
+    genre = Genre(name="Fantasy")
+    db_session.add(genre)
+    await db_session.flush()
+    db_session.add(BookGenre(book_id=book1.id, genre_id=genre.id))
+    await db_session.commit()
+
+    resp = await client.get(f"/api/books?genre={genre.id}")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["title"] == "Fantasy Book"
+
+
+async def test_list_books_filter_multiple_genres_or(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "Fantasy Book")
+    book2 = await _create_book(db_session, shelf.id, "SciFi Book")
+    await _create_book(db_session, shelf.id, "Other Book")
+    g1 = Genre(name="Fantasy")
+    g2 = Genre(name="Sci-Fi")
+    db_session.add_all([g1, g2])
+    await db_session.flush()
+    db_session.add(BookGenre(book_id=book1.id, genre_id=g1.id))
+    db_session.add(BookGenre(book_id=book2.id, genre_id=g2.id))
+    await db_session.commit()
+
+    resp = await client.get(f"/api/books?genre={g1.id},{g2.id}&filter_mode=or")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 2
+
+
+async def test_list_books_filter_multiple_genres_and(client, db_session, tmp_path):
+    """AND mode: book must have ALL selected genres."""
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "Both Genres")
+    book2 = await _create_book(db_session, shelf.id, "Fantasy Only")
+    g1 = Genre(name="Fantasy")
+    g2 = Genre(name="Sci-Fi")
+    db_session.add_all([g1, g2])
+    await db_session.flush()
+    db_session.add(BookGenre(book_id=book1.id, genre_id=g1.id))
+    db_session.add(BookGenre(book_id=book1.id, genre_id=g2.id))
+    db_session.add(BookGenre(book_id=book2.id, genre_id=g1.id))
+    await db_session.commit()
+
+    resp = await client.get(f"/api/books?genre={g1.id},{g2.id}&filter_mode=and")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["title"] == "Both Genres"
+
+
+async def test_list_books_filter_multiple_tags_or(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "Tagged A")
+    book2 = await _create_book(db_session, shelf.id, "Tagged B")
+    await _create_book(db_session, shelf.id, "No Tags")
+    t1 = Tag(name="tag-a")
+    t2 = Tag(name="tag-b")
+    db_session.add_all([t1, t2])
+    await db_session.flush()
+    db_session.add(BookTag(book_id=book1.id, tag_id=t1.id))
+    db_session.add(BookTag(book_id=book2.id, tag_id=t2.id))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?tag=tag-a,tag-b&filter_mode=or")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 2
+
+
+async def test_list_books_filter_multiple_tags_and(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "Both Tags")
+    book2 = await _create_book(db_session, shelf.id, "One Tag")
+    t1 = Tag(name="tag-a")
+    t2 = Tag(name="tag-b")
+    db_session.add_all([t1, t2])
+    await db_session.flush()
+    db_session.add(BookTag(book_id=book1.id, tag_id=t1.id))
+    db_session.add(BookTag(book_id=book1.id, tag_id=t2.id))
+    db_session.add(BookTag(book_id=book2.id, tag_id=t1.id))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?tag=tag-a,tag-b&filter_mode=and")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["title"] == "Both Tags"
+
+
+async def test_list_books_filter_author(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    await _create_book(db_session, shelf.id, "Book A", author="Alice")
+    await _create_book(db_session, shelf.id, "Book B", author="Bob")
+    await _create_book(db_session, shelf.id, "Book C", author="Charlie")
+
+    resp = await client.get("/api/books?author=Alice,Bob")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 2
+    titles = {i["title"] for i in resp.json()["items"]}
+    assert titles == {"Book A", "Book B"}
+
+
+async def test_list_books_filter_format_multi(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    db_session.add(
+        Book(id="e1", title="EPUB1", format="epub", file_path="e1.epub", shelf_id=shelf.id)
+    )
+    db_session.add(Book(id="p1", title="PDF1", format="pdf", file_path="p1.pdf", shelf_id=shelf.id))
+    db_session.add(Book(id="c1", title="CBZ1", format="cbz", file_path="c1.cbz", shelf_id=shelf.id))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?format=epub,pdf")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 2
+
+
+async def test_list_books_cross_category_and(client, db_session, tmp_path):
+    """Genre + tag filters always intersect (cross-category AND)."""
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "Has Both")
+    book2 = await _create_book(db_session, shelf.id, "Genre Only")
+    book3 = await _create_book(db_session, shelf.id, "Tag Only")
+    genre = Genre(name="Fantasy")
+    tag = Tag(name="favorites")
+    db_session.add_all([genre, tag])
+    await db_session.flush()
+    db_session.add(BookGenre(book_id=book1.id, genre_id=genre.id))
+    db_session.add(BookGenre(book_id=book2.id, genre_id=genre.id))
+    db_session.add(BookTag(book_id=book1.id, tag_id=tag.id))
+    db_session.add(BookTag(book_id=book3.id, tag_id=tag.id))
+    await db_session.commit()
+
+    resp = await client.get(f"/api/books?genre={genre.id}&tag=favorites")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["title"] == "Has Both"

@@ -102,9 +102,12 @@ async def list_books_endpoint(
     shelf_id: int | None = Query(None),
     format: str | None = Query(None),
     tag: str | None = Query(None),
+    genre: str | None = Query(None),
+    author: str | None = Query(None),
     series_id: int | None = Query(None),
     status: str | None = Query(None),
     sort: str = Query("created_at"),
+    filter_mode: str = Query("and"),
     session: AsyncSession = Depends(get_session),
 ):
     books, total = await list_books(
@@ -115,9 +118,12 @@ async def list_books_endpoint(
         shelf_id=shelf_id,
         format=format,
         tag=tag,
+        genre=genre,
+        author=author,
         series_id=series_id,
         status=status,
         sort=sort,
+        filter_mode=filter_mode,
     )
 
     # Batch-fetch max reading progress per book (single query)
