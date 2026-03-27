@@ -189,7 +189,13 @@ function mockFetch({
     return Promise.resolve({
       ok: true,
       status: 200,
-      json: async () => ({ items: books, total, page: 1, per_page: 24 }),
+      json: async () => ({
+        items: books,
+        total,
+        page: 1,
+        per_page: 25,
+        pages: Math.max(1, Math.ceil(total / 25)),
+      }),
     }) as Promise<Response>
   })
 }
@@ -342,6 +348,64 @@ describe('Library', () => {
     )
   })
 
+  it('uses backend pages for grouped pagination instead of raw total', async () => {
+    const groupedBooks = [
+      ...Array.from({ length: 4 }, (_, i) => ({
+        ...MOCK_BOOKS[i % MOCK_BOOKS.length],
+        id: 100 + i,
+        title: `00 Grouped Series ${i + 1}`,
+        series_id: 1,
+        series_name: 'Grouped Series',
+        series_sequence: i + 1,
+      })),
+      ...Array.from({ length: 24 }, (_, i) => ({
+        ...MOCK_BOOKS[i % MOCK_BOOKS.length],
+        id: 200 + i,
+        title: `${String(i + 1).padStart(2, '0')} Standalone`,
+      })),
+    ]
+
+    fetchSpy.mockRestore()
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const u = url.toString()
+      if (u.includes('/api/shelves')) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => MOCK_SHELVES,
+        }) as Promise<Response>
+      }
+      if (
+        u.includes('/api/genres') ||
+        u.includes('/api/tags') ||
+        u.includes('/api/authors')
+      ) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [],
+        }) as Promise<Response>
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: groupedBooks,
+          total: 28,
+          page: 1,
+          per_page: 25,
+          pages: 1,
+        }),
+      }) as Promise<Response>
+    })
+
+    localStorage.setItem('shelfloom:groupBySeries', 'true')
+    renderLibrary()
+    await waitFor(() => screen.getByTestId('series-card'))
+    expect(screen.queryByLabelText('Next page')).not.toBeInTheDocument()
+    localStorage.removeItem('shelfloom:groupBySeries')
+  })
+
   it('renders group-by-series toggle button', async () => {
     renderLibrary()
     await waitFor(() => screen.getAllByTestId('book-card'))
@@ -406,6 +470,12 @@ describe('Library', () => {
         series_sequence: 1,
       },
       {
+        ...MOCK_BOOKS[1],
+        series_id: 1,
+        series_name: 'Dune Saga',
+        series_sequence: 2,
+      },
+      {
         ...MOCK_BOOKS[2],
       },
     ]
@@ -417,8 +487,36 @@ describe('Library', () => {
     await waitFor(() => {
       expect(screen.getByTestId('series-card')).toBeInTheDocument()
     })
-    // True book count from series tree (6), not just 1 on page
-    expect(screen.getByText('6 books')).toBeInTheDocument()
+    expect(screen.getByText('2 books')).toBeInTheDocument()
+    localStorage.removeItem('shelfloom:groupBySeries')
+  })
+
+  it('fills grouped pages to 25 visible entries when series collapse books', async () => {
+    const groupedBooks = [
+      ...Array.from({ length: 3 }, (_, i) => ({
+        ...MOCK_BOOKS[i % MOCK_BOOKS.length],
+        id: 300 + i,
+        title: `00 Paged Series ${i + 1}`,
+        series_id: 1,
+        series_name: 'Paged Series',
+        series_sequence: i + 1,
+      })),
+      ...Array.from({ length: 24 }, (_, i) => ({
+        ...MOCK_BOOKS[i % MOCK_BOOKS.length],
+        id: 400 + i,
+        title: `${String(i + 1).padStart(2, '0')} Visible Book`,
+      })),
+    ]
+
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({ books: groupedBooks, total: 27 })
+    localStorage.setItem('shelfloom:groupBySeries', 'true')
+    renderLibrary()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('series-card')).toBeInTheDocument()
+    })
+    expect(screen.getAllByTestId('book-card')).toHaveLength(24)
     localStorage.removeItem('shelfloom:groupBySeries')
   })
 
@@ -665,7 +763,8 @@ describe('Bulk Upload', () => {
           items: books,
           total: books.length,
           page: 1,
-          per_page: 24,
+          per_page: 25,
+          pages: 1,
         }),
       }) as Promise<Response>
     })
@@ -844,7 +943,8 @@ describe('Bulk Selection', () => {
           items: MOCK_BOOKS,
           total: MOCK_BOOKS.length,
           page: 1,
-          per_page: 24,
+          per_page: 25,
+          pages: 1,
         }),
       }) as Promise<Response>
     })
