@@ -11,11 +11,11 @@ const MOCK_LENS = {
   filter_state: {
     genres: [1],
     tags: [3],
-    seriesIds: [],
+    series_ids: [],
     authors: [],
     formats: ['epub'],
     mode: 'and',
-    shelfId: null,
+    shelf_id: null,
     status: 'reading',
   },
   created_at: '2024-01-01T00:00:00Z',
