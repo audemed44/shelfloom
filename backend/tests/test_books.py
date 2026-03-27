@@ -165,6 +165,11 @@ async def test_list_books_filter_tag(client, db_session, tmp_path):
     assert resp.status_code == 200
     assert resp.json()["total"] == 1
 
+    # Also works by tag ID
+    resp2 = await client.get(f"/api/books?tag={tag.id}")
+    assert resp2.status_code == 200
+    assert resp2.json()["total"] == 1
+
 
 async def test_list_books_filter_series(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)

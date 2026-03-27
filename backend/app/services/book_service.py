@@ -134,27 +134,43 @@ async def list_books(
                 )
                 query = query.where(subq.exists())
 
-    # Tag filter — supports comma-separated names
+    # Tag filter — supports comma-separated IDs or names
     if tag is not None:
         from app.models.tag import BookTag, Tag
 
-        tag_names = [t.strip() for t in tag.split(",") if t.strip()]
-        if tag_names:
-            if filter_mode == "and":
-                for tname in tag_names:
-                    subq = (
-                        select(BookTag.book_id)
-                        .join(Tag, BookTag.tag_id == Tag.id)
-                        .where(Tag.name == tname, BookTag.book_id == Book.id)
+        raw_tags = [t.strip() for t in tag.split(",") if t.strip()]
+        if raw_tags:
+            # Detect if values are IDs (all numeric) or names
+            all_numeric = all(t.isdigit() for t in raw_tags)
+            if all_numeric:
+                tag_ids = [int(t) for t in raw_tags]
+                if filter_mode == "and":
+                    for tid in tag_ids:
+                        subq = select(BookTag.book_id).where(
+                            BookTag.tag_id == tid, BookTag.book_id == Book.id
+                        )
+                        query = query.where(subq.exists())
+                else:
+                    subq = select(BookTag.book_id).where(
+                        BookTag.tag_id.in_(tag_ids), BookTag.book_id == Book.id
                     )
                     query = query.where(subq.exists())
             else:
-                subq = (
-                    select(BookTag.book_id)
-                    .join(Tag, BookTag.tag_id == Tag.id)
-                    .where(Tag.name.in_(tag_names), BookTag.book_id == Book.id)
-                )
-                query = query.where(subq.exists())
+                if filter_mode == "and":
+                    for tname in raw_tags:
+                        subq = (
+                            select(BookTag.book_id)
+                            .join(Tag, BookTag.tag_id == Tag.id)
+                            .where(Tag.name == tname, BookTag.book_id == Book.id)
+                        )
+                        query = query.where(subq.exists())
+                else:
+                    subq = (
+                        select(BookTag.book_id)
+                        .join(Tag, BookTag.tag_id == Tag.id)
+                        .where(Tag.name.in_(raw_tags), BookTag.book_id == Book.id)
+                    )
+                    query = query.where(subq.exists())
 
     # Genre filter — supports comma-separated IDs
     if genre is not None:
