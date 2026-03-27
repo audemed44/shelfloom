@@ -10,6 +10,7 @@ import {
   Layers,
   Plus,
   ChevronDown,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
@@ -22,7 +23,16 @@ import BulkUploadZone from '../components/library/BulkUploadZone'
 import BulkActionToolbar from '../components/library/BulkActionToolbar'
 import BulkEditModal from '../components/library/BulkEditModal'
 import CreateManualBookModal from '../components/library/CreateManualBookModal'
-import type { Book, Shelf, PaginatedResponse, SeriesWithCount } from '../types'
+import FilterDrawer from '../components/library/FilterDrawer'
+import ActiveFilterChips from '../components/library/ActiveFilterChips'
+import type {
+  Book,
+  Shelf,
+  PaginatedResponse,
+  SeriesWithCount,
+  FilterState,
+  FilterLabels,
+} from '../types'
 
 const PER_PAGE = 24
 
@@ -104,6 +114,8 @@ interface ControlsProps {
   onView: (v: string) => void
   groupBySeries: boolean
   onGroupBySeries: (v: boolean) => void
+  activeFilterCount: number
+  onFiltersClick: () => void
 }
 
 function Controls({
@@ -115,6 +127,8 @@ function Controls({
   onView,
   groupBySeries,
   onGroupBySeries,
+  activeFilterCount,
+  onFiltersClick,
 }: ControlsProps) {
   return (
     <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -161,6 +175,25 @@ function Controls({
           data-testid="group-by-series-toggle"
         >
           <Layers size={16} />
+        </button>
+
+        {/* Filters button */}
+        <button
+          onClick={onFiltersClick}
+          className={`relative p-2.5 border transition-colors ${
+            activeFilterCount > 0
+              ? 'bg-primary text-white border-primary'
+              : 'text-white/40 border-white/10 hover:text-white hover:bg-white/5'
+          }`}
+          aria-label="Filters"
+          data-testid="filters-button"
+        >
+          <SlidersHorizontal size={16} />
+          {activeFilterCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 flex items-center justify-center px-1 bg-primary text-[9px] font-black text-white border border-black rounded-full">
+              {activeFilterCount}
+            </span>
+          )}
         </button>
 
         {/* View toggle */}
@@ -280,6 +313,23 @@ export default function Library() {
     'shelfloom:groupBySeries',
     false
   )
+  const [filters, setFilters] = usePersistedState<FilterState>(
+    'shelfloom:filters',
+    {
+      genres: [],
+      tags: [],
+      seriesIds: [],
+      authors: [],
+      formats: [],
+      mode: 'and',
+    }
+  )
+  const [filterLabels, setFilterLabels] = useState<FilterLabels>({
+    genres: {},
+    tags: {},
+    series: {},
+  })
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [page, setPage] = useState(1)
   const [rev, setRev] = useState(0)
   const [showManualModal, setShowManualModal] = useState(false)
@@ -319,6 +369,7 @@ export default function Library() {
     selectedShelfId,
     sort,
     status,
+    filters,
     page,
     groupBySeries,
     clearSelection,
@@ -341,9 +392,18 @@ export default function Library() {
     if (debouncedSearch) params.set('search', debouncedSearch)
     if (selectedShelfId) params.set('shelf_id', String(selectedShelfId))
     if (status) params.set('status', status)
+    if (filters.genres.length > 0) params.set('genre', filters.genres.join(','))
+    if (filters.tags.length > 0) params.set('tag', filters.tags.join(','))
+    if (filters.seriesIds.length > 0)
+      params.set('series_id', filters.seriesIds.join(','))
+    if (filters.authors.length > 0)
+      params.set('author', filters.authors.join(','))
+    if (filters.formats.length > 0)
+      params.set('format', filters.formats.join(','))
+    if (filters.mode !== 'and') params.set('filter_mode', filters.mode)
     if (rev > 0) params.set('_rev', String(rev))
     return `/api/books?${params}`
-  }, [page, debouncedSearch, selectedShelfId, sort, status, rev])
+  }, [page, debouncedSearch, selectedShelfId, sort, status, filters, rev])
 
   const { data: booksData, loading } =
     useApi<PaginatedResponse<Book>>(booksPath)
@@ -445,6 +505,51 @@ export default function Library() {
     })
   }, [selectableIds])
 
+  const activeFilterCount =
+    filters.genres.length +
+    filters.tags.length +
+    filters.seriesIds.length +
+    filters.authors.length +
+    filters.formats.length
+
+  const handleApplyFilters = useCallback(
+    (newFilters: FilterState, newLabels: FilterLabels) => {
+      setFilters(newFilters)
+      setFilterLabels(newLabels)
+      setPage(1)
+    },
+    [setFilters]
+  )
+
+  const handleRemoveFilter = useCallback(
+    (
+      category: 'genres' | 'tags' | 'seriesIds' | 'authors' | 'formats',
+      value: string | number
+    ) => {
+      setFilters((prev) => ({
+        ...prev,
+        [category]: (prev[category] as (string | number)[]).filter(
+          (v) => v !== value
+        ),
+      }))
+      setPage(1)
+    },
+    [setFilters]
+  )
+
+  const handleClearAllFilters = useCallback(() => {
+    setFilters({
+      genres: [],
+      tags: [],
+      seriesIds: [],
+      authors: [],
+      formats: [],
+      mode: filters.mode,
+    })
+    setFilterLabels({ genres: {}, tags: {}, series: {} })
+    setPage(1)
+  }, [setFilters, filters.mode])
+
   const handleBulkSuccess = useCallback(() => {
     setShowBulkEditModal(false)
     clearSelection()
@@ -530,6 +635,16 @@ export default function Library() {
         onView={setView}
         groupBySeries={groupBySeries}
         onGroupBySeries={setGroupBySeries}
+        activeFilterCount={activeFilterCount}
+        onFiltersClick={() => setDrawerOpen(true)}
+      />
+
+      {/* Active filter chips */}
+      <ActiveFilterChips
+        filters={filters}
+        labels={filterLabels}
+        onRemove={handleRemoveFilter}
+        onClearAll={handleClearAllFilters}
       />
 
       {/* Content */}
@@ -750,6 +865,25 @@ export default function Library() {
           onSuccess={handleBulkSuccess}
         />
       )}
+
+      {/* Filter drawer */}
+      <FilterDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        filters={filters}
+        onApply={handleApplyFilters}
+        shelves={shelves ?? []}
+        shelfId={selectedShelfId}
+        onShelfChange={(id) => {
+          setSelectedShelfId(id)
+          resetPage()
+        }}
+        status={status}
+        onStatusChange={(s) => {
+          setStatus(s)
+          resetPage()
+        }}
+      />
     </div>
   )
 }
