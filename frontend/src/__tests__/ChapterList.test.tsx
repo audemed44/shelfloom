@@ -116,6 +116,47 @@ describe('ChapterList', () => {
         }) as Promise<Response>
       }
 
+      if (
+        requestUrl === '/api/serials/1/chapters/fetch-pending' &&
+        method === 'POST'
+      ) {
+        status = {
+          serial_id: 1,
+          state: 'running',
+          start: 2,
+          end: 2,
+          total: 1,
+          processed: 0,
+          fetched: 0,
+          skipped: 0,
+          failed: 0,
+          current_chapter_number: null,
+          current_chapter_title: null,
+          started_at: '2026-03-25T10:00:00Z',
+          finished_at: null,
+          logs: [],
+          error: null,
+        }
+
+        return Promise.resolve({
+          ok: true,
+          status: 202,
+          json: async () => ({
+            status: 'started',
+            new_chapters: 0,
+            pending_count: 1,
+            job: {
+              serial_id: 1,
+              state: 'running',
+              start: 2,
+              end: 2,
+              total: 1,
+              started_at: '2026-03-25T10:00:00Z',
+            },
+          }),
+        }) as Promise<Response>
+      }
+
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -244,5 +285,30 @@ describe('ChapterList', () => {
 
     expect(screen.getByText('Words — · Pages — · Run 1*')).toBeInTheDocument()
     expect(screen.getAllByText('Arc One').length).toBeGreaterThan(0)
+  })
+
+  it('starts a pending fetch job from the toolbar', async () => {
+    chapters = [
+      makeChapter(1, {
+        has_content: true,
+        fetched_at: '2026-03-25T10:00:01Z',
+        word_count: 42,
+      }),
+      makeChapter(2),
+    ]
+
+    render(<ChapterList serialId={1} totalChapters={2} />)
+
+    await waitFor(() =>
+      expect(screen.getByText('1/2 fetched')).toBeInTheDocument()
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fetch Pending' }))
+
+    await waitFor(() =>
+      expect(screen.getByText('Fetching 1 pending chapter')).toBeInTheDocument()
+    )
+    expect(screen.getByText('running')).toBeInTheDocument()
+    expect(screen.getByText('range 2–2')).toBeInTheDocument()
   })
 })

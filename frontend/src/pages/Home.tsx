@@ -5,8 +5,10 @@ import {
   BookOpen,
   Flame,
   RefreshCw,
+  Download,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
@@ -15,6 +17,10 @@ import type { PaginatedResponse } from '../types'
 import type { Book, SerialDashboardEntry } from '../types'
 import type { LucideIcon } from 'lucide-react'
 import type { HeatmapEntry } from '../components/ReadingHeatmap'
+import type {
+  PendingChapterBatchStatusResponse,
+  PendingChapterFetchResponse,
+} from '../types/api'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -292,54 +298,59 @@ function ActivityFeed({ sessions }: { sessions: RecentSession[] }) {
 // New chapters card
 // ---------------------------------------------------------------------------
 
-function NewChaptersCard({ serial }: { serial: SerialDashboardEntry }) {
+function NewChaptersCard({
+  serial,
+  onFetchPending,
+  fetchPendingDisabled,
+  fetchPendingLoading,
+}: {
+  serial: SerialDashboardEntry
+  onFetchPending: (serialId: number) => void
+  fetchPendingDisabled: boolean
+  fetchPendingLoading: boolean
+}) {
   const hasNew = serial.new_chapter_count > 0
   return (
-    <Link
-      to={`/serials/${serial.id}`}
-      className="group block"
-      data-testid="new-chapters-card"
-    >
-      <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
-        <img
-          src={`/api/serials/${serial.id}/cover`}
-          alt={serial.title ?? 'Serial'}
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
-        />
-        {/* New chapters badge */}
-        {hasNew && (
-          <div className="absolute top-2 left-2">
-            <span className="bg-primary text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
-              +{serial.new_chapter_count} NEW
-            </span>
-          </div>
-        )}
-        {/* Error badge — only shown for error status */}
-        {serial.status === 'error' && (
-          <div className="absolute top-2 right-2">
-            <span className="bg-red-500/90 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
-              ERROR
-            </span>
-          </div>
-        )}
-        {/* Bottom badges: chapter count + fetched progress */}
-        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/90 to-transparent">
-          <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
-            {serial.total_chapters} ch
-          </span>
-          <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
-            {serial.fetched_count}/{serial.total_chapters} fetched
-          </span>
-          {serial.stubbed_chapter_count > 0 && (
-            <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-amber-300 normal-case leading-tight">
-              {serial.stubbed_chapter_count} stubbed
-            </span>
+    <div className="group block" data-testid="new-chapters-card">
+      <Link to={`/serials/${serial.id}`} className="block">
+        <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
+          <img
+            src={`/api/serials/${serial.id}/cover`}
+            alt={serial.title ?? 'Serial'}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+          {hasNew && (
+            <div className="absolute top-2 left-2">
+              <span className="bg-primary text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
+                +{serial.new_chapter_count} NEW
+              </span>
+            </div>
           )}
+          {serial.status === 'error' && (
+            <div className="absolute top-2 right-2">
+              <span className="bg-red-500/90 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
+                ERROR
+              </span>
+            </div>
+          )}
+          <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/90 to-transparent">
+            <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
+              {serial.total_chapters} ch
+            </span>
+            <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
+              {serial.fetched_count}/{serial.total_chapters} fetched
+            </span>
+            {serial.stubbed_chapter_count > 0 && (
+              <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-amber-300 normal-case leading-tight">
+                {serial.stubbed_chapter_count} stubbed
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      </Link>
       <div className="mt-2 px-0.5">
         <p className="text-sm font-black tracking-tighter leading-tight line-clamp-2">
           {serial.title}
@@ -349,8 +360,25 @@ function NewChaptersCard({ serial }: { serial: SerialDashboardEntry }) {
             {serial.author}
           </p>
         )}
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onFetchPending(serial.id)
+          }}
+          disabled={fetchPendingDisabled}
+          className="mt-3 inline-flex items-center gap-2 px-3 py-2 text-[10px] font-black tracking-widest uppercase bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-40 transition-colors"
+        >
+          {fetchPendingLoading || serial.fetch_state === 'running' ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Download size={12} />
+          )}
+          Fetch Pending
+        </button>
       </div>
-    </Link>
+    </div>
   )
 }
 
@@ -387,10 +415,19 @@ export default function Home() {
 
   const [serialRefreshKey, setSerialRefreshKey] = useState(0)
   const [checkingUpdates, setCheckingUpdates] = useState(false)
+  const [fetchingPendingAll, setFetchingPendingAll] = useState(false)
+  const [fetchingPendingSerialId, setFetchingPendingSerialId] = useState<
+    number | null
+  >(null)
 
   const { data: serialsDashboard } = useApi<SerialDashboardEntry[]>(
     `/api/serials/dashboard?_k=${serialRefreshKey}`
   )
+  const [batchStatusRefreshKey, setBatchStatusRefreshKey] = useState(0)
+  const { data: pendingBatchStatus } =
+    useApi<PendingChapterBatchStatusResponse>(
+      `/api/serials/fetch-pending-status?_k=${batchStatusRefreshKey}`
+    )
 
   const handleCheckUpdates = useCallback(async () => {
     setCheckingUpdates(true)
@@ -403,6 +440,54 @@ export default function Home() {
       setCheckingUpdates(false)
     }
   }, [])
+
+  const refreshSerialDashboard = useCallback(() => {
+    setSerialRefreshKey((k) => k + 1)
+    setBatchStatusRefreshKey((k) => k + 1)
+  }, [])
+
+  const handleFetchAllPending = useCallback(async () => {
+    setFetchingPendingAll(true)
+    try {
+      await api.post<PendingChapterBatchStatusResponse>(
+        '/api/serials/fetch-pending'
+      )
+      refreshSerialDashboard()
+    } catch {
+      // ignore
+    } finally {
+      setFetchingPendingAll(false)
+    }
+  }, [refreshSerialDashboard])
+
+  const handleFetchPendingSerial = useCallback(
+    async (serialId: number) => {
+      setFetchingPendingSerialId(serialId)
+      try {
+        await api.post<PendingChapterFetchResponse>(
+          `/api/serials/${serialId}/chapters/fetch-pending`
+        )
+        refreshSerialDashboard()
+      } catch {
+        // ignore
+      } finally {
+        setFetchingPendingSerialId((current) =>
+          current === serialId ? null : current
+        )
+      }
+    },
+    [refreshSerialDashboard]
+  )
+
+  useEffect(() => {
+    if (pendingBatchStatus?.state !== 'running') return
+
+    const intervalId = window.setInterval(() => {
+      refreshSerialDashboard()
+    }, 1000)
+
+    return () => window.clearInterval(intervalId)
+  }, [pendingBatchStatus?.state, refreshSerialDashboard])
 
   const currentlyReading = booksData?.items ?? []
   const streak = overview?.current_streak_days ?? 0
@@ -419,6 +504,7 @@ export default function Home() {
       ).length,
     [completedBooks]
   )
+  const batchRunning = pendingBatchStatus?.state === 'running'
 
   return (
     <div className="p-6 lg:p-12">
@@ -474,6 +560,18 @@ export default function Home() {
                 Web Serials
               </h4>
               <button
+                onClick={handleFetchAllPending}
+                disabled={batchRunning || fetchingPendingAll}
+                className="flex items-center gap-2 px-3 py-2 text-[10px] font-black tracking-widest uppercase bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-40 transition-colors"
+              >
+                {batchRunning || fetchingPendingAll ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : (
+                  <Download size={12} />
+                )}
+                Fetch All Pending
+              </button>
+              <button
                 onClick={handleCheckUpdates}
                 disabled={checkingUpdates}
                 className="text-white/40 hover:text-primary transition-colors disabled:opacity-50"
@@ -484,6 +582,12 @@ export default function Home() {
                   className={checkingUpdates ? 'animate-spin' : ''}
                 />
               </button>
+              {pendingBatchStatus && pendingBatchStatus.state !== 'idle' && (
+                <span className="text-[10px] tracking-widest uppercase text-white/35">
+                  {pendingBatchStatus.processed_serials}/
+                  {pendingBatchStatus.total_serials} processed
+                </span>
+              )}
             </div>
             <ScrollRow>
               {serialsDashboard.map((serial) => (
@@ -491,7 +595,16 @@ export default function Home() {
                   key={serial.id}
                   className="w-[calc(50%-6px)] sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(20%-13px)] xl:w-[calc(16.667%-13px)] flex-shrink-0"
                 >
-                  <NewChaptersCard serial={serial} />
+                  <NewChaptersCard
+                    serial={serial}
+                    onFetchPending={handleFetchPendingSerial}
+                    fetchPendingDisabled={
+                      batchRunning ||
+                      serial.fetch_state === 'running' ||
+                      fetchingPendingSerialId === serial.id
+                    }
+                    fetchPendingLoading={fetchingPendingSerialId === serial.id}
+                  />
                 </div>
               ))}
             </ScrollRow>

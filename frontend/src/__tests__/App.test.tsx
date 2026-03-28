@@ -44,6 +44,21 @@ function mockFetch(url: string): Promise<Response> {
   else if (url.includes('/api/stats/calendar')) data = []
   else if (url.includes('/api/stats/recent-sessions')) data = []
   else if (url.includes('/api/stats/books-completed')) data = []
+  else if (url.includes('/api/serials/fetch-pending-status'))
+    data = {
+      state: 'idle',
+      total_serials: 0,
+      processed_serials: 0,
+      current_serial_id: null,
+      started: 0,
+      already_running: 0,
+      noop: 0,
+      failed: 0,
+      new_chapters: 0,
+      started_at: null,
+      finished_at: null,
+      error: null,
+    }
   else if (url.includes('/api/serials/dashboard')) data = []
   else data = []
 
