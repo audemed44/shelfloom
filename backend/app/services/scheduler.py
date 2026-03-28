@@ -21,26 +21,32 @@ class ScanStatus:
 
 
 class Scheduler:
-    """Manages periodic and manual library scans."""
+    """Manages periodic and manual library scans and serial update checks."""
 
     def __init__(self) -> None:
         self.status = ScanStatus()
         self.mtime_cache: dict[str, float] = {}
         self._loop_task: asyncio.Task | None = None
+        self._serial_check_task: asyncio.Task | None = None
 
     async def start(self, session_factory, settings, covers_dir: str) -> None:
-        """Start the background scan loop (runs scan once, then on interval)."""
+        """Start background loops for library scanning and serial update checking."""
         self._loop_task = asyncio.create_task(self._loop(session_factory, settings, covers_dir))
+        self._serial_check_task = asyncio.create_task(
+            self._serial_check_loop(session_factory, settings)
+        )
 
     async def stop(self) -> None:
-        """Cancel the background loop."""
-        if self._loop_task:
-            self._loop_task.cancel()
-            try:
-                await self._loop_task
-            except asyncio.CancelledError:
-                pass
-            self._loop_task = None
+        """Cancel all background loops."""
+        for task in (self._loop_task, self._serial_check_task):
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+        self._loop_task = None
+        self._serial_check_task = None
 
     async def trigger(self, session_factory, settings, covers_dir: str) -> asyncio.Task | None:
         """Manually trigger a scan. Returns the task, or None if already running."""
@@ -49,11 +55,34 @@ class Scheduler:
         task = asyncio.create_task(self._run_scan(session_factory, settings, covers_dir))
         return task
 
+    async def trigger_serial_check(self, session_factory) -> asyncio.Task | None:
+        """Manually trigger a serial update check. Returns the task."""
+        from app.services.serial_service import check_all_serials_for_updates
+
+        task = asyncio.create_task(check_all_serials_for_updates(session_factory))
+        return task
+
     async def _loop(self, session_factory, settings, covers_dir: str) -> None:
         """Periodic loop: scan then sleep."""
         while True:
             await self._run_scan(session_factory, settings, covers_dir)
             await asyncio.sleep(settings.scan_interval)
+
+    async def _serial_check_loop(self, session_factory, settings) -> None:
+        """Periodic loop: check serials for new chapters."""
+        from app.services.serial_service import check_all_serials_for_updates
+
+        while True:
+            try:
+                result = await check_all_serials_for_updates(session_factory)
+                log.info(
+                    "Serial check complete: %d checked, %d new chapters",
+                    result["checked"],
+                    result["new_chapters"],
+                )
+            except Exception as e:
+                log.error("Serial check failed: %s", e, exc_info=True)
+            await asyncio.sleep(settings.serial_check_interval)
 
     async def _run_scan(self, session_factory, settings, covers_dir: str) -> None:
         if self.status.is_running:

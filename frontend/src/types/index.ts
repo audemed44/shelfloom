@@ -17,4 +17,5 @@ export type {
   PaginatedResponse,
   ApiError,
   SeriesWithCount,
+  SerialDashboardEntry,
 } from './api'

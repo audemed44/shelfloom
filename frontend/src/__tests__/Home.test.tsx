@@ -122,7 +122,7 @@ describe('Home', () => {
       expect(screen.getByTestId('currently-reading-card')).toBeInTheDocument()
       expect(screen.getAllByText('The Way of Kings').length).toBeGreaterThan(0)
       expect(screen.getAllByText('Brandon Sanderson').length).toBeGreaterThan(0)
-      expect(screen.getByText('42% Complete')).toBeInTheDocument()
+      expect(screen.getByText('42%')).toBeInTheDocument()
     })
   })
 

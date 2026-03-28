@@ -4,7 +4,7 @@ import { Clock, BookOpen, Flame } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { ReadingHeatmap } from '../components/ReadingHeatmap'
 import type { PaginatedResponse } from '../types'
-import type { Book } from '../types'
+import type { Book, SerialDashboardEntry } from '../types'
 import type { LucideIcon } from 'lucide-react'
 import type { HeatmapEntry } from '../components/ReadingHeatmap'
 
@@ -120,11 +120,10 @@ function CurrentlyReadingCard({
   return (
     <Link
       to={`/books/${book.id}`}
-      className="bg-white/5 border border-white/10 p-5 flex gap-4 items-start relative overflow-hidden hover:border-white/20 transition-colors group"
+      className="group block"
       data-testid="currently-reading-card"
     >
-      <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
-      <div className="w-16 h-24 flex-shrink-0 bg-white/10 overflow-hidden">
+      <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
         <img
           src={`/api/books/${book.id}/cover`}
           alt={book.title}
@@ -133,30 +132,29 @@ function CurrentlyReadingCard({
             e.currentTarget.style.display = 'none'
           }}
         />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-primary text-[10px] font-black tracking-widest mb-1">
-          Currently Reading
-        </p>
-        <h3 className="text-sm font-black tracking-tight text-white leading-snug truncate">
-          {book.title}
-        </h3>
-        {book.author && (
-          <p className="text-white/50 text-xs mt-0.5 normal-case truncate">
-            {book.author}
-          </p>
-        )}
-        <div className="mt-3 space-y-1">
-          <span className="text-[10px] text-white/40 font-black">
-            {Math.round(progress)}% Complete
+        <div className="absolute top-2 right-2">
+          <span className="bg-black/70 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white/50">
+            {Math.round(progress)}%
           </span>
-          <div className="h-1 bg-white/10 w-full overflow-hidden">
+        </div>
+        {progress > 0 && progress < 100 && (
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/60">
             <div
               className="h-full bg-primary transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
-        </div>
+        )}
+      </div>
+      <div className="mt-2 px-0.5">
+        <p className="text-sm font-black tracking-tighter leading-tight line-clamp-2">
+          {book.title}
+        </p>
+        {book.author && (
+          <p className="text-xs text-white/40 mt-0.5 normal-case truncate">
+            {book.author}
+          </p>
+        )}
       </div>
     </Link>
   )
@@ -211,13 +209,64 @@ function ActivityFeed({ sessions }: { sessions: RecentSession[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// New chapters card
+// ---------------------------------------------------------------------------
+
+function NewChaptersCard({ serial }: { serial: SerialDashboardEntry }) {
+  const hasNew = serial.new_chapter_count > 0
+  return (
+    <Link
+      to={`/serials/${serial.id}`}
+      className="bg-white/5 border border-white/10 p-5 flex gap-4 items-start relative overflow-hidden hover:border-white/20 transition-colors group"
+      data-testid="new-chapters-card"
+    >
+      <div
+        className={`absolute top-0 left-0 w-1 h-full ${hasNew ? 'bg-primary' : 'bg-white/10'}`}
+      />
+      <div className="w-16 h-24 flex-shrink-0 bg-white/10 overflow-hidden">
+        <img
+          src={`/api/serials/${serial.id}/cover`}
+          alt={serial.title ?? 'Serial'}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none'
+          }}
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <p
+            className={`text-[10px] font-black tracking-widest ${hasNew ? 'text-primary' : 'text-white/40'}`}
+          >
+            {hasNew ? `+${serial.new_chapter_count} New` : 'Up to Date'}
+          </p>
+        </div>
+        <h3 className="text-sm font-black tracking-tight text-white leading-snug truncate">
+          {serial.title}
+        </h3>
+        {serial.latest_chapter_title && (
+          <p className="text-white/50 text-xs mt-0.5 normal-case truncate">
+            {serial.latest_chapter_title}
+          </p>
+        )}
+        <div className="mt-3">
+          <span className="text-[10px] text-white/40 font-black">
+            {serial.total_chapters} Chapters
+          </span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export default function Home() {
   const { data: booksData } = useApi<
     PaginatedResponse<Book & { reading_progress?: number }>
-  >('/api/books?status=reading&sort=last_read&per_page=6')
+  >('/api/books?status=reading&sort=last_read&per_page=3')
 
   const { data: overview } = useApi<StatsOverview>('/api/stats/overview')
 
@@ -241,7 +290,11 @@ export default function Home() {
     '/api/stats/books-completed'
   )
 
-  const currentlyReading = (booksData?.items ?? []).slice(0, 6)
+  const { data: serialsDashboard } = useApi<SerialDashboardEntry[]>(
+    '/api/serials/dashboard'
+  )
+
+  const currentlyReading = (booksData?.items ?? []).slice(0, 3)
   const streak = overview?.current_streak_days ?? 0
   const thisWeekSeconds = weekTimeData?.reduce((a, b) => a + b.value, 0) ?? 0
   const thisWeekPages = weekPagesData?.reduce((a, b) => a + b.value, 0) ?? 0
@@ -273,8 +326,7 @@ export default function Home() {
         {/* Currently Reading */}
         <section className="col-span-12">
           {currentlyReading.length === 0 ? (
-            <div className="bg-white/5 border border-white/10 p-8 relative flex items-center justify-center py-12">
-              <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+            <div className="bg-white/5 border border-white/10 p-8 flex items-center justify-center py-12">
               <div className="text-center">
                 <BookOpen size={40} className="mx-auto mb-3 text-white/20" />
                 <p className="text-sm font-black tracking-widest text-white/30">
@@ -286,13 +338,32 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentlyReading.map((book) => (
-                <CurrentlyReadingCard key={book.id} book={book} />
-              ))}
-            </div>
+            <>
+              <h4 className="text-[10px] font-black tracking-widest text-white/40 mb-4">
+                Currently Reading
+              </h4>
+              <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-3 gap-4">
+                {currentlyReading.map((book) => (
+                  <CurrentlyReadingCard key={book.id} book={book} />
+                ))}
+              </div>
+            </>
           )}
         </section>
+
+        {/* New Chapters */}
+        {serialsDashboard && serialsDashboard.length > 0 && (
+          <section className="col-span-12">
+            <h4 className="text-[10px] font-black tracking-widest text-white/40 mb-4">
+              Web Serials
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {serialsDashboard.slice(0, 3).map((serial) => (
+                <NewChaptersCard key={serial.id} serial={serial} />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Heatmap */}
         <section className="col-span-12 lg:col-span-8">
