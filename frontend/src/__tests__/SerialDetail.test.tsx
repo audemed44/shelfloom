@@ -141,6 +141,9 @@ describe('SerialDetail', () => {
   it('prefers the uploaded cover endpoint when both cover_path and cover_url exist', async () => {
     renderDetail()
     await waitFor(() => screen.getByRole('heading', { level: 1 }))
+    await waitFor(() =>
+      expect(screen.getByAltText('Test Story')).toBeInTheDocument()
+    )
     const cover = screen.getByAltText('Test Story')
     expect(cover.getAttribute('src')).toContain('/api/serials/1/cover')
     expect(cover.getAttribute('src')).toContain('cover=')
