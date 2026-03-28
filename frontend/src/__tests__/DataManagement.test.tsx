@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import DataManagement from '../pages/DataManagement'
+import { TestMemoryRouter } from '../test-utils/router'
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -118,12 +118,19 @@ function mockFetch(overrides: Record<string, unknown> = {}) {
   }) as unknown as typeof globalThis.fetch
 }
 
-function renderPage() {
-  return render(
-    <MemoryRouter initialEntries={['/data-management']}>
+async function renderPage() {
+  render(
+    <TestMemoryRouter initialEntries={['/data-management']}>
       <DataManagement />
-    </MemoryRouter>
+    </TestMemoryRouter>
   )
+
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('duplicate-group-book-1') ??
+        screen.queryByTestId('no-duplicates')
+    ).not.toBeNull()
+  })
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────
@@ -133,12 +140,12 @@ describe('DataManagement page', () => {
   afterEach(() => vi.restoreAllMocks())
 
   it('renders the page title', async () => {
-    renderPage()
+    await renderPage()
     expect(screen.getByText('Data Management')).toBeInTheDocument()
   })
 
   it('shows four tabs', async () => {
-    renderPage()
+    await renderPage()
     expect(screen.getByText('Duplicate Sessions')).toBeInTheDocument()
     expect(screen.getByText('Unmatched Data')).toBeInTheDocument()
     expect(screen.getByText('Duplicate Books')).toBeInTheDocument()
@@ -147,14 +154,14 @@ describe('DataManagement page', () => {
 
   describe('Duplicate Sessions tab', () => {
     it('shows a duplicate group with book title', async () => {
-      renderPage()
+      await renderPage()
       await waitFor(() => {
         expect(screen.getByText('Dune')).toBeInTheDocument()
       })
     })
 
     it('shows dismissed and active session labels', async () => {
-      renderPage()
+      await renderPage()
       await waitFor(() => {
         expect(screen.getByTestId('dismissed-session')).toBeInTheDocument()
         expect(screen.getByTestId('active-session')).toBeInTheDocument()
@@ -183,7 +190,7 @@ describe('DataManagement page', () => {
         return { ok: true, status: 200, json: async () => [] } as Response
       }) as unknown as typeof globalThis.fetch
 
-      renderPage()
+      await renderPage()
       await waitFor(() => screen.getByText('Restore dismissed'))
       await user.click(screen.getByText('Restore dismissed'))
 
@@ -195,7 +202,7 @@ describe('DataManagement page', () => {
 
     it('shows empty state when no duplicates', async () => {
       mockFetch({ '/api/data-mgmt/duplicate-sessions': [] })
-      renderPage()
+      await renderPage()
       await waitFor(() => {
         expect(screen.getByTestId('no-duplicates')).toBeInTheDocument()
       })
@@ -205,7 +212,7 @@ describe('DataManagement page', () => {
   describe('Unmatched Data tab', () => {
     it('shows unmatched entries after switching tab', async () => {
       const user = userEvent.setup()
-      renderPage()
+      await renderPage()
       await user.click(screen.getByText('Unmatched Data'))
 
       await waitFor(() => {
@@ -216,7 +223,7 @@ describe('DataManagement page', () => {
     it('shows empty state when no unmatched', async () => {
       mockFetch({ '/api/data-mgmt/unmatched': [] })
       const user = userEvent.setup()
-      renderPage()
+      await renderPage()
       await user.click(screen.getByText('Unmatched Data'))
       await waitFor(() => {
         expect(screen.getByTestId('no-unmatched')).toBeInTheDocument()
@@ -246,7 +253,7 @@ describe('DataManagement page', () => {
       }) as unknown as typeof globalThis.fetch
 
       const user = userEvent.setup()
-      renderPage()
+      await renderPage()
       await user.click(screen.getByText('Unmatched Data'))
       await waitFor(() => screen.getByText('Unknown KO Book'))
       await user.click(screen.getByLabelText('Dismiss'))
@@ -258,7 +265,7 @@ describe('DataManagement page', () => {
   describe('Duplicate Books tab', () => {
     it('shows duplicate book groups', async () => {
       const user = userEvent.setup()
-      renderPage()
+      await renderPage()
       await user.click(screen.getByText('Duplicate Books'))
 
       await waitFor(() => {
@@ -271,7 +278,7 @@ describe('DataManagement page', () => {
     it('shows empty state when no duplicates', async () => {
       mockFetch({ '/api/data-mgmt/duplicate-books': [] })
       const user = userEvent.setup()
-      renderPage()
+      await renderPage()
       await user.click(screen.getByText('Duplicate Books'))
       await waitFor(() => {
         expect(screen.getByTestId('no-duplicate-books')).toBeInTheDocument()
@@ -282,7 +289,7 @@ describe('DataManagement page', () => {
   describe('Import Log tab', () => {
     it('shows import log entries', async () => {
       const user = userEvent.setup()
-      renderPage()
+      await renderPage()
       await user.click(screen.getByText('Import Log'))
 
       await waitFor(() => {
@@ -301,7 +308,7 @@ describe('DataManagement page', () => {
         },
       })
       const user = userEvent.setup()
-      renderPage()
+      await renderPage()
       await user.click(screen.getByText('Import Log'))
       await waitFor(() => {
         expect(screen.getByTestId('no-import-log')).toBeInTheDocument()
@@ -324,9 +331,9 @@ describe('Settings links to DataManagement', () => {
 
     const { default: Settings } = await import('../pages/Settings')
     render(
-      <MemoryRouter>
+      <TestMemoryRouter>
         <Settings />
-      </MemoryRouter>
+      </TestMemoryRouter>
     )
 
     await waitFor(() => {

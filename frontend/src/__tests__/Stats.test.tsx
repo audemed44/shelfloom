@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import Stats from '../pages/Stats'
+import { TestMemoryRouter } from '../test-utils/router'
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -94,11 +94,17 @@ function mockFetch(url: string): Promise<Response> {
   } as Response)
 }
 
-function renderStats() {
-  return render(
-    <MemoryRouter>
+async function renderStats() {
+  render(
+    <TestMemoryRouter>
       <Stats />
-    </MemoryRouter>
+    </TestMemoryRouter>
+  )
+
+  await waitFor(() =>
+    expect(screen.getAllByTestId('metric-card').length).toBeGreaterThanOrEqual(
+      4
+    )
   )
 }
 
@@ -120,8 +126,8 @@ describe('Stats', () => {
     globalThis.fetch = originalFetch
   })
 
-  it('renders heading and all tab buttons', () => {
-    renderStats()
+  it('renders heading and all tab buttons', async () => {
+    await renderStats()
     expect(screen.getByTestId('stats-heading')).toBeInTheDocument()
     expect(screen.getByTestId('tab-overview')).toBeInTheDocument()
     expect(screen.getByTestId('tab-reading-time')).toBeInTheDocument()
@@ -131,7 +137,7 @@ describe('Stats', () => {
   })
 
   it('shows metric cards when overview data loads', async () => {
-    renderStats()
+    await renderStats()
     await waitFor(() => {
       expect(
         screen.getAllByTestId('metric-card').length
@@ -182,7 +188,7 @@ describe('Stats', () => {
       } as Response)
     })
 
-    renderStats()
+    await renderStats()
     await waitFor(() =>
       expect(screen.getByText('No data for this period')).toBeInTheDocument()
     )
@@ -190,7 +196,7 @@ describe('Stats', () => {
 
   it('date range preset changes the API call', async () => {
     const user = userEvent.setup()
-    renderStats()
+    await renderStats()
 
     // Wait for initial load
     await waitFor(() => screen.getByTestId('preset-30d'))
@@ -210,7 +216,7 @@ describe('Stats', () => {
 
   it('granularity toggle updates bar chart title', async () => {
     const user = userEvent.setup()
-    renderStats()
+    await renderStats()
 
     await waitFor(() => screen.getByTestId('gran-day'))
 
@@ -231,7 +237,7 @@ describe('Stats', () => {
 
   it('switching to calendar tab shows the calendar grid', async () => {
     const user = userEvent.setup()
-    renderStats()
+    await renderStats()
 
     await user.click(screen.getByTestId('tab-calendar'))
 
@@ -243,7 +249,7 @@ describe('Stats', () => {
 
   it('switching to books-authors tab shows author bars', async () => {
     const user = userEvent.setup()
-    renderStats()
+    await renderStats()
 
     await user.click(screen.getByTestId('tab-books-authors'))
 

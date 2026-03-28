@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import Lenses from '../pages/Lenses'
+import { TestMemoryRouter } from '../test-utils/router'
 
 const MOCK_LENSES = [
   {
@@ -67,9 +67,9 @@ afterEach(() => {
 
 function renderLenses() {
   return render(
-    <MemoryRouter>
+    <TestMemoryRouter>
       <Lenses />
-    </MemoryRouter>
+    </TestMemoryRouter>
   )
 }
 

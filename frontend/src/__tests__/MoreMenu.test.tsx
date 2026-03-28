@@ -1,14 +1,14 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import MoreMenu from '../components/nav/MoreMenu'
+import { TestMemoryRouter } from '../test-utils/router'
 
 function renderMenu(open: boolean, onClose = vi.fn()) {
   return render(
-    <MemoryRouter>
+    <TestMemoryRouter>
       <MoreMenu open={open} onClose={onClose} />
-    </MemoryRouter>
+    </TestMemoryRouter>
   )
 }
 

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import BulkEditModal from '../components/library/BulkEditModal'
 import type { Shelf } from '../types/api'
+import { TestMemoryRouter } from '../test-utils/router'
 
 const SHELVES: Shelf[] = [
   {
@@ -91,25 +91,25 @@ function mockFetch() {
   })
 }
 
-function renderModal(
+async function renderModal(
   overrides: {
     onClose?: () => void
     onSuccess?: () => void
   } = {}
 ) {
   const selectedIds = new Set(['b1', 'b2'])
-  return render(
-    <MemoryRouter
-      future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-    >
+  render(
+    <TestMemoryRouter>
       <BulkEditModal
         selectedIds={selectedIds}
         shelves={SHELVES}
         onClose={overrides.onClose ?? vi.fn()}
         onSuccess={overrides.onSuccess ?? vi.fn()}
       />
-    </MemoryRouter>
+    </TestMemoryRouter>
   )
+
+  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(4))
 }
 
 describe('BulkEditModal', () => {
@@ -124,21 +124,21 @@ describe('BulkEditModal', () => {
     fetchSpy.mockRestore()
   })
 
-  it('renders the modal with section headers', () => {
-    renderModal()
+  it('renders the modal with section headers', async () => {
+    await renderModal()
     expect(screen.getByText('Edit 2 Books')).toBeInTheDocument()
     expect(screen.getByText('01 Metadata')).toBeInTheDocument()
     expect(screen.getByText('02 Move to Shelf')).toBeInTheDocument()
   })
 
-  it('apply button is disabled when no changes are made', () => {
-    renderModal()
+  it('apply button is disabled when no changes are made', async () => {
+    await renderModal()
     const btn = screen.getByTestId('bulk-apply-btn')
     expect(btn).toBeDisabled()
   })
 
-  it('shows shelf options in the move dropdown', () => {
-    renderModal()
+  it('shows shelf options in the move dropdown', async () => {
+    await renderModal()
     const select = screen.getByTestId(
       'bulk-move-shelf-select'
     ) as HTMLSelectElement
@@ -147,7 +147,7 @@ describe('BulkEditModal', () => {
 
   it('requires confirmation checkbox before move is enabled', async () => {
     const user = userEvent.setup()
-    renderModal()
+    await renderModal()
 
     await user.selectOptions(screen.getByTestId('bulk-move-shelf-select'), '2')
     // Apply still disabled — need confirmation
@@ -160,7 +160,7 @@ describe('BulkEditModal', () => {
   it('shows result summary after applying metadata changes', async () => {
     const user = userEvent.setup()
     const onSuccess = vi.fn()
-    renderModal({ onSuccess })
+    await renderModal({ onSuccess })
 
     // Type a genre name and press enter to add it
     const genreInput = screen.getAllByPlaceholderText(

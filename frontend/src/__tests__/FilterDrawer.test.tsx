@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FilterDrawer from '../components/library/FilterDrawer'
 import type { FilterState, FilterLabels } from '../types/api'
@@ -111,6 +111,11 @@ const defaultProps = {
   onStatusChange: vi.fn(),
 }
 
+async function renderDrawer(props: Partial<typeof defaultProps> = {}) {
+  render(<FilterDrawer {...defaultProps} {...props} />)
+  await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(4))
+}
+
 describe('FilterDrawer', () => {
   beforeEach(() => {
     setupMockFetch()
@@ -122,7 +127,7 @@ describe('FilterDrawer', () => {
   })
 
   it('renders all accordion sections when open', async () => {
-    render(<FilterDrawer {...defaultProps} />)
+    await renderDrawer()
 
     expect(screen.getByTestId('filter-drawer')).toBeInTheDocument()
     expect(screen.getByTestId('accordion-shelves')).toBeInTheDocument()
@@ -141,7 +146,7 @@ describe('FilterDrawer', () => {
 
   it('expands accordion on click to show items', async () => {
     const user = userEvent.setup()
-    render(<FilterDrawer {...defaultProps} />)
+    await renderDrawer()
 
     // Genre section should be collapsed by default
     const genreAccordion = screen.getByTestId('accordion-genre')
@@ -155,7 +160,7 @@ describe('FilterDrawer', () => {
 
   it('toggles AND/OR mode', async () => {
     const user = userEvent.setup()
-    render(<FilterDrawer {...defaultProps} />)
+    await renderDrawer()
 
     const andBtn = screen.getByTestId('filter-mode-and')
     const orBtn = screen.getByTestId('filter-mode-or')
@@ -170,7 +175,7 @@ describe('FilterDrawer', () => {
   it('calls onApply with selected filters', async () => {
     const user = userEvent.setup()
     const onApply = vi.fn()
-    render(<FilterDrawer {...defaultProps} onApply={onApply} />)
+    await renderDrawer({ onApply })
 
     // Expand format section and select EPUB
     await user.click(screen.getByTestId('accordion-format'))
@@ -188,13 +193,10 @@ describe('FilterDrawer', () => {
   it('Clear All resets all draft filters', async () => {
     const user = userEvent.setup()
     const onApply = vi.fn()
-    render(
-      <FilterDrawer
-        {...defaultProps}
-        onApply={onApply}
-        filters={{ ...EMPTY_FILTERS, formats: ['epub'] }}
-      />
-    )
+    await renderDrawer({
+      onApply,
+      filters: { ...EMPTY_FILTERS, formats: ['epub'] },
+    })
 
     await user.click(screen.getByTestId('filter-clear-all'))
     await user.click(screen.getByTestId('filter-apply'))
@@ -207,7 +209,7 @@ describe('FilterDrawer', () => {
   it('closes on backdrop click', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    render(<FilterDrawer {...defaultProps} onClose={onClose} />)
+    await renderDrawer({ onClose })
 
     await user.click(screen.getByTestId('filter-drawer-backdrop'))
     expect(onClose).toHaveBeenCalled()
@@ -216,7 +218,7 @@ describe('FilterDrawer', () => {
   it('closes on Escape key', async () => {
     const user = userEvent.setup()
     const onClose = vi.fn()
-    render(<FilterDrawer {...defaultProps} onClose={onClose} />)
+    await renderDrawer({ onClose })
 
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
@@ -224,7 +226,7 @@ describe('FilterDrawer', () => {
 
   it('search filters the checkbox list', async () => {
     const user = userEvent.setup()
-    render(<FilterDrawer {...defaultProps} />)
+    await renderDrawer()
 
     // Expand genre section
     await user.click(screen.getByTestId('accordion-genre'))
@@ -239,26 +241,23 @@ describe('FilterDrawer', () => {
     expect(screen.queryByText('Mystery')).not.toBeInTheDocument()
   })
 
-  it('shows Save as Lens button in footer', () => {
-    render(<FilterDrawer {...defaultProps} />)
+  it('shows Save as Lens button in footer', async () => {
+    await renderDrawer()
     expect(screen.getByTestId('save-as-lens-btn')).toBeInTheDocument()
   })
 
   it('opens SaveLensModal when Save as Lens is clicked', async () => {
     const user = userEvent.setup()
-    render(<FilterDrawer {...defaultProps} />)
+    await renderDrawer()
 
     await user.click(screen.getByTestId('save-as-lens-btn'))
     expect(screen.getByTestId('save-lens-modal')).toBeInTheDocument()
   })
 
   it('shows selected count in accordion header', async () => {
-    render(
-      <FilterDrawer
-        {...defaultProps}
-        filters={{ ...EMPTY_FILTERS, formats: ['epub', 'pdf'] }}
-      />
-    )
+    await renderDrawer({
+      filters: { ...EMPTY_FILTERS, formats: ['epub', 'pdf'] },
+    })
 
     // Format section header should show count of 2
     const formatSection = screen.getByTestId('accordion-format')
