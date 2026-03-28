@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy import text
 
 from app.database import make_engine
+from app.models.shelf import Shelf
 
 
 @pytest.mark.asyncio
@@ -51,3 +52,15 @@ async def test_tables_created(db_engine):
         "highlights",
     }
     assert expected.issubset(set(table_names))
+
+
+@pytest.mark.asyncio
+async def test_db_isolation_resets_committed_rows(db_session):
+    db_session.add(Shelf(name="Leaky Shelf", path="/tmp/leaky"))
+    await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_db_isolation_starts_with_empty_tables(db_session):
+    result = await db_session.execute(text("SELECT COUNT(*) FROM shelves"))
+    assert result.scalar() == 0
