@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { usePersistedState } from '../hooks/usePersistedState'
+import { useNavigate } from 'react-router-dom'
 import {
   Search,
   LayoutGrid,
@@ -10,6 +11,7 @@ import {
   Layers,
   Plus,
   SlidersHorizontal,
+  Star,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
@@ -43,6 +45,7 @@ const STATUS_OPTIONS = [
   { value: 'reading', label: 'Reading' },
   { value: 'unread', label: 'Unread' },
   { value: 'completed', label: 'Completed' },
+  { value: 'dnf', label: 'DNF' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -109,6 +112,8 @@ interface ControlsProps {
   onView: (v: string) => void
   groupBySeries: boolean
   onGroupBySeries: (v: boolean) => void
+  showRatings: boolean
+  onShowRatings: (v: boolean) => void
   activeFilterCount: number
   onFiltersClick: () => void
 }
@@ -122,6 +127,8 @@ function Controls({
   onView,
   groupBySeries,
   onGroupBySeries,
+  showRatings,
+  onShowRatings,
   activeFilterCount,
   onFiltersClick,
 }: ControlsProps) {
@@ -189,6 +196,22 @@ function Controls({
               {activeFilterCount}
             </span>
           )}
+        </button>
+
+        <button
+          onClick={() => onShowRatings(!showRatings)}
+          className={`flex items-center gap-2 px-3 py-2.5 border transition-colors ${
+            showRatings
+              ? 'bg-primary text-white border-primary'
+              : 'text-white/40 border-white/10 hover:text-white hover:bg-white/5'
+          }`}
+          aria-label="Toggle ratings"
+          data-testid="ratings-toggle"
+        >
+          <Star size={14} />
+          <span className="hidden sm:inline text-[10px] font-black tracking-widest uppercase">
+            Ratings
+          </span>
         </button>
 
         {/* View toggle */}
@@ -296,6 +319,7 @@ function Pagination({ page, totalPages, total, onPage }: PaginationProps) {
 // ---------------------------------------------------------------------------
 
 export default function Library() {
+  const navigate = useNavigate()
   const [view, setView] = usePersistedState('shelfloom:view', 'grid')
   const [search, setSearch] = useState('')
   const [selectedShelfId, setSelectedShelfId] = useState<number | null>(null)
@@ -308,6 +332,10 @@ export default function Library() {
     'shelfloom:groupBySeries',
     false
   )
+  const [showRatings, setShowRatings] = usePersistedState(
+    'shelfloom:showRatings',
+    true
+  )
   const [filters, setFilters] = usePersistedState<FilterState>(
     'shelfloom:filters',
     {
@@ -316,6 +344,9 @@ export default function Library() {
       seriesIds: [],
       authors: [],
       formats: [],
+      minRating: null,
+      hasRating: null,
+      hasReview: null,
       mode: 'and',
     }
   )
@@ -331,6 +362,11 @@ export default function Library() {
   const [expandedSeriesIds, setExpandedSeriesIds] = useState<Set<number>>(
     new Set()
   )
+  const [quickRateToast, setQuickRateToast] = useState<{
+    bookId: string
+    title: string
+    rating: number
+  } | null>(null)
 
   // Selection state for bulk actions
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -396,6 +432,12 @@ export default function Library() {
       params.set('author', filters.authors.join(','))
     if (filters.formats.length > 0)
       params.set('format', filters.formats.join(','))
+    if (filters.minRating != null)
+      params.set('min_rating', String(filters.minRating))
+    if (filters.hasRating != null)
+      params.set('has_rating', String(filters.hasRating))
+    if (filters.hasReview != null)
+      params.set('has_review', String(filters.hasReview))
     if (filters.mode !== 'and') params.set('filter_mode', filters.mode)
     if (rev > 0) params.set('_rev', String(rev))
     return `/api/books?${params}`
@@ -463,7 +505,9 @@ export default function Library() {
     filters.tags.length +
     filters.seriesIds.length +
     filters.authors.length +
-    filters.formats.length
+    filters.formats.length +
+    (filters.minRating != null || filters.hasRating != null ? 1 : 0) +
+    (filters.hasReview != null ? 1 : 0)
 
   const handleApplyFilters = useCallback(
     (newFilters: FilterState, newLabels: FilterLabels) => {
@@ -476,15 +520,34 @@ export default function Library() {
 
   const handleRemoveFilter = useCallback(
     (
-      category: 'genres' | 'tags' | 'seriesIds' | 'authors' | 'formats',
+      category:
+        | 'genres'
+        | 'tags'
+        | 'seriesIds'
+        | 'authors'
+        | 'formats'
+        | 'minRating'
+        | 'hasRating'
+        | 'hasReview',
       value: string | number
     ) => {
-      setFilters((prev) => ({
-        ...prev,
-        [category]: (prev[category] as (string | number)[]).filter(
-          (v) => v !== value
-        ),
-      }))
+      setFilters((prev) => {
+        if (category === 'minRating') {
+          return { ...prev, minRating: null }
+        }
+        if (category === 'hasRating') {
+          return { ...prev, hasRating: null }
+        }
+        if (category === 'hasReview') {
+          return { ...prev, hasReview: null }
+        }
+        return {
+          ...prev,
+          [category]: (prev[category] as (string | number)[]).filter(
+            (v) => v !== value
+          ),
+        }
+      })
       setPage(1)
     },
     [setFilters]
@@ -497,6 +560,9 @@ export default function Library() {
       seriesIds: [],
       authors: [],
       formats: [],
+      minRating: null,
+      hasRating: null,
+      hasReview: null,
       mode: filters.mode,
     })
     setFilterLabels({ genres: {}, tags: {}, series: {} })
@@ -508,6 +574,12 @@ export default function Library() {
     clearSelection()
     setRev((r) => r + 1)
   }, [clearSelection])
+
+  useEffect(() => {
+    if (!quickRateToast) return
+    const timeout = window.setTimeout(() => setQuickRateToast(null), 4000)
+    return () => window.clearTimeout(timeout)
+  }, [quickRateToast])
 
   return (
     <div className="p-4 sm:p-6 lg:p-12">
@@ -591,6 +663,8 @@ export default function Library() {
           setGroupBySeries(v)
           resetPage()
         }}
+        showRatings={showRatings}
+        onShowRatings={setShowRatings}
         activeFilterCount={activeFilterCount}
         onFiltersClick={() => setDrawerOpen(true)}
       />
@@ -631,6 +705,8 @@ export default function Library() {
             groupBySeries={groupBySeries}
             expandedSeriesIds={expandedSeriesIds}
             onToggleSeriesExpanded={toggleSeriesExpanded}
+            showRatings={showRatings}
+            onQuickRate={(payload) => setQuickRateToast(payload)}
             isSelecting={isSelecting}
             selectedIds={selectedIds}
             onToggleSelection={toggleSelection}
@@ -673,6 +749,35 @@ export default function Library() {
           onClose={() => setShowBulkEditModal(false)}
           onSuccess={handleBulkSuccess}
         />
+      )}
+
+      {quickRateToast && (
+        <div className="fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-black/95 p-4 shadow-2xl">
+          <p className="text-[10px] font-black tracking-widest uppercase text-primary">
+            Rated {quickRateToast.rating.toFixed(1)} Stars
+          </p>
+          <p className="mt-2 text-sm text-white/70 normal-case line-clamp-2">
+            {quickRateToast.title}
+          </p>
+          <div className="mt-4 flex items-center justify-end gap-3">
+            <button
+              onClick={() => setQuickRateToast(null)}
+              className="text-[10px] font-black tracking-widest uppercase text-white/40 hover:text-white transition-colors"
+            >
+              Dismiss
+            </button>
+            <button
+              onClick={() => {
+                const bookId = quickRateToast.bookId
+                setQuickRateToast(null)
+                navigate(`/books/${bookId}`, { state: { openVerdict: true } })
+              }}
+              className="text-[10px] font-black tracking-widest uppercase text-primary hover:underline"
+            >
+              Add Note
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Filter drawer */}

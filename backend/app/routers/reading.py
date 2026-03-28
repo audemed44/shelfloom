@@ -45,6 +45,8 @@ async def mark_read(
         session.add(record)
     else:
         record.progress = 100.0
+    book = await get_book(session, book_id)
+    book.reading_state = None
     await session.commit()
     return {"status": "ok"}
 
@@ -69,6 +71,38 @@ async def unmark_read(
     record = result.scalar_one_or_none()
     if record:
         await session.delete(record)
+        await session.commit()
+
+
+@router.post("/{book_id}/dnf", status_code=200)
+async def mark_dnf(
+    book_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Mark a book as did not finish without discarding reading history."""
+    try:
+        book = await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    book.reading_state = "dnf"
+    await session.commit()
+    return {"status": "ok"}
+
+
+@router.delete("/{book_id}/dnf", status_code=204)
+async def clear_dnf(
+    book_id: str,
+    session: AsyncSession = Depends(get_session),
+) -> None:
+    """Clear the did-not-finish state for a book."""
+    try:
+        book = await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    if book.reading_state == "dnf":
+        book.reading_state = None
         await session.commit()
 
 

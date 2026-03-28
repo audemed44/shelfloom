@@ -100,10 +100,12 @@ async def get_overview(
     # session in the requested time window (or all time when no window given).
     books_read_q = (
         select(func.count(func.distinct(ReadingProgress.book_id)))
+        .join(Book, Book.id == ReadingProgress.book_id)
         .join(ReadingSession, ReadingSession.book_id == ReadingProgress.book_id)
         .where(
             ReadingProgress.progress >= 99.0,
             ReadingSession.dismissed == False,  # noqa: E712
+            Book.reading_state.is_(None) | (Book.reading_state != "dnf"),
         )
     )
     if from_dt:
@@ -189,6 +191,7 @@ async def get_books_completed(
             ),
         )
         .where(ReadingProgress.progress >= 99.0)
+        .where(Book.reading_state.is_(None) | (Book.reading_state != "dnf"))
         .group_by(Book.id, ReadingProgress.book_id)
     )
     if from_dt:

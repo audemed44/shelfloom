@@ -276,3 +276,21 @@ async def test_reading_summary_unknown_book(client):
     """Reading summary returns 404 for unknown book."""
     resp = await client.get("/api/books/nonexistent-id/reading-summary")
     assert resp.status_code == 404
+
+
+async def test_mark_dnf_and_clear(client, db_session):
+    book = await _create_book(client, db_session)
+
+    mark_resp = await client.post(f"/api/books/{book.id}/dnf")
+    assert mark_resp.status_code == 200
+
+    detail = await client.get(f"/api/books/{book.id}")
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "dnf"
+
+    clear_resp = await client.delete(f"/api/books/{book.id}/dnf")
+    assert clear_resp.status_code == 204
+
+    detail_after_clear = await client.get(f"/api/books/{book.id}")
+    assert detail_after_clear.status_code == 200
+    assert detail_after_clear.json()["status"] == "unread"

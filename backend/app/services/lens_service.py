@@ -30,6 +30,12 @@ def _fs_to_kwargs(fs: LensFilterState) -> dict:
         kwargs["author"] = ",".join(fs.authors)
     if fs.formats:
         kwargs["format"] = ",".join(fs.formats)
+    if fs.min_rating is not None:
+        kwargs["min_rating"] = fs.min_rating
+    if fs.has_rating is not None:
+        kwargs["has_rating"] = fs.has_rating
+    if fs.has_review is not None:
+        kwargs["has_review"] = fs.has_review
     if fs.shelf_id is not None:
         kwargs["shelf_id"] = fs.shelf_id
     if fs.status is not None:

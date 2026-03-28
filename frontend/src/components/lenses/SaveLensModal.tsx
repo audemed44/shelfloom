@@ -20,6 +20,11 @@ function summarize(fs: LensFilterState): string {
   if (fs.authors.length > 0) parts.push(`${fs.authors.length} author(s)`)
   if (fs.formats.length > 0)
     parts.push(fs.formats.map((f) => f.toUpperCase()).join(', '))
+  if (fs.has_rating === true) parts.push('rated')
+  if (fs.has_rating === false) parts.push('unrated')
+  if (fs.min_rating != null) parts.push(`rating ${fs.min_rating.toFixed(1)}+`)
+  if (fs.has_review === true) parts.push('has review')
+  if (fs.has_review === false) parts.push('no review')
   if (fs.shelf_id != null) parts.push('shelf filter')
   if (fs.status != null) parts.push(`status: ${fs.status}`)
   return parts.length > 0 ? parts.join(' · ') : 'All books'
@@ -53,6 +58,9 @@ export default function SaveLensModal({
           series_ids: filterState.series_ids,
           authors: filterState.authors,
           formats: filterState.formats,
+          min_rating: filterState.min_rating,
+          has_rating: filterState.has_rating,
+          has_review: filterState.has_review,
           mode: filterState.mode,
           shelf_id: filterState.shelf_id,
           status: filterState.status,
