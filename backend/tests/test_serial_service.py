@@ -68,6 +68,18 @@ async def _wait_for_fetch_state(client, serial_id: int, target_state: str, timeo
         await asyncio.sleep(0.01)
 
 
+async def _wait_for_pending_batch_state(client, target_state: str, timeout: float = 1.0):
+    deadline = asyncio.get_running_loop().time() + timeout
+    while True:
+        resp = await client.get("/api/serials/fetch-pending-status")
+        data = resp.json()
+        if data["state"] == target_state:
+            return data
+        if asyncio.get_running_loop().time() >= deadline:
+            raise AssertionError(f"Timed out waiting for batch state {target_state!r}: {data}")
+        await asyncio.sleep(0.01)
+
+
 @pytest.fixture
 async def serial(db_session):
     """Create a minimal WebSerial row for tests that don't go through add_serial."""
@@ -1862,6 +1874,141 @@ async def test_api_fetch_chapters_rejects_parallel_job(client, serial):
         await _wait_for_fetch_state(client, serial.id, "completed")
 
 
+@pytest.mark.asyncio
+async def test_api_fetch_pending_starts_job_for_missing_live_chapters(client, db_session, serial):
+    from sqlalchemy import select
+
+    from app.scrapers.base import ChapterContent, ChapterInfo
+
+    result = await db_session.execute(
+        select(SerialChapter)
+        .where(SerialChapter.serial_id == serial.id)
+        .order_by(SerialChapter.chapter_number)
+    )
+    chapters = list(result.scalars().all())
+    chapters[0].content = "<p>Already fetched</p>"
+    chapters[0].word_count = 50
+    chapters[0].fetched_at = datetime.now(UTC)
+    chapters[2].content = "<p>Already fetched too</p>"
+    chapters[2].word_count = 60
+    chapters[2].fetched_at = datetime.now(UTC)
+    await db_session.commit()
+
+    mock_adapter = MagicMock()
+    mock_adapter.fetch_chapter_list = AsyncMock(
+        return_value=[
+            ChapterInfo(1, "Chapter 1", "https://royalroad.com/ch/1", None),
+            ChapterInfo(2, "Chapter 2", "https://royalroad.com/ch/2", None),
+            ChapterInfo(3, "Chapter 3", "https://royalroad.com/ch/3", None),
+        ]
+    )
+    mock_adapter.fetch_chapter_content = AsyncMock(
+        return_value=ChapterContent(0, "Fetched Title", "<p>Hello</p>", 42)
+    )
+
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
+        resp = await client.post(f"/api/serials/{serial.id}/chapters/fetch-pending")
+        assert resp.status_code == 202
+        data = resp.json()
+        assert data["status"] == "started"
+        assert data["pending_count"] == 1
+        assert data["job"]["start"] == 2
+        assert data["job"]["end"] == 2
+        assert data["job"]["total"] == 1
+
+        final_status = await _wait_for_fetch_state(client, serial.id, "completed")
+        assert final_status["fetched"] == 1
+        chapters_resp = await client.get(f"/api/serials/{serial.id}/chapters")
+        assert chapters_resp.json()[1]["has_content"] is True
+
+
+@pytest.mark.asyncio
+async def test_api_fetch_pending_returns_noop_when_nothing_pending(client, serial_with_content):
+    from app.scrapers.base import ChapterInfo
+
+    mock_adapter = MagicMock()
+    mock_adapter.fetch_chapter_list = AsyncMock(
+        return_value=[
+            ChapterInfo(1, "Chapter 1", "https://royalroad.com/ch/1", None),
+            ChapterInfo(2, "Chapter 2", "https://royalroad.com/ch/2", None),
+            ChapterInfo(3, "Chapter 3", "https://royalroad.com/ch/3", None),
+        ]
+    )
+
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
+        resp = await client.post(f"/api/serials/{serial_with_content.id}/chapters/fetch-pending")
+
+    assert resp.status_code == 202
+    assert resp.json() == {
+        "status": "noop",
+        "new_chapters": 0,
+        "pending_count": 0,
+        "job": None,
+    }
+
+
+@pytest.mark.asyncio
+async def test_api_fetch_pending_batch_runs_serials_sequentially(client, db_session, serial):
+    from app.scrapers.base import ChapterContent, ChapterInfo
+
+    other = WebSerial(
+        url="https://royalroad.com/fiction/2/other-story",
+        source="royalroad",
+        title="Other Story",
+        author="Author",
+        status="ongoing",
+        total_chapters=1,
+        live_chapter_count=1,
+    )
+    db_session.add(other)
+    await db_session.flush()
+    db_session.add(
+        SerialChapter(
+            serial_id=other.id,
+            chapter_number=1,
+            source_key="https://royalroad.com/other/1",
+            title="Other Chapter 1",
+            source_url="https://royalroad.com/other/1",
+        )
+    )
+    await db_session.commit()
+
+    active = 0
+    max_active = 0
+
+    async def fetch_chapter_list(serial_url: str):
+        if serial_url.endswith("/test-story"):
+            return [
+                ChapterInfo(1, "Chapter 1", "https://royalroad.com/ch/1", None),
+                ChapterInfo(2, "Chapter 2", "https://royalroad.com/ch/2", None),
+                ChapterInfo(3, "Chapter 3", "https://royalroad.com/ch/3", None),
+            ]
+        return [ChapterInfo(1, "Other Chapter 1", "https://royalroad.com/other/1", None)]
+
+    async def fetch_chapter_content(url: str):
+        nonlocal active, max_active
+        active += 1
+        max_active = max(max_active, active)
+        await asyncio.sleep(0.02)
+        active -= 1
+        return ChapterContent(0, f"Fetched {url}", "<p>Hello</p>", 42)
+
+    mock_adapter = MagicMock()
+    mock_adapter.fetch_chapter_list = AsyncMock(side_effect=fetch_chapter_list)
+    mock_adapter.fetch_chapter_content = AsyncMock(side_effect=fetch_chapter_content)
+
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
+        start_resp = await client.post("/api/serials/fetch-pending")
+        assert start_resp.status_code == 202
+
+        final_status = await _wait_for_pending_batch_state(client, "completed", timeout=2.0)
+
+    assert final_status["started"] == 2
+    assert final_status["processed_serials"] == 2
+    assert final_status["failed"] == 0
+    assert max_active == 1
+
+
 # ---------------------------------------------------------------------------
 # Serial cover upload / refresh
 # ---------------------------------------------------------------------------
@@ -2121,6 +2268,7 @@ async def test_api_serials_dashboard(client, serial):
     assert data[0]["total_chapters"] == 3
     assert data[0]["fetched_count"] == 0
     assert "new_chapter_count" in data[0]
+    assert data[0]["fetch_state"] == "idle"
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import type {
   ChapterFetchJobResponse,
   ChapterFetchStatusResponse,
+  PendingChapterFetchResponse,
   SerialChapter,
   SerialVolume,
 } from '../../types/api'
@@ -12,6 +13,7 @@ interface ChapterListProps {
   serialId: number
   totalChapters: number
   volumes?: SerialVolume[]
+  onRefresh?: () => void
 }
 
 function fmtDate(iso: string | null): string {
@@ -116,15 +118,19 @@ export default function ChapterList({
   serialId,
   totalChapters,
   volumes = [],
+  onRefresh,
 }: ChapterListProps) {
   const isMountedRef = useRef(true)
+  const lastFetchStateRef = useRef<string>('idle')
   const [offset, setOffset] = useState(0)
   const [chapters, setChapters] = useState<SerialChapter[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [fetchStart, setFetchStart] = useState('')
   const [fetchEnd, setFetchEnd] = useState('')
   const [fetching, setFetching] = useState(false)
+  const [fetchingPending, setFetchingPending] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  const [fetchMessage, setFetchMessage] = useState<string | null>(null)
   const [fetchStatus, setFetchStatus] =
     useState<ChapterFetchStatusResponse | null>(null)
 
@@ -197,6 +203,18 @@ export default function ChapterList({
     return () => window.clearInterval(intervalId)
   }, [fetchStatus?.state, loadChapters, loadFetchStatus])
 
+  useEffect(() => {
+    const currentState = fetchStatus?.state ?? 'idle'
+    const previousState = lastFetchStateRef.current
+    if (
+      previousState === 'running' &&
+      (currentState === 'completed' || currentState === 'error')
+    ) {
+      onRefresh?.()
+    }
+    lastFetchStateRef.current = currentState
+  }, [fetchStatus?.state, onRefresh])
+
   const handleFetch = async () => {
     const start = parseInt(fetchStart, 10)
     const end = parseInt(fetchEnd, 10)
@@ -207,6 +225,7 @@ export default function ChapterList({
 
     setFetching(true)
     setFetchError(null)
+    setFetchMessage(null)
 
     try {
       const job = await api.post<ChapterFetchJobResponse>(
@@ -223,6 +242,45 @@ export default function ChapterList({
     } finally {
       if (isMountedRef.current) {
         setFetching(false)
+      }
+    }
+  }
+
+  const handleFetchPending = async () => {
+    setFetchingPending(true)
+    setFetchError(null)
+    setFetchMessage(null)
+
+    try {
+      const result = await api.post<PendingChapterFetchResponse>(
+        `/api/serials/${serialId}/chapters/fetch-pending`
+      )
+      if (!isMountedRef.current || !result) return
+      if (result.status === 'started' && result.job) {
+        setFetchStatus(makePendingStatus(serialId, result.job))
+        setFetchMessage(
+          `Fetching ${result.pending_count} pending chapter${result.pending_count === 1 ? '' : 's'}`
+        )
+        onRefresh?.()
+        await loadFetchStatus()
+        await loadChapters(true)
+        return
+      }
+
+      setFetchMessage(
+        result.new_chapters > 0
+          ? 'No pending chapters after update'
+          : 'No pending chapters'
+      )
+      onRefresh?.()
+      await loadFetchStatus()
+      await loadChapters(true)
+    } catch (err) {
+      const e = err as { data?: { detail?: string } }
+      setFetchError(e.data?.detail ?? 'Failed to fetch pending chapters')
+    } finally {
+      if (isMountedRef.current) {
+        setFetchingPending(false)
       }
     }
   }
@@ -275,8 +333,23 @@ export default function ChapterList({
           )}
           Fetch Content
         </button>
+        <button
+          onClick={handleFetchPending}
+          disabled={fetchingPending || fetching || running}
+          className="flex items-center gap-2 px-4 py-2 text-xs font-black tracking-widest uppercase bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-50 transition-colors"
+        >
+          {fetchingPending || running ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <Download size={12} />
+          )}
+          Fetch Pending
+        </button>
         {fetchError && (
           <p className="text-xs text-red-400 normal-case">{fetchError}</p>
+        )}
+        {fetchMessage && !fetchError && (
+          <p className="text-xs text-white/50 normal-case">{fetchMessage}</p>
         )}
         {shown > 0 && (
           <p className="text-[10px] text-white/30 tracking-widest uppercase ml-auto">

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import Home from '../pages/Home'
 import { TestMemoryRouter } from '../test-utils/router'
 
@@ -69,8 +69,43 @@ const MOCK_RECENT_SESSIONS = [
   },
 ]
 
-function mockFetch(url: string): Promise<Response> {
+const MOCK_SERIALS_DASHBOARD = [
+  {
+    id: 7,
+    title: 'The Wandering Inn',
+    author: 'pirateaba',
+    cover_path: null,
+    status: 'ongoing',
+    total_chapters: 20,
+    live_chapter_count: 20,
+    stubbed_chapter_count: 0,
+    fetched_count: 12,
+    new_chapter_count: 2,
+    latest_chapter_title: 'Chapter 20',
+    latest_chapter_date: '2026-03-10T00:00:00Z',
+    last_checked_at: '2026-03-10T00:00:00Z',
+    fetch_state: 'idle',
+  },
+]
+
+const MOCK_BATCH_STATUS = {
+  state: 'idle',
+  total_serials: 0,
+  processed_serials: 0,
+  current_serial_id: null,
+  started: 0,
+  already_running: 0,
+  noop: 0,
+  failed: 0,
+  new_chapters: 0,
+  started_at: null,
+  finished_at: null,
+  error: null,
+}
+
+function mockFetch(url: string, init?: RequestInit): Promise<Response> {
   let data: unknown = null
+  const method = init?.method?.toUpperCase() ?? 'GET'
 
   if (url.includes('/api/books')) data = MOCK_BOOKS_RESPONSE
   else if (url.includes('/api/stats/overview')) data = MOCK_OVERVIEW
@@ -79,6 +114,25 @@ function mockFetch(url: string): Promise<Response> {
   else if (url.includes('/api/stats/pages')) data = MOCK_PAGES_SERIES
   else if (url.includes('/api/stats/recent-sessions'))
     data = MOCK_RECENT_SESSIONS
+  else if (url.includes('/api/serials/fetch-pending-status'))
+    data = MOCK_BATCH_STATUS
+  else if (url.includes('/api/serials/dashboard')) data = MOCK_SERIALS_DASHBOARD
+  else if (url.includes('/api/serials/fetch-pending') && method === 'POST')
+    data = { ...MOCK_BATCH_STATUS, state: 'running', total_serials: 1 }
+  else if (url.includes('/chapters/fetch-pending') && method === 'POST')
+    data = {
+      status: 'started',
+      new_chapters: 0,
+      pending_count: 3,
+      job: {
+        serial_id: 7,
+        state: 'running',
+        start: 13,
+        end: 15,
+        total: 3,
+        started_at: '2026-03-10T00:00:00Z',
+      },
+    }
 
   return Promise.resolve({
     ok: true,
@@ -110,7 +164,9 @@ describe('Home', () => {
 
   beforeEach(() => {
     originalFetch = globalThis.fetch
-    fetchSpy = vi.fn((url: unknown) => mockFetch(String(url)))
+    fetchSpy = vi.fn((url: unknown, init?: RequestInit) =>
+      mockFetch(String(url), init)
+    )
     globalThis.fetch = fetchSpy as unknown as typeof globalThis.fetch
   })
 
@@ -192,5 +248,35 @@ describe('Home', () => {
     expect(await screen.findByText('1h 30m')).toBeInTheDocument()
     // 120 pages
     expect(await screen.findByText('120')).toBeInTheDocument()
+  })
+
+  it('starts the dashboard pending batch from the header action', async () => {
+    await renderHome()
+    fireEvent.click(screen.getByRole('button', { name: /fetch all pending/i }))
+
+    await waitFor(() =>
+      expect(
+        fetchSpy.mock.calls.some(
+          ([url, init]) =>
+            String(url).includes('/api/serials/fetch-pending') &&
+            (init as RequestInit | undefined)?.method === 'POST'
+        )
+      ).toBe(true)
+    )
+  })
+
+  it('starts a per-serial pending fetch from the dashboard card', async () => {
+    await renderHome()
+    fireEvent.click(screen.getByRole('button', { name: /fetch pending/i }))
+
+    await waitFor(() =>
+      expect(
+        fetchSpy.mock.calls.some(
+          ([url, init]) =>
+            String(url).includes('/api/serials/7/chapters/fetch-pending') &&
+            (init as RequestInit | undefined)?.method === 'POST'
+        )
+      ).toBe(true)
+    )
   })
 })
