@@ -275,7 +275,7 @@ function NewChaptersCard({ serial }: { serial: SerialDashboardEntry }) {
 export default function Home() {
   const { data: booksData } = useApi<
     PaginatedResponse<Book & { reading_progress?: number }>
-  >('/api/books?status=reading&sort=last_read&per_page=3')
+  >('/api/books?status=reading&sort=last_read&per_page=6')
 
   const { data: overview } = useApi<StatsOverview>('/api/stats/overview')
 
@@ -318,7 +318,7 @@ export default function Home() {
     }
   }, [])
 
-  const currentlyReading = (booksData?.items ?? []).slice(0, 3)
+  const currentlyReading = (booksData?.items ?? []).slice(0, 6)
   const streak = overview?.current_streak_days ?? 0
   const thisWeekSeconds = weekTimeData?.reduce((a, b) => a + b.value, 0) ?? 0
   const thisWeekPages = weekPagesData?.reduce((a, b) => a + b.value, 0) ?? 0
@@ -395,7 +395,7 @@ export default function Home() {
               </button>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-              {serialsDashboard.slice(0, 3).map((serial) => (
+              {serialsDashboard.slice(0, 6).map((serial) => (
                 <NewChaptersCard key={serial.id} serial={serial} />
               ))}
             </div>
