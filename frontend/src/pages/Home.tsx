@@ -310,47 +310,70 @@ function NewChaptersCard({
   fetchPendingLoading: boolean
 }) {
   const hasNew = serial.new_chapter_count > 0
+  const isFetchingPending =
+    fetchPendingLoading || serial.fetch_state === 'running'
+
   return (
     <div className="group block" data-testid="new-chapters-card">
-      <Link to={`/serials/${serial.id}`} className="block">
-        <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
-          <img
-            src={`/api/serials/${serial.id}/cover`}
-            alt={serial.title ?? 'Serial'}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none'
-            }}
-          />
-          {hasNew && (
-            <div className="absolute top-2 left-2">
-              <span className="bg-primary text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
-                +{serial.new_chapter_count} NEW
-              </span>
-            </div>
-          )}
-          {serial.status === 'error' && (
-            <div className="absolute top-2 right-2">
-              <span className="bg-red-500/90 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
-                ERROR
-              </span>
-            </div>
-          )}
-          <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/90 to-transparent">
-            <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
-              {serial.total_chapters} ch
-            </span>
-            <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
-              {serial.fetched_count}/{serial.total_chapters} fetched
-            </span>
-            {serial.stubbed_chapter_count > 0 && (
-              <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-amber-300 normal-case leading-tight">
-                {serial.stubbed_chapter_count} stubbed
-              </span>
+      <div className="relative">
+        <Link to={`/serials/${serial.id}`} className="block">
+          <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
+            <img
+              src={`/api/serials/${serial.id}/cover`}
+              alt={serial.title ?? 'Serial'}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+            {hasNew && (
+              <div className="absolute top-2 left-2">
+                <span className="bg-primary text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
+                  +{serial.new_chapter_count} NEW
+                </span>
+              </div>
             )}
+            {serial.status === 'error' && (
+              <div className="absolute top-2 right-2">
+                <span className="bg-red-500/90 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
+                  ERROR
+                </span>
+              </div>
+            )}
+            <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/90 to-transparent">
+              <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
+                {serial.total_chapters} ch
+              </span>
+              <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
+                {serial.fetched_count}/{serial.total_chapters} fetched
+              </span>
+              {serial.stubbed_chapter_count > 0 && (
+                <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-amber-300 normal-case leading-tight">
+                  {serial.stubbed_chapter_count} stubbed
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      </Link>
+        </Link>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onFetchPending(serial.id)
+          }}
+          aria-label={`Fetch pending chapters for ${serial.title ?? 'serial'}`}
+          title="Fetch pending chapters"
+          disabled={fetchPendingDisabled}
+          className="absolute bottom-2 right-2 z-10 p-2 bg-black/60 border border-white/10 text-white/50 hover:text-primary hover:border-white/30 transition-all disabled:opacity-40"
+        >
+          {isFetchingPending ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <Download size={13} />
+          )}
+        </button>
+      </div>
       <div className="mt-2 px-0.5">
         <p className="text-sm font-black tracking-tighter leading-tight line-clamp-2">
           {serial.title}
@@ -360,23 +383,6 @@ function NewChaptersCard({
             {serial.author}
           </p>
         )}
-        <button
-          type="button"
-          onClick={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onFetchPending(serial.id)
-          }}
-          disabled={fetchPendingDisabled}
-          className="mt-3 inline-flex items-center gap-2 px-3 py-2 text-[10px] font-black tracking-widest uppercase bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-40 transition-colors"
-        >
-          {fetchPendingLoading || serial.fetch_state === 'running' ? (
-            <Loader2 size={12} className="animate-spin" />
-          ) : (
-            <Download size={12} />
-          )}
-          Fetch Pending
-        </button>
       </div>
     </div>
   )
@@ -562,14 +568,15 @@ export default function Home() {
               <button
                 onClick={handleFetchAllPending}
                 disabled={batchRunning || fetchingPendingAll}
-                className="flex items-center gap-2 px-3 py-2 text-[10px] font-black tracking-widest uppercase bg-primary/15 text-primary hover:bg-primary/25 disabled:opacity-40 transition-colors"
+                aria-label="Fetch all pending chapters"
+                title="Fetch all pending chapters"
+                className="text-white/40 hover:text-primary transition-colors disabled:opacity-50"
               >
                 {batchRunning || fetchingPendingAll ? (
-                  <Loader2 size={12} className="animate-spin" />
+                  <Loader2 size={14} className="animate-spin" />
                 ) : (
-                  <Download size={12} />
+                  <Download size={14} />
                 )}
-                Fetch All Pending
               </button>
               <button
                 onClick={handleCheckUpdates}
