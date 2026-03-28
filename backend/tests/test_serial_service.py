@@ -82,6 +82,7 @@ async def serial(db_session):
         author="Author",
         status="ongoing",
         total_chapters=3,
+        live_chapter_count=3,
         series_id=series.id,
     )
     db_session.add(s)
@@ -92,8 +93,9 @@ async def serial(db_session):
             SerialChapter(
                 serial_id=s.id,
                 chapter_number=i,
+                source_key=f"https://royalroad.com/ch/{i}",
                 title=f"Chapter {i}",
-                source_url=f"https://royalroad.com/fiction/1/chapter/{i}",
+                source_url=f"https://royalroad.com/ch/{i}",
             )
         )
 
@@ -758,6 +760,35 @@ async def test_fetch_chapters_error_sets_status(db_session, serial):
 
 
 @pytest.mark.asyncio
+async def test_fetch_stubbed_chapter_without_cache_skips_scraper(db_session, serial):
+    from sqlalchemy import select
+
+    result = await db_session.execute(
+        select(SerialChapter).where(
+            SerialChapter.serial_id == serial.id,
+            SerialChapter.chapter_number == 2,
+        )
+    )
+    chapter = result.scalar_one()
+    chapter.is_stubbed = True
+    chapter.stubbed_at = datetime.now(UTC)
+    chapter.content = None
+    await db_session.commit()
+
+    mock_adapter = MagicMock()
+    mock_adapter.fetch_chapter_content = AsyncMock()
+
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
+        fetched = await fetch_chapters_content(db_session, serial.id, 2, 2)
+
+    assert fetched == []
+    mock_adapter.fetch_chapter_content.assert_not_called()
+    await db_session.refresh(serial)
+    assert serial.status == "ongoing"
+    assert serial.last_error is None
+
+
+@pytest.mark.asyncio
 async def test_update_from_source_no_adapter(db_session, serial):
     with (
         patch("app.services.serial_service.get_adapter_by_name", return_value=None),
@@ -815,6 +846,116 @@ async def test_update_from_source_marks_volumes_stale(db_session, serial):
 
     await db_session.refresh(vol)
     assert vol.is_stale is True
+
+
+@pytest.mark.asyncio
+async def test_update_from_source_preserves_stubbed_chapter_numbers(db_session, serial):
+    from sqlalchemy import select
+
+    from app.scrapers.base import ChapterInfo
+
+    for i in range(4, 101):
+        db_session.add(
+            SerialChapter(
+                serial_id=serial.id,
+                chapter_number=i,
+                source_key=f"https://royalroad.com/ch/{i}",
+                title=f"Ch {i}",
+                source_url=f"https://royalroad.com/ch/{i}",
+            )
+        )
+    serial.total_chapters = 100
+    serial.live_chapter_count = 100
+    await db_session.commit()
+
+    surviving_numbers = [1, 2, 3, 4, *range(51, 101)]
+    mock_adapter = MagicMock()
+    mock_adapter.fetch_chapter_list = AsyncMock(
+        return_value=[
+            ChapterInfo(idx, f"Ch {number}", f"https://royalroad.com/ch/{number}", None)
+            for idx, number in enumerate(surviving_numbers, start=1)
+        ]
+    )
+
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
+        result = await update_from_source(db_session, serial.id)
+
+    assert result["new_chapters"] == 0
+    assert result["total_chapters"] == 100
+
+    await db_session.refresh(serial)
+    assert serial.total_chapters == 100
+    assert serial.live_chapter_count == 54
+    assert serial.stubbed_chapter_count == 46
+
+    chapters = list(
+        (
+            await db_session.execute(
+                select(SerialChapter)
+                .where(SerialChapter.serial_id == serial.id)
+                .order_by(SerialChapter.chapter_number)
+            )
+        ).scalars()
+    )
+    assert chapters[4].chapter_number == 5
+    assert chapters[4].is_stubbed is True
+    assert chapters[50].chapter_number == 51
+    assert chapters[50].is_stubbed is False
+
+
+@pytest.mark.asyncio
+async def test_update_from_source_appends_new_chapters_after_stubbed_gap(db_session, serial):
+    from sqlalchemy import select
+
+    from app.scrapers.base import ChapterInfo
+
+    for i in range(4, 101):
+        db_session.add(
+            SerialChapter(
+                serial_id=serial.id,
+                chapter_number=i,
+                source_key=f"https://royalroad.com/ch/{i}",
+                title=f"Ch {i}",
+                source_url=f"https://royalroad.com/ch/{i}",
+            )
+        )
+    serial.total_chapters = 100
+    serial.live_chapter_count = 100
+    await db_session.commit()
+
+    surviving_and_new = [1, 2, 3, 4, *range(51, 103)]
+    mock_adapter = MagicMock()
+    mock_adapter.fetch_chapter_list = AsyncMock(
+        return_value=[
+            ChapterInfo(idx, f"Ch {number}", f"https://royalroad.com/ch/{number}", None)
+            for idx, number in enumerate(surviving_and_new, start=1)
+        ]
+    )
+
+    with patch("app.services.serial_service.get_adapter_by_name", return_value=mock_adapter):
+        result = await update_from_source(db_session, serial.id)
+
+    assert result["new_chapters"] == 2
+    assert result["total_chapters"] == 102
+
+    await db_session.refresh(serial)
+    assert serial.total_chapters == 102
+    assert serial.live_chapter_count == 56
+    assert serial.stubbed_chapter_count == 46
+
+    chapters = list(
+        (
+            await db_session.execute(
+                select(SerialChapter)
+                .where(SerialChapter.serial_id == serial.id)
+                .order_by(SerialChapter.chapter_number)
+            )
+        ).scalars()
+    )
+    assert chapters[-2].chapter_number == 101
+    assert chapters[-2].source_url == "https://royalroad.com/ch/101"
+    assert chapters[-1].chapter_number == 102
+    assert chapters[-1].source_url == "https://royalroad.com/ch/102"
 
 
 @pytest.mark.asyncio
@@ -1583,6 +1724,7 @@ async def test_api_volume_preview_reports_partial_estimates(client, db_session, 
             "total_words": 280,
             "estimated_pages": 1,
             "is_partial": True,
+            "stubbed_missing_count": 0,
         },
         {
             "start": 2,
@@ -1593,7 +1735,47 @@ async def test_api_volume_preview_reports_partial_estimates(client, db_session, 
             "total_words": 560,
             "estimated_pages": 2,
             "is_partial": True,
+            "stubbed_missing_count": 0,
         },
+    ]
+
+
+@pytest.mark.asyncio
+async def test_api_volume_preview_counts_stubbed_missing_chapters(client, db_session, serial):
+    from sqlalchemy import select
+
+    result = await db_session.execute(
+        select(SerialChapter)
+        .where(SerialChapter.serial_id == serial.id)
+        .order_by(SerialChapter.chapter_number)
+    )
+    chapters = list(result.scalars().all())
+    chapters[0].word_count = 300
+    chapters[0].content = "<p>Chapter 1</p>"
+    chapters[0].fetched_at = datetime.now(UTC)
+    chapters[1].is_stubbed = True
+    chapters[1].stubbed_at = datetime.now(UTC)
+    chapters[1].word_count = None
+    chapters[1].content = None
+    await db_session.commit()
+
+    resp = await client.post(
+        f"/api/serials/{serial.id}/volumes/preview",
+        json={"splits": [{"start": 1, "end": 2, "name": "Alpha"}]},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == [
+        {
+            "start": 1,
+            "end": 2,
+            "name": "Alpha",
+            "chapter_count": 2,
+            "fetched_chapter_count": 1,
+            "total_words": 300,
+            "estimated_pages": 1,
+            "is_partial": True,
+            "stubbed_missing_count": 1,
+        }
     ]
 
 
@@ -1811,7 +1993,7 @@ async def test_check_serial_for_updates_finds_new_chapters(db_session, serial):
         ChapterInfo(
             chapter_number=i,
             title=f"Chapter {i}",
-            source_url=f"https://example.com/{i}",
+            source_url=f"https://royalroad.com/ch/{i}",
             publish_date=None,
         )
         for i in range(1, 6)  # 5 chapters total, serial has 3
@@ -1837,7 +2019,7 @@ async def test_check_serial_for_updates_no_new(db_session, serial):
         ChapterInfo(
             chapter_number=i,
             title=f"Chapter {i}",
-            source_url=f"https://example.com/{i}",
+            source_url=f"https://royalroad.com/ch/{i}",
             publish_date=None,
         )
         for i in range(1, 4)

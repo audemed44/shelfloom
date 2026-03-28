@@ -43,7 +43,7 @@ from app.services.serial_service import (
     generate_volume,
     get_chapter_fetch_status,
     get_serial,
-    get_volume_word_counts,
+    get_volume_metrics,
     list_chapter_responses,
     list_serials,
     list_serials_for_dashboard,
@@ -66,15 +66,22 @@ router = APIRouter(tags=["serials"])
 WORDS_PER_PAGE = 280
 
 
-def _enrich_volumes(volumes: list[object], word_counts: dict[int, int]) -> list[VolumeResponse]:
-    """Build VolumeResponse list with estimated_pages and total_words."""
+def _enrich_volumes(volumes: list[object], metrics: dict[int, object]) -> list[VolumeResponse]:
+    """Build VolumeResponse list with derived volume metrics."""
     result: list[VolumeResponse] = []
     for v in volumes:
         resp = VolumeResponse.model_validate(v)
-        words = word_counts.get(resp.id)
-        if words is not None and words > 0:
-            resp.total_words = words
-            resp.estimated_pages = max(1, words // WORDS_PER_PAGE)
+        metric = metrics.get(resp.id)
+        if metric is not None:
+            total_words = int(getattr(metric, "total_words"))
+            resp.total_words = total_words
+            resp.estimated_pages = (
+                max(1, total_words // WORDS_PER_PAGE) if total_words > 0 else None
+            )
+            resp.chapter_count = int(getattr(metric, "chapter_count"))
+            resp.fetched_chapter_count = int(getattr(metric, "fetched_chapter_count"))
+            resp.is_partial = bool(getattr(metric, "is_partial"))
+            resp.stubbed_missing_count = int(getattr(metric, "stubbed_missing_count"))
         result.append(resp)
     return result
 
@@ -342,8 +349,8 @@ async def configure_volumes_endpoint(
     except Exception as exc:
         log.exception("Failed to configure volumes for serial %d", serial_id)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
-    word_counts = await get_volume_word_counts(session, serial_id)
-    return _enrich_volumes(volumes, word_counts)
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes(volumes, metrics)
 
 
 @router.post(
@@ -356,8 +363,8 @@ async def auto_split_volumes_endpoint(
         volumes = await auto_split_volumes(session, serial_id, body)
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    word_counts = await get_volume_word_counts(session, serial_id)
-    return _enrich_volumes(volumes, word_counts)
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes(volumes, metrics)
 
 
 @router.post("/serials/{serial_id}/volumes/add", response_model=VolumeResponse, status_code=201)
@@ -368,8 +375,8 @@ async def add_single_volume_endpoint(
         vol = await add_single_volume(session, serial_id, body)
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    word_counts = await get_volume_word_counts(session, serial_id)
-    return _enrich_volumes([vol], word_counts)[0]
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes([vol], metrics)[0]
 
 
 @router.get("/serials/{serial_id}/volumes", response_model=list[VolumeResponse])
@@ -378,8 +385,8 @@ async def list_volumes_endpoint(serial_id: int, session: AsyncSession = Depends(
         volumes = await list_volumes(session, serial_id)
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    word_counts = await get_volume_word_counts(session, serial_id)
-    return _enrich_volumes(volumes, word_counts)
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes(volumes, metrics)
 
 
 @router.patch("/serials/{serial_id}/volumes/{volume_id}", response_model=VolumeResponse)
@@ -393,8 +400,8 @@ async def update_volume_endpoint(
         vol = await update_volume(session, serial_id, volume_id, body)
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    word_counts = await get_volume_word_counts(session, serial_id)
-    return _enrich_volumes([vol], word_counts)[0]
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes([vol], metrics)[0]
 
 
 @router.delete("/serials/{serial_id}/volumes/{volume_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -426,8 +433,8 @@ async def upload_volume_cover_endpoint(
         vol = await upload_volume_cover(session, serial_id, volume_id, content, suffix)
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    word_counts = await get_volume_word_counts(session, serial_id)
-    return _enrich_volumes([vol], word_counts)[0]
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes([vol], metrics)[0]
 
 
 @router.post("/serials/{serial_id}/volumes/{volume_id}/generate", response_model=VolumeResponse)
@@ -447,8 +454,8 @@ async def generate_volume_endpoint(
     except Exception as exc:
         log.exception("Unexpected error generating volume %d for serial %d", volume_id, serial_id)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
-    word_counts = await get_volume_word_counts(session, serial_id)
-    return _enrich_volumes([vol], word_counts)[0]
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes([vol], metrics)[0]
 
 
 @router.post("/serials/{serial_id}/volumes/generate-all", response_model=list[VolumeResponse])
@@ -461,8 +468,8 @@ async def generate_all_volumes_endpoint(
         volumes = await generate_all_volumes(session, serial_id, shelf_id)
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    word_counts = await get_volume_word_counts(session, serial_id)
-    return _enrich_volumes(volumes, word_counts)
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes(volumes, metrics)
 
 
 @router.post("/serials/{serial_id}/volumes/{volume_id}/rebuild", response_model=VolumeResponse)
@@ -477,5 +484,5 @@ async def rebuild_volume_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except VolumeGenerationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
-    word_counts = await get_volume_word_counts(session, serial_id)
-    return _enrich_volumes([vol], word_counts)[0]
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes([vol], metrics)[0]

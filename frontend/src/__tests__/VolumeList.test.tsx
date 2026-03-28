@@ -39,6 +39,7 @@ describe('VolumeList', () => {
               total_words: 560,
               estimated_pages: 2,
               is_partial: true,
+              stubbed_missing_count: 1,
             },
           ],
         }) as Promise<Response>
@@ -79,6 +80,7 @@ describe('VolumeList', () => {
     expect(screen.getByText('~2* pages')).toBeInTheDocument()
     expect(screen.getByText('560 words')).toBeInTheDocument()
     expect(screen.getByText('2/3 fetched')).toBeInTheDocument()
+    expect(screen.getByText('1 stubbed missing')).toBeInTheDocument()
     expect(previewRequests[previewRequests.length - 1]).toEqual({
       splits: [{ start: 1, end: 3 }],
     })

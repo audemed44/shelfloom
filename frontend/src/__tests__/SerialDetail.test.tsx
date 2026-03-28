@@ -16,6 +16,8 @@ const SERIAL: WebSerial = {
   cover_url: 'https://example.com/cover.jpg',
   status: 'ongoing',
   total_chapters: 50,
+  live_chapter_count: 50,
+  stubbed_chapter_count: 0,
   last_checked_at: null,
   last_error: null,
   created_at: '2026-01-01T00:00:00',

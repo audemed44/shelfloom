@@ -17,6 +17,8 @@ function makeChapter(
     chapter_number: chapterNumber,
     title: `Chapter ${chapterNumber}`,
     source_url: `https://example.com/ch/${chapterNumber}`,
+    is_stubbed: false,
+    stubbed_at: null,
     publish_date: null,
     word_count: null,
     estimated_pages: null,
