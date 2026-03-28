@@ -158,44 +158,49 @@ export default function LensDetail() {
 
       {/* View controls */}
       <div className="flex justify-end mb-4">
-        <div className="flex border border-white/10" data-testid="view-toggle">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => {
               setGroupBySeries((prev) => !prev)
               setPage(1)
             }}
-            className={`p-2.5 border-r border-white/10 transition-colors ${
+            className={`border p-2.5 transition-colors ${
               groupBySeries
                 ? 'bg-primary text-white'
-                : 'text-white/40 hover:text-white hover:bg-white/5'
+                : 'border-white/10 text-white/40 hover:bg-white/5 hover:text-white'
             }`}
             aria-label="Group by series"
             data-testid="group-by-series-toggle"
           >
             <Layers size={16} />
           </button>
-          <button
-            onClick={() => setView('grid')}
-            className={`p-2.5 transition-colors ${
-              view === 'grid'
-                ? 'bg-primary text-white'
-                : 'text-white/40 hover:text-white hover:bg-white/5'
-            }`}
-            aria-label="Grid view"
+          <div
+            className="flex border border-white/10"
+            data-testid="view-toggle"
           >
-            <LayoutGrid size={16} />
-          </button>
-          <button
-            onClick={() => setView('list')}
-            className={`p-2.5 transition-colors ${
-              view === 'list'
-                ? 'bg-primary text-white'
-                : 'text-white/40 hover:text-white hover:bg-white/5'
-            }`}
-            aria-label="List view"
-          >
-            <LayoutList size={16} />
-          </button>
+            <button
+              onClick={() => setView('grid')}
+              className={`p-2.5 transition-colors ${
+                view === 'grid'
+                  ? 'bg-primary text-white'
+                  : 'text-white/40 hover:text-white hover:bg-white/5'
+              }`}
+              aria-label="Grid view"
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              onClick={() => setView('list')}
+              className={`p-2.5 transition-colors ${
+                view === 'list'
+                  ? 'bg-primary text-white'
+                  : 'text-white/40 hover:text-white hover:bg-white/5'
+              }`}
+              aria-label="List view"
+            >
+              <LayoutList size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
