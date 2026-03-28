@@ -16,6 +16,12 @@
     @apply bg-black text-white font-sans uppercase;
   }
 
+  body,
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
   html.light {
     color-scheme: light;
     @apply bg-gray-50 text-zinc-900;
@@ -26,6 +32,16 @@
   textarea,
   [data-normal-case] {
     text-transform: none;
+  }
+}
+
+@layer utilities {
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pb-safe-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
   }
 }
 
