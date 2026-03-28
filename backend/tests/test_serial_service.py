@@ -1899,7 +1899,16 @@ async def test_list_serials_for_dashboard(db_session, serial):
     entry = entries[0]
     assert entry.id == serial.id
     assert entry.total_chapters == 3
+    assert entry.fetched_count == 0  # no content fetched yet
     assert entry.latest_chapter_title == "Chapter 3"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_fetched_count_with_content(db_session, serial_with_content):
+    """fetched_count should reflect chapters that have content."""
+    entries = await list_serials_for_dashboard(db_session)
+    assert len(entries) == 1
+    assert entries[0].fetched_count == 3  # all 3 chapters have content
 
 
 @pytest.mark.asyncio
@@ -1928,6 +1937,7 @@ async def test_api_serials_dashboard(client, serial):
     assert len(data) == 1
     assert data[0]["id"] == serial.id
     assert data[0]["total_chapters"] == 3
+    assert data[0]["fetched_count"] == 0
     assert "new_chapter_count" in data[0]
 
 

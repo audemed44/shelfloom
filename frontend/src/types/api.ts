@@ -369,6 +369,7 @@ export interface SerialDashboardEntry {
   cover_path: string | null
   status: string
   total_chapters: number
+  fetched_count: number
   new_chapter_count: number
   latest_chapter_title: string | null
   latest_chapter_date: string | null
