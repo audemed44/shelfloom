@@ -14,6 +14,8 @@ from app.schemas.serial import (
     ChapterFetchRequest,
     ChapterFetchStatusResponse,
     ChapterResponse,
+    PendingChapterBatchStatusResponse,
+    PendingChapterFetchResponse,
     SerialCreate,
     SerialDashboardResponse,
     SerialResponse,
@@ -27,6 +29,8 @@ from app.schemas.serial import (
 from app.scrapers.registry import get_adapter, list_adapter_names
 from app.services.serial_service import (
     ChapterFetchAlreadyRunning,
+    ChapterFetchBatchBusy,
+    PendingChapterBatchAlreadyRunning,
     ScrapingError,
     SerialAlreadyExists,
     SerialNotFound,
@@ -39,9 +43,11 @@ from app.services.serial_service import (
     configure_volumes,
     delete_serial,
     delete_volume,
+    fetch_pending_chapters,
     generate_all_volumes,
     generate_volume,
     get_chapter_fetch_status,
+    get_pending_chapter_batch_status,
     get_serial,
     get_volume_metrics,
     list_chapter_responses,
@@ -52,6 +58,7 @@ from app.services.serial_service import (
     rebuild_volume,
     refresh_serial_cover,
     start_chapter_fetch_job,
+    start_pending_chapter_batch,
     update_from_source,
     update_serial,
     update_volume,
@@ -123,6 +130,31 @@ async def list_serials_endpoint(session: AsyncSession = Depends(get_session)):
 async def serials_dashboard_endpoint(session: AsyncSession = Depends(get_session)):
     entries = await list_serials_for_dashboard(session)
     return [SerialDashboardResponse(**entry.__dict__) for entry in entries]
+
+
+@router.get(
+    "/serials/fetch-pending-status",
+    response_model=PendingChapterBatchStatusResponse,
+)
+async def fetch_pending_status_endpoint():
+    return await get_pending_chapter_batch_status()
+
+
+@router.post(
+    "/serials/fetch-pending",
+    response_model=PendingChapterBatchStatusResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def fetch_all_pending_endpoint(request: Request):
+    session_factory = getattr(
+        request.app.state,
+        "serial_fetch_session_factory",
+        get_session_factory(),
+    )
+    try:
+        return await start_pending_chapter_batch(session_factory)
+    except PendingChapterBatchAlreadyRunning as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 
 
 @router.post("/serials/check-updates")
@@ -282,11 +314,40 @@ async def fetch_chapters_endpoint(
         )
     except ChapterFetchAlreadyRunning as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ChapterFetchBatchBusy as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except ScrapingError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     return job
+
+
+@router.post(
+    "/serials/{serial_id}/chapters/fetch-pending",
+    response_model=PendingChapterFetchResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def fetch_pending_chapters_endpoint(
+    serial_id: int,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    try:
+        session_factory = getattr(
+            request.app.state,
+            "serial_fetch_session_factory",
+            get_session_factory(),
+        )
+        return await fetch_pending_chapters(session, session_factory, serial_id)
+    except ChapterFetchAlreadyRunning as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ChapterFetchBatchBusy as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except SerialNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ScrapingError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
 
 
 @router.get(

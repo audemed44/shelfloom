@@ -52,6 +52,7 @@ class SerialDashboardResponse(BaseModel):
     latest_chapter_title: str | None
     latest_chapter_date: datetime | None
     last_checked_at: datetime | None
+    fetch_state: str = "idle"
 
 
 class ChapterResponse(BaseModel):
@@ -140,6 +141,28 @@ class ChapterFetchStatusResponse(BaseModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
     logs: list[ChapterFetchLogEntry] = Field(default_factory=list)
+    error: str | None = None
+
+
+class PendingChapterFetchResponse(BaseModel):
+    status: str
+    new_chapters: int
+    pending_count: int
+    job: ChapterFetchJobResponse | None = None
+
+
+class PendingChapterBatchStatusResponse(BaseModel):
+    state: str
+    total_serials: int = 0
+    processed_serials: int = 0
+    current_serial_id: int | None = None
+    started: int = 0
+    already_running: int = 0
+    noop: int = 0
+    failed: int = 0
+    new_chapters: int = 0
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
     error: str | None = None
 
 

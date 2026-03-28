@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,6 +23,8 @@ from app.schemas.serial import (
     ChapterFetchLogEntry,
     ChapterFetchStatusResponse,
     ChapterResponse,
+    PendingChapterBatchStatusResponse,
+    PendingChapterFetchResponse,
     SerialCreate,
     SerialUpdate,
     SingleVolumeCreate,
@@ -61,6 +64,14 @@ class ChapterFetchAlreadyRunning(Exception):
     pass
 
 
+class PendingChapterBatchAlreadyRunning(Exception):
+    pass
+
+
+class ChapterFetchBatchBusy(Exception):
+    pass
+
+
 _FETCH_JOB_LOG_LIMIT = 100
 _FETCH_JOB_RETENTION_SECONDS = 300
 _WORDS_PER_PAGE = 280
@@ -72,6 +83,7 @@ class _ChapterFetchJob:
     start: int
     end: int
     total: int
+    chapter_numbers: tuple[int, ...] | None = None
     state: str = "running"
     processed: int = 0
     fetched: int = 0
@@ -218,6 +230,43 @@ class _ChapterFetchProgressReporter:
             self.job.current_chapter_number = None
             self.job.current_chapter_title = None
         await self._append_log("error", error)
+
+
+@dataclass
+class _PendingChapterBatchJob:
+    total_serials: int
+    state: str = "running"
+    processed_serials: int = 0
+    current_serial_id: int | None = None
+    started: int = 0
+    already_running: int = 0
+    noop: int = 0
+    failed: int = 0
+    new_chapters: int = 0
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    finished_at: datetime | None = None
+    error: str | None = None
+    task: asyncio.Task[None] | None = field(default=None, repr=False)
+
+    def to_status_response(self) -> PendingChapterBatchStatusResponse:
+        return PendingChapterBatchStatusResponse(
+            state=self.state,
+            total_serials=self.total_serials,
+            processed_serials=self.processed_serials,
+            current_serial_id=self.current_serial_id,
+            started=self.started,
+            already_running=self.already_running,
+            noop=self.noop,
+            failed=self.failed,
+            new_chapters=self.new_chapters,
+            started_at=self.started_at,
+            finished_at=self.finished_at,
+            error=self.error,
+        )
+
+
+_pending_chapter_batch_job: _PendingChapterBatchJob | None = None
+_pending_chapter_batch_job_lock = asyncio.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -518,6 +567,7 @@ async def start_chapter_fetch_job(
     start: int,
     end: int,
 ) -> ChapterFetchJobResponse:
+    await _ensure_no_conflicting_pending_batch(serial_id)
     serial = await get_serial(session, serial_id)
     adapter = get_adapter_by_name(serial.source)
     if adapter is None:
@@ -533,6 +583,28 @@ async def start_chapter_fetch_job(
         )
     )
 
+    job = await _schedule_chapter_fetch_job(
+        session_factory,
+        serial_id=serial_id,
+        start=start,
+        end=end,
+        total=int(total or 0),
+        chapter_numbers=None,
+    )
+    return job.to_job_response()
+
+
+async def _schedule_chapter_fetch_job(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    serial_id: int,
+    start: int,
+    end: int,
+    total: int,
+    chapter_numbers: Sequence[int] | None,
+) -> _ChapterFetchJob:
+    normalized_numbers = tuple(chapter_numbers) if chapter_numbers is not None else None
+
     async with _chapter_fetch_jobs_lock:
         existing = _chapter_fetch_jobs.get(serial_id)
         if existing is not None and _job_snapshot_expired(existing):
@@ -547,12 +619,13 @@ async def start_chapter_fetch_job(
             serial_id=serial_id,
             start=start,
             end=end,
-            total=int(total or 0),
+            total=total,
+            chapter_numbers=normalized_numbers,
         )
         _chapter_fetch_jobs[serial_id] = job
 
     job.task = asyncio.create_task(_run_chapter_fetch_job(session_factory, job))
-    return job.to_job_response()
+    return job
 
 
 async def get_chapter_fetch_status(
@@ -571,6 +644,50 @@ async def get_chapter_fetch_status(
         return job.to_status_response()
 
 
+async def get_serial_fetch_state(serial_id: int) -> str:
+    async with _chapter_fetch_jobs_lock:
+        job = _chapter_fetch_jobs.get(serial_id)
+        if job is not None and _job_snapshot_expired(job):
+            del _chapter_fetch_jobs[serial_id]
+            job = None
+        if job is None:
+            return "idle"
+        return job.state
+
+
+async def fetch_pending_chapters(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    serial_id: int,
+) -> PendingChapterFetchResponse:
+    await _ensure_no_conflicting_pending_batch(serial_id)
+    await _ensure_no_running_chapter_fetch_job(serial_id)
+    result = await update_from_source(session, serial_id)
+    pending_numbers = await _list_pending_chapter_numbers(session, serial_id)
+    if not pending_numbers:
+        return PendingChapterFetchResponse(
+            status="noop",
+            new_chapters=result["new_chapters"],
+            pending_count=0,
+            job=None,
+        )
+
+    job = await _schedule_chapter_fetch_job(
+        session_factory,
+        serial_id=serial_id,
+        start=min(pending_numbers),
+        end=max(pending_numbers),
+        total=len(pending_numbers),
+        chapter_numbers=pending_numbers,
+    )
+    return PendingChapterFetchResponse(
+        status="started",
+        new_chapters=result["new_chapters"],
+        pending_count=len(pending_numbers),
+        job=job.to_job_response(),
+    )
+
+
 async def _run_chapter_fetch_job(
     session_factory: async_sessionmaker[AsyncSession],
     job: _ChapterFetchJob,
@@ -584,6 +701,7 @@ async def _run_chapter_fetch_job(
                 job.start,
                 job.end,
                 progress=reporter,
+                chapter_numbers=job.chapter_numbers,
             )
         await reporter.mark_completed()
     except Exception as exc:
@@ -597,21 +715,23 @@ async def fetch_chapters_content(
     start: int,
     end: int,
     progress: _ChapterFetchProgressReporter | None = None,
+    chapter_numbers: Sequence[int] | None = None,
 ) -> list[SerialChapter]:
     serial = await get_serial(session, serial_id)
     adapter = get_adapter_by_name(serial.source)
     if adapter is None:
         raise ScrapingError(f"No adapter named {serial.source!r} for serial URL: {serial.url!r}")
 
-    result = await session.execute(
-        select(SerialChapter)
-        .where(
-            SerialChapter.serial_id == serial_id,
+    chapter_query = select(SerialChapter).where(SerialChapter.serial_id == serial_id)
+    if chapter_numbers is None:
+        chapter_query = chapter_query.where(
             SerialChapter.chapter_number >= start,
             SerialChapter.chapter_number <= end,
         )
-        .order_by(SerialChapter.chapter_number)
-    )
+    else:
+        chapter_query = chapter_query.where(SerialChapter.chapter_number.in_(list(chapter_numbers)))
+
+    result = await session.execute(chapter_query.order_by(SerialChapter.chapter_number))
     chapters = list(result.scalars().all())
 
     fetched: list[SerialChapter] = []
@@ -1195,10 +1315,18 @@ def _estimate_pages(word_count: int | None) -> int | None:
 
 
 def reset_chapter_fetch_jobs() -> None:
+    global _pending_chapter_batch_job
     for job in _chapter_fetch_jobs.values():
         if job.task is not None and not job.task.done():
             job.task.cancel()
     _chapter_fetch_jobs.clear()
+    if _pending_chapter_batch_job is not None:
+        if (
+            _pending_chapter_batch_job.task is not None
+            and not _pending_chapter_batch_job.task.done()
+        ):
+            _pending_chapter_batch_job.task.cancel()
+        _pending_chapter_batch_job = None
 
 
 def _job_snapshot_expired(job: _ChapterFetchJob) -> bool:
@@ -1207,6 +1335,73 @@ def _job_snapshot_expired(job: _ChapterFetchJob) -> bool:
         and job.finished_at is not None
         and (datetime.now(UTC) - job.finished_at).total_seconds() > _FETCH_JOB_RETENTION_SECONDS
     )
+
+
+def _batch_snapshot_expired(job: _PendingChapterBatchJob) -> bool:
+    return (
+        job.state != "running"
+        and job.finished_at is not None
+        and (datetime.now(UTC) - job.finished_at).total_seconds() > _FETCH_JOB_RETENTION_SECONDS
+    )
+
+
+async def _get_pending_chapter_batch_job() -> _PendingChapterBatchJob | None:
+    global _pending_chapter_batch_job
+    async with _pending_chapter_batch_job_lock:
+        if _pending_chapter_batch_job is not None and _batch_snapshot_expired(
+            _pending_chapter_batch_job
+        ):
+            _pending_chapter_batch_job = None
+        return _pending_chapter_batch_job
+
+
+async def _ensure_no_conflicting_pending_batch(serial_id: int) -> None:
+    batch = await _get_pending_chapter_batch_job()
+    if batch is None or batch.state != "running":
+        return
+    if batch.current_serial_id == serial_id:
+        return
+    raise ChapterFetchBatchBusy("A pending chapter batch is already running")
+
+
+async def _get_eligible_dashboard_serial_ids(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> list[int]:
+    async with session_factory() as session:
+        result = await session.execute(
+            select(WebSerial.id)
+            .where(WebSerial.status.in_(["ongoing", "error"]))
+            .order_by(WebSerial.last_checked_at.desc().nullslast())
+        )
+        return list(result.scalars().all())
+
+
+async def _list_pending_chapter_numbers(
+    session: AsyncSession,
+    serial_id: int,
+) -> list[int]:
+    result = await session.execute(
+        select(SerialChapter.chapter_number)
+        .where(
+            SerialChapter.serial_id == serial_id,
+            SerialChapter.content.is_(None),
+            SerialChapter.is_stubbed.is_(False),
+        )
+        .order_by(SerialChapter.chapter_number)
+    )
+    return list(result.scalars().all())
+
+
+async def _ensure_no_running_chapter_fetch_job(serial_id: int) -> None:
+    async with _chapter_fetch_jobs_lock:
+        existing = _chapter_fetch_jobs.get(serial_id)
+        if existing is not None and _job_snapshot_expired(existing):
+            del _chapter_fetch_jobs[serial_id]
+            existing = None
+        if existing is not None and existing.state == "running":
+            raise ChapterFetchAlreadyRunning(
+                f"A chapter fetch is already running for serial {serial_id}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -1273,6 +1468,125 @@ async def check_all_serials_for_updates(
     return {"checked": len(serials), "new_chapters": total_new}
 
 
+async def start_pending_chapter_batch(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> PendingChapterBatchStatusResponse:
+    global _pending_chapter_batch_job
+
+    serial_ids = await _get_eligible_dashboard_serial_ids(session_factory)
+
+    async with _pending_chapter_batch_job_lock:
+        if _pending_chapter_batch_job is not None and _batch_snapshot_expired(
+            _pending_chapter_batch_job
+        ):
+            _pending_chapter_batch_job = None
+        if _pending_chapter_batch_job is not None and _pending_chapter_batch_job.state == "running":
+            raise PendingChapterBatchAlreadyRunning("A pending chapter batch is already running")
+
+        job = _PendingChapterBatchJob(total_serials=len(serial_ids))
+        _pending_chapter_batch_job = job
+
+    job.task = asyncio.create_task(_run_pending_chapter_batch(session_factory, job, serial_ids))
+    return job.to_status_response()
+
+
+async def get_pending_chapter_batch_status() -> PendingChapterBatchStatusResponse:
+    job = await _get_pending_chapter_batch_job()
+    if job is None:
+        return PendingChapterBatchStatusResponse(state="idle")
+    return job.to_status_response()
+
+
+async def _set_pending_batch_current_serial(
+    job: _PendingChapterBatchJob,
+    serial_id: int | None,
+) -> None:
+    async with _pending_chapter_batch_job_lock:
+        job.current_serial_id = serial_id
+
+
+async def _increment_pending_batch_counter(
+    job: _PendingChapterBatchJob,
+    *,
+    started: int = 0,
+    already_running: int = 0,
+    noop: int = 0,
+    failed: int = 0,
+    new_chapters: int = 0,
+    processed_serials: int = 0,
+) -> None:
+    async with _pending_chapter_batch_job_lock:
+        job.started += started
+        job.already_running += already_running
+        job.noop += noop
+        job.failed += failed
+        job.new_chapters += new_chapters
+        job.processed_serials += processed_serials
+
+
+async def _mark_pending_batch_completed(job: _PendingChapterBatchJob) -> None:
+    async with _pending_chapter_batch_job_lock:
+        job.state = "completed"
+        job.current_serial_id = None
+        job.finished_at = datetime.now(UTC)
+
+
+async def _mark_pending_batch_error(job: _PendingChapterBatchJob, error: str) -> None:
+    async with _pending_chapter_batch_job_lock:
+        job.state = "error"
+        job.error = error
+        job.current_serial_id = None
+        job.finished_at = datetime.now(UTC)
+
+
+async def _run_pending_chapter_batch(
+    session_factory: async_sessionmaker[AsyncSession],
+    job: _PendingChapterBatchJob,
+    serial_ids: list[int],
+) -> None:
+    try:
+        for serial_id in serial_ids:
+            await _set_pending_batch_current_serial(job, serial_id)
+            try:
+                async with session_factory() as session:
+                    result = await fetch_pending_chapters(session, session_factory, serial_id)
+            except ChapterFetchAlreadyRunning:
+                await _increment_pending_batch_counter(
+                    job,
+                    already_running=1,
+                    processed_serials=1,
+                )
+                continue
+            except Exception:
+                log.exception("Pending chapter batch failed for serial %d", serial_id)
+                await _increment_pending_batch_counter(job, failed=1, processed_serials=1)
+                continue
+
+            await _increment_pending_batch_counter(job, new_chapters=result.new_chapters)
+            if result.status == "noop":
+                await _increment_pending_batch_counter(job, noop=1, processed_serials=1)
+                continue
+
+            await _increment_pending_batch_counter(job, started=1)
+
+            running_job = None
+            async with _chapter_fetch_jobs_lock:
+                running_job = _chapter_fetch_jobs.get(serial_id)
+                if running_job is not None and _job_snapshot_expired(running_job):
+                    del _chapter_fetch_jobs[serial_id]
+                    running_job = None
+
+            if running_job is not None and running_job.task is not None:
+                await running_job.task
+
+            await _increment_pending_batch_counter(job, processed_serials=1)
+
+        await _mark_pending_batch_completed(job)
+    except Exception as exc:
+        log.exception("Pending chapter batch failed")
+        await _mark_pending_batch_error(job, str(exc))
+
+
 async def acknowledge_serial(session: AsyncSession, serial_id: int) -> None:
     """Mark a serial as viewed, clearing the 'new chapters' indicator."""
     serial = await session.scalar(select(WebSerial).where(WebSerial.id == serial_id))
@@ -1297,6 +1611,7 @@ class SerialDashboardEntry:
     latest_chapter_title: str | None
     latest_chapter_date: datetime | None
     last_checked_at: datetime | None
+    fetch_state: str
 
 
 async def list_serials_for_dashboard(
@@ -1364,6 +1679,7 @@ async def list_serials_for_dashboard(
                 latest_chapter_title=latest.title if latest else None,
                 latest_chapter_date=latest.publish_date if latest else None,
                 last_checked_at=serial.last_checked_at,
+                fetch_state=await get_serial_fetch_state(serial.id),
             )
         )
 

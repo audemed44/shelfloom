@@ -424,6 +424,7 @@ export default function SerialDetail() {
           serialId={displaySerial.id}
           totalChapters={displaySerial.total_chapters}
           volumes={volumes ?? []}
+          onRefresh={refresh}
         />
       </section>
 

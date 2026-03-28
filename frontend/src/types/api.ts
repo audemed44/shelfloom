@@ -378,6 +378,7 @@ export interface SerialDashboardEntry {
   latest_chapter_title: string | null
   latest_chapter_date: string | null
   last_checked_at: string | null
+  fetch_state: string
 }
 
 export interface SerialChapter {
@@ -429,6 +430,28 @@ export interface ChapterFetchStatusResponse {
   started_at: string | null
   finished_at: string | null
   logs: ChapterFetchLogEntry[]
+  error: string | null
+}
+
+export interface PendingChapterFetchResponse {
+  status: string
+  new_chapters: number
+  pending_count: number
+  job: ChapterFetchJobResponse | null
+}
+
+export interface PendingChapterBatchStatusResponse {
+  state: string
+  total_serials: number
+  processed_serials: number
+  current_serial_id: number | null
+  started: number
+  already_running: number
+  noop: number
+  failed: number
+  new_chapters: number
+  started_at: string | null
+  finished_at: string | null
   error: string | null
 }
 
