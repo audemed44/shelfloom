@@ -4,12 +4,12 @@ import BottomNav from './BottomNav'
 
 export default function Layout() {
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="flex min-h-screen min-h-dvh flex-col bg-black text-white">
       {/* Sidebar: hidden on mobile, icon-only on sm/md, full on lg+ */}
       <Sidebar />
 
       {/* Main content: full-width on mobile, offset by sidebar on sm+ */}
-      <main className="sm:ml-20 lg:ml-64 pb-20 sm:pb-0 min-h-screen">
+      <main className="min-h-screen min-h-dvh flex-1 pb-20 sm:ml-20 sm:pb-0 lg:ml-64">
         <Outlet />
       </main>
 
