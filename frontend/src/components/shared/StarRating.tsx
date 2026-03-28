@@ -58,6 +58,10 @@ export default function StarRating({
         type="button"
         className="relative inline-flex cursor-pointer"
         style={{ width: size, height: size }}
+        onMouseDown={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+        }}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect()
           const isLeftHalf = e.clientX - rect.left < rect.width / 2
@@ -66,6 +70,8 @@ export default function StarRating({
         }}
         onMouseLeave={() => setHoverValue(null)}
         onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
           const rect = e.currentTarget.getBoundingClientRect()
           const isLeftHalf = e.clientX - rect.left < rect.width / 2
           onChange(starIndex + (isLeftHalf ? 0.5 : 1))

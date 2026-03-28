@@ -246,7 +246,16 @@ describe('FilterDrawer', () => {
 
   it('shows Save as Lens button in footer', async () => {
     await renderDrawer()
+    expect(screen.getByTestId('filter-drawer-footer')).toBeInTheDocument()
     expect(screen.getByTestId('save-as-lens-btn')).toBeInTheDocument()
+  })
+
+  it('includes DNF in the status options', async () => {
+    const user = userEvent.setup()
+    await renderDrawer()
+
+    await user.click(screen.getByTestId('accordion-status'))
+    expect(screen.getByRole('radio', { name: /dnf/i })).toBeInTheDocument()
   })
 
   it('opens SaveLensModal when Save as Lens is clicked', async () => {
