@@ -7,13 +7,14 @@
     "dev": "bash dev.sh",
     "dev:win": "powershell.exe -ExecutionPolicy Bypass -File dev.ps1",
     "test": "npm run test:backend && npm run test:frontend",
-    "test:backend": "cd backend && .venv/Scripts/python -m pytest --cov=app --cov-fail-under=90",
+    "test:backend": "uv run --directory backend python -m pytest -n auto --dist loadfile --cov=app --cov-fail-under=90",
+    "test:backend:profile": "uv run --directory backend python -m pytest --durations=25 --durations-min=0.2",
     "test:frontend": "npm test -w frontend",
     "lint": "concurrently \"npm run lint:backend\" \"npm run lint:frontend\"",
-    "lint:backend": "cd backend && .venv/Scripts/python -m ruff check .",
+    "lint:backend": "uv run --directory backend python -m ruff check .",
     "lint:frontend": "npm run lint -w frontend",
     "format": "concurrently \"npm run format:backend\" \"npm run format:frontend\"",
-    "format:backend": "cd backend && .venv/Scripts/python -m ruff format app tests",
+    "format:backend": "uv run --directory backend python -m ruff format app tests",
     "format:frontend": "npm run format -w frontend"
   },
   "devDependencies": {
