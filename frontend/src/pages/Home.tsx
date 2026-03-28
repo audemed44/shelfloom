@@ -1,6 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, BookOpen, Flame } from 'lucide-react'
+import { Clock, BookOpen, Flame, RefreshCw } from 'lucide-react'
+import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import { ReadingHeatmap } from '../components/ReadingHeatmap'
 import type { PaginatedResponse } from '../types'
@@ -217,13 +218,10 @@ function NewChaptersCard({ serial }: { serial: SerialDashboardEntry }) {
   return (
     <Link
       to={`/serials/${serial.id}`}
-      className="bg-white/5 border border-white/10 p-5 flex gap-4 items-start relative overflow-hidden hover:border-white/20 transition-colors group"
+      className="group block"
       data-testid="new-chapters-card"
     >
-      <div
-        className={`absolute top-0 left-0 w-1 h-full ${hasNew ? 'bg-primary' : 'bg-white/10'}`}
-      />
-      <div className="w-16 h-24 flex-shrink-0 bg-white/10 overflow-hidden">
+      <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
         <img
           src={`/api/serials/${serial.id}/cover`}
           alt={serial.title ?? 'Serial'}
@@ -232,28 +230,39 @@ function NewChaptersCard({ serial }: { serial: SerialDashboardEntry }) {
             e.currentTarget.style.display = 'none'
           }}
         />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <p
-            className={`text-[10px] font-black tracking-widest ${hasNew ? 'text-primary' : 'text-white/40'}`}
-          >
-            {hasNew ? `+${serial.new_chapter_count} New` : 'Up to Date'}
-          </p>
-        </div>
-        <h3 className="text-sm font-black tracking-tight text-white leading-snug truncate">
-          {serial.title}
-        </h3>
-        {serial.latest_chapter_title && (
-          <p className="text-white/50 text-xs mt-0.5 normal-case truncate">
-            {serial.latest_chapter_title}
-          </p>
+        {/* New chapters badge */}
+        {hasNew && (
+          <div className="absolute top-2 left-2">
+            <span className="bg-primary text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
+              +{serial.new_chapter_count} NEW
+            </span>
+          </div>
         )}
-        <div className="mt-3">
-          <span className="text-[10px] text-white/40 font-black">
-            {serial.total_chapters} Chapters
+        {/* Status badge */}
+        <div className="absolute top-2 right-2">
+          <span className="bg-black/70 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white/50">
+            {serial.status.toUpperCase()}
           </span>
         </div>
+        {/* Bottom badges: chapter count + fetched progress */}
+        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
+          <span className="bg-white/20 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
+            {serial.total_chapters} ch
+          </span>
+          <span className="bg-white/20 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
+            {serial.fetched_count}/{serial.total_chapters} fetched
+          </span>
+        </div>
+      </div>
+      <div className="mt-2 px-0.5">
+        <p className="text-sm font-black tracking-tighter leading-tight line-clamp-2">
+          {serial.title}
+        </p>
+        {serial.author && (
+          <p className="text-xs text-white/40 mt-0.5 normal-case truncate">
+            {serial.author}
+          </p>
+        )}
       </div>
     </Link>
   )
@@ -290,9 +299,24 @@ export default function Home() {
     '/api/stats/books-completed'
   )
 
+  const [serialRefreshKey, setSerialRefreshKey] = useState(0)
+  const [checkingUpdates, setCheckingUpdates] = useState(false)
+
   const { data: serialsDashboard } = useApi<SerialDashboardEntry[]>(
-    '/api/serials/dashboard'
+    `/api/serials/dashboard?_k=${serialRefreshKey}`
   )
+
+  const handleCheckUpdates = useCallback(async () => {
+    setCheckingUpdates(true)
+    try {
+      await api.post('/api/serials/check-updates')
+      setSerialRefreshKey((k) => k + 1)
+    } catch {
+      // ignore
+    } finally {
+      setCheckingUpdates(false)
+    }
+  }, [])
 
   const currentlyReading = (booksData?.items ?? []).slice(0, 3)
   const streak = overview?.current_streak_days ?? 0
@@ -339,10 +363,10 @@ export default function Home() {
             </div>
           ) : (
             <>
-              <h4 className="text-[10px] font-black tracking-widest text-white/40 mb-4">
+              <h4 className="text-sm font-black tracking-widest text-white mb-4">
                 Currently Reading
               </h4>
-              <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
                 {currentlyReading.map((book) => (
                   <CurrentlyReadingCard key={book.id} book={book} />
                 ))}
@@ -354,10 +378,23 @@ export default function Home() {
         {/* New Chapters */}
         {serialsDashboard && serialsDashboard.length > 0 && (
           <section className="col-span-12">
-            <h4 className="text-[10px] font-black tracking-widest text-white/40 mb-4">
-              Web Serials
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="flex items-center gap-3 mb-4">
+              <h4 className="text-sm font-black tracking-widest text-white">
+                Web Serials
+              </h4>
+              <button
+                onClick={handleCheckUpdates}
+                disabled={checkingUpdates}
+                className="text-white/40 hover:text-primary transition-colors disabled:opacity-50"
+                title="Check for new chapters"
+              >
+                <RefreshCw
+                  size={14}
+                  className={checkingUpdates ? 'animate-spin' : ''}
+                />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
               {serialsDashboard.slice(0, 3).map((serial) => (
                 <NewChaptersCard key={serial.id} serial={serial} />
               ))}

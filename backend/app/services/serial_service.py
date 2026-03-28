@@ -1194,6 +1194,7 @@ class SerialDashboardEntry:
     cover_path: str | None
     status: str
     total_chapters: int
+    fetched_count: int
     new_chapter_count: int
     latest_chapter_title: str | None
     latest_chapter_date: datetime | None
@@ -1221,6 +1222,19 @@ async def list_serials_for_dashboard(
             count_q = count_q.where(SerialChapter.publish_date > serial.last_viewed_at)
         new_count = await session.scalar(count_q) or 0
 
+        # Count fetched chapters (content is not null)
+        fetched = (
+            await session.scalar(
+                select(sa_func.count())
+                .select_from(SerialChapter)
+                .where(
+                    SerialChapter.serial_id == serial.id,
+                    SerialChapter.content.isnot(None),
+                )
+            )
+            or 0
+        )
+
         # Get latest chapter
         latest = await session.scalar(
             select(SerialChapter)
@@ -1237,6 +1251,7 @@ async def list_serials_for_dashboard(
                 cover_path=serial.cover_path,
                 status=serial.status,
                 total_chapters=serial.total_chapters,
+                fetched_count=fetched,
                 new_chapter_count=new_count,
                 latest_chapter_title=latest.title if latest else None,
                 latest_chapter_date=latest.publish_date if latest else None,
