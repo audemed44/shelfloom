@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -113,7 +113,7 @@ async def serial_with_content(db_session, serial):
     for ch in result.scalars().all():
         ch.content = f"<p>Content of chapter {ch.chapter_number}</p>"
         ch.word_count = 5
-        ch.fetched_at = datetime.utcnow()
+        ch.fetched_at = datetime.now(UTC)
     await db_session.commit()
     return serial
 
@@ -370,7 +370,7 @@ async def test_fetch_chapters_marks_volumes_stale(db_session, serial_with_conten
         volume_number=1,
         chapter_start=1,
         chapter_end=3,
-        generated_at=datetime.utcnow(),
+        generated_at=datetime.now(UTC),
     )
     db_session.add(vol)
     await db_session.commit()
@@ -795,7 +795,7 @@ async def test_update_from_source_marks_volumes_stale(db_session, serial):
         volume_number=1,
         chapter_start=1,
         chapter_end=10,
-        generated_at=datetime.utcnow(),
+        generated_at=datetime.now(UTC),
     )
     db_session.add(vol)
     await db_session.commit()
@@ -1517,11 +1517,11 @@ async def test_api_chapters_include_running_page_estimates(client, db_session, s
 
     chapters[0].content = "<p>Chapter 1</p>"
     chapters[0].word_count = 280
-    chapters[0].fetched_at = datetime.utcnow()
+    chapters[0].fetched_at = datetime.now(UTC)
     chapters[1].word_count = None
     chapters[2].content = "<p>Chapter 3</p>"
     chapters[2].word_count = 560
-    chapters[2].fetched_at = datetime.utcnow()
+    chapters[2].fetched_at = datetime.now(UTC)
     await db_session.commit()
 
     resp = await client.get(f"/api/serials/{serial.id}/chapters?offset=1&limit=2")
@@ -1554,11 +1554,11 @@ async def test_api_volume_preview_reports_partial_estimates(client, db_session, 
     chapters = list(result.scalars().all())
     chapters[0].word_count = 280
     chapters[0].content = "<p>Chapter 1</p>"
-    chapters[0].fetched_at = datetime.utcnow()
+    chapters[0].fetched_at = datetime.now(UTC)
     chapters[1].word_count = None
     chapters[2].word_count = 560
     chapters[2].content = "<p>Chapter 3</p>"
-    chapters[2].fetched_at = datetime.utcnow()
+    chapters[2].fetched_at = datetime.now(UTC)
     await db_session.commit()
 
     resp = await client.post(
