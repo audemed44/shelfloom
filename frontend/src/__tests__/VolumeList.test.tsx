@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import VolumeList from '../components/serials/VolumeList'
+import { TestMemoryRouter } from '../test-utils/router'
 
 describe('VolumeList', () => {
   let fetchSpy: { mockRestore: () => void }
@@ -59,7 +59,7 @@ describe('VolumeList', () => {
 
   it('renders preview estimates for valid custom ranges', async () => {
     render(
-      <MemoryRouter>
+      <TestMemoryRouter>
         <VolumeList
           serialId={1}
           volumes={[]}
@@ -67,7 +67,7 @@ describe('VolumeList', () => {
           shelves={[]}
           onRefresh={vi.fn()}
         />
-      </MemoryRouter>
+      </TestMemoryRouter>
     )
 
     fireEvent.change(screen.getByPlaceholderText('End'), {

@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 import SetupWizard from '../components/SetupWizard'
+import { TestMemoryRouter } from '../test-utils/router'
 
 // ── mocks ──────────────────────────────────────────────────────────────────────
 
@@ -92,9 +92,9 @@ function mockFetch(
 
 function renderWizard(onComplete = vi.fn()) {
   return render(
-    <MemoryRouter>
+    <TestMemoryRouter>
       <SetupWizard onComplete={onComplete} />
-    </MemoryRouter>
+    </TestMemoryRouter>
   )
 }
 

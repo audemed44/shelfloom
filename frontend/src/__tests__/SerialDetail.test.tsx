@@ -156,7 +156,9 @@ describe('SerialDetail', () => {
       },
     })
     renderDetail()
-    await waitFor(() => screen.getByRole('heading', { level: 1 }))
+    await waitFor(() =>
+      expect(screen.getByAltText('Test Story')).toBeInTheDocument()
+    )
     const cover = screen.getByAltText('Test Story')
     expect(cover.getAttribute('src')).toBe(
       'https://example.com/remote-cover.jpg'
