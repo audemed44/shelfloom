@@ -5,6 +5,7 @@ import {
   Search,
   LayoutGrid,
   LayoutList,
+  X,
   ChevronLeft,
   ChevronRight,
   BookOpen,
@@ -752,29 +753,40 @@ export default function Library() {
       )}
 
       {quickRateToast && (
-        <div className="fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-black/95 p-4 shadow-2xl">
-          <p className="text-[10px] font-black tracking-widest uppercase text-primary">
+        <div
+          className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 border border-white/10 bg-black/95 p-4 shadow-2xl sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[24rem]"
+          data-testid="quick-rate-toast"
+        >
+          <button
+            type="button"
+            onClick={() => setQuickRateToast(null)}
+            className="absolute right-3 top-3 flex size-7 items-center justify-center border border-white/10 text-white/40 transition-colors hover:border-white/30 hover:text-white"
+            aria-label="Dismiss rating toast"
+          >
+            <X size={14} />
+          </button>
+          <p className="pr-10 text-[10px] font-black tracking-widest uppercase text-primary">
             Rated {quickRateToast.rating.toFixed(1)} Stars
           </p>
-          <p className="mt-2 text-sm text-white/70 normal-case line-clamp-2">
+          <p className="mt-2 pr-10 text-sm text-white/70 normal-case line-clamp-2">
             {quickRateToast.title}
           </p>
-          <div className="mt-4 flex items-center justify-end gap-3">
-            <button
-              onClick={() => setQuickRateToast(null)}
-              className="text-[10px] font-black tracking-widest uppercase text-white/40 hover:text-white transition-colors"
-            >
-              Dismiss
-            </button>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
             <button
               onClick={() => {
                 const bookId = quickRateToast.bookId
                 setQuickRateToast(null)
                 navigate(`/books/${bookId}`, { state: { openVerdict: true } })
               }}
-              className="text-[10px] font-black tracking-widest uppercase text-primary hover:underline"
+              className="flex w-full items-center justify-center border border-primary bg-primary px-4 py-2.5 text-[10px] font-black tracking-widest uppercase text-white transition-colors hover:bg-primary/90 sm:w-auto"
             >
               Add Note
+            </button>
+            <button
+              onClick={() => setQuickRateToast(null)}
+              className="flex w-full items-center justify-center border border-white/10 px-4 py-2.5 text-[10px] font-black tracking-widest uppercase text-white/40 transition-colors hover:text-white hover:border-white/30 sm:w-auto"
+            >
+              Dismiss
             </button>
           </div>
         </div>
