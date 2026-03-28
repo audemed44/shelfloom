@@ -15,6 +15,7 @@ from app.schemas.serial import (
     ChapterFetchStatusResponse,
     ChapterResponse,
     SerialCreate,
+    SerialDashboardResponse,
     SerialResponse,
     SerialUpdate,
     SingleVolumeCreate,
@@ -30,9 +31,11 @@ from app.services.serial_service import (
     SerialAlreadyExists,
     SerialNotFound,
     VolumeGenerationError,
+    acknowledge_serial,
     add_serial,
     add_single_volume,
     auto_split_volumes,
+    check_all_serials_for_updates,
     configure_volumes,
     delete_serial,
     delete_volume,
@@ -43,6 +46,7 @@ from app.services.serial_service import (
     get_volume_word_counts,
     list_chapter_responses,
     list_serials,
+    list_serials_for_dashboard,
     list_volumes,
     preview_volume_ranges,
     rebuild_volume,
@@ -106,6 +110,23 @@ async def add_serial_endpoint(body: SerialCreate, session: AsyncSession = Depend
 async def list_serials_endpoint(session: AsyncSession = Depends(get_session)):
     items = await list_serials(session)
     return [SerialResponse.model_validate(s) for s in items]
+
+
+@router.get("/serials/dashboard", response_model=list[SerialDashboardResponse])
+async def serials_dashboard_endpoint(session: AsyncSession = Depends(get_session)):
+    entries = await list_serials_for_dashboard(session)
+    return [SerialDashboardResponse(**entry.__dict__) for entry in entries]
+
+
+@router.post("/serials/check-updates")
+async def check_serial_updates_endpoint(request: Request):
+    session_factory = getattr(
+        request.app.state,
+        "serial_fetch_session_factory",
+        get_session_factory(),
+    )
+    result = await check_all_serials_for_updates(session_factory)
+    return result
 
 
 @router.get("/serials/{serial_id}", response_model=SerialResponse)
@@ -192,6 +213,14 @@ async def delete_serial_endpoint(
 ):
     try:
         await delete_serial(session, serial_id, delete_files=delete_files)
+    except SerialNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.post("/serials/{serial_id}/acknowledge", status_code=status.HTTP_204_NO_CONTENT)
+async def acknowledge_serial_endpoint(serial_id: int, session: AsyncSession = Depends(get_session)):
+    try:
+        await acknowledge_serial(session, serial_id)
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 

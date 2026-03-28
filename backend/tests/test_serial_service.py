@@ -25,9 +25,11 @@ from app.services.serial_service import (
     SerialAlreadyExists,
     SerialNotFound,
     VolumeGenerationError,
+    acknowledge_serial,
     add_serial,
     add_single_volume,
     auto_split_volumes,
+    check_serial_for_updates,
     configure_volumes,
     delete_serial,
     delete_volume,
@@ -38,6 +40,7 @@ from app.services.serial_service import (
     get_volume_word_counts,
     list_chapters,
     list_serials,
+    list_serials_for_dashboard,
     list_volumes,
     rebuild_volume,
     refresh_serial_cover,
@@ -1792,3 +1795,163 @@ async def test_api_refresh_serial_cover_no_url(client, serial):
 async def test_api_refresh_serial_cover_not_found(client):
     resp = await client.post("/api/serials/99999/refresh-cover")
     assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# check_serial_for_updates
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_check_serial_for_updates_finds_new_chapters(db_session, serial):
+    """New chapters from the adapter should be inserted."""
+    from app.scrapers.base import ChapterInfo
+
+    new_chapters = [
+        ChapterInfo(
+            chapter_number=i,
+            title=f"Chapter {i}",
+            source_url=f"https://example.com/{i}",
+            publish_date=None,
+        )
+        for i in range(1, 6)  # 5 chapters total, serial has 3
+    ]
+    with patch("app.services.serial_service.get_adapter_by_name") as mock_get:
+        adapter = MagicMock()
+        adapter.fetch_chapter_list = AsyncMock(return_value=new_chapters)
+        mock_get.return_value = adapter
+
+        count = await check_serial_for_updates(db_session, serial)
+
+    assert count == 2  # chapters 4 and 5 are new
+    await db_session.refresh(serial)
+    assert serial.total_chapters == 5
+
+
+@pytest.mark.asyncio
+async def test_check_serial_for_updates_no_new(db_session, serial):
+    """When adapter returns same chapters, no new rows are created."""
+    from app.scrapers.base import ChapterInfo
+
+    same_chapters = [
+        ChapterInfo(
+            chapter_number=i,
+            title=f"Chapter {i}",
+            source_url=f"https://example.com/{i}",
+            publish_date=None,
+        )
+        for i in range(1, 4)
+    ]
+    with patch("app.services.serial_service.get_adapter_by_name") as mock_get:
+        adapter = MagicMock()
+        adapter.fetch_chapter_list = AsyncMock(return_value=same_chapters)
+        mock_get.return_value = adapter
+
+        count = await check_serial_for_updates(db_session, serial)
+
+    assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_check_serial_for_updates_scrape_error(db_session, serial):
+    """Scraping error should set error status, not raise."""
+    with patch("app.services.serial_service.get_adapter_by_name") as mock_get:
+        adapter = MagicMock()
+        adapter.fetch_chapter_list = AsyncMock(side_effect=Exception("network error"))
+        mock_get.return_value = adapter
+
+        count = await check_serial_for_updates(db_session, serial)
+
+    assert count == 0
+    await db_session.refresh(serial)
+    assert serial.status == "error"
+    assert "network error" in serial.last_error
+
+
+# ---------------------------------------------------------------------------
+# acknowledge_serial
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_acknowledge_serial(db_session, serial):
+    assert serial.last_viewed_at is None
+    await acknowledge_serial(db_session, serial.id)
+    await db_session.refresh(serial)
+    assert serial.last_viewed_at is not None
+
+
+@pytest.mark.asyncio
+async def test_acknowledge_serial_not_found(db_session):
+    with pytest.raises(SerialNotFound):
+        await acknowledge_serial(db_session, 99999)
+
+
+# ---------------------------------------------------------------------------
+# list_serials_for_dashboard
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_list_serials_for_dashboard(db_session, serial):
+    entries = await list_serials_for_dashboard(db_session)
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry.id == serial.id
+    assert entry.total_chapters == 3
+    assert entry.latest_chapter_title == "Chapter 3"
+
+
+@pytest.mark.asyncio
+async def test_dashboard_new_count_after_acknowledge(db_session, serial):
+    """After acknowledging, new_chapter_count should be 0 for existing chapters."""
+
+    # Acknowledge first
+    await acknowledge_serial(db_session, serial.id)
+    await db_session.refresh(serial)
+
+    entries = await list_serials_for_dashboard(db_session)
+    # Existing chapters have no publish_date, so they won't be > last_viewed_at
+    assert entries[0].new_chapter_count == 0
+
+
+# ---------------------------------------------------------------------------
+# API: dashboard, acknowledge, check-updates
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_api_serials_dashboard(client, serial):
+    resp = await client.get("/api/serials/dashboard")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["id"] == serial.id
+    assert data[0]["total_chapters"] == 3
+    assert "new_chapter_count" in data[0]
+
+
+@pytest.mark.asyncio
+async def test_api_acknowledge_serial(client, serial):
+    resp = await client.post(f"/api/serials/{serial.id}/acknowledge")
+    assert resp.status_code == 204
+
+
+@pytest.mark.asyncio
+async def test_api_acknowledge_serial_not_found(client):
+    resp = await client.post("/api/serials/99999/acknowledge")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_check_updates(client, serial):
+    with patch("app.services.serial_service.get_adapter_by_name") as mock_get:
+        adapter = MagicMock()
+        adapter.fetch_chapter_list = AsyncMock(return_value=[])
+        mock_get.return_value = adapter
+
+        resp = await client.post("/api/serials/check-updates")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "checked" in data
+    assert "new_chapters" in data

@@ -107,7 +107,7 @@ async def test_scheduler_loop_runs_scan_then_sleeps():
 
 async def test_scheduler_stop_cancels_loop():
     s = Scheduler()
-    settings = MagicMock(scan_interval=9999)
+    settings = MagicMock(scan_interval=9999, serial_check_interval=9999)
 
     # Start a loop that would sleep forever
     session = AsyncMock()

@@ -36,6 +36,19 @@ class SerialResponse(BaseModel):
     series_id: int | None
 
 
+class SerialDashboardResponse(BaseModel):
+    id: int
+    title: str | None
+    author: str | None
+    cover_path: str | None
+    status: str
+    total_chapters: int
+    new_chapter_count: int
+    latest_chapter_title: str | None
+    latest_chapter_date: datetime | None
+    last_checked_at: datetime | None
+
+
 class ChapterResponse(BaseModel):
     model_config = {"from_attributes": True}
     id: int
