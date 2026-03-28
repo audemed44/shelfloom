@@ -63,7 +63,10 @@ export default function SerialDetail() {
 
   useEffect(() => {
     setSerialOverride(serial ?? null)
-  }, [serial])
+    if (serial && serialId) {
+      api.post(`/api/serials/${serialId}/acknowledge`).catch(() => {})
+    }
+  }, [serial, serialId])
 
   useEffect(() => {
     if (!activeSerial) {

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     default_shelf_name: str = "Library"
     koreader_path: str = "/koreader"
     scan_interval: int = 300  # seconds
+    serial_check_interval: int = 86400  # seconds (default 24h)
     debug: bool = False
     log_level: str = "INFO"
 

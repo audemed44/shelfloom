@@ -362,6 +362,19 @@ export interface WebSerial {
   series_id: number | null
 }
 
+export interface SerialDashboardEntry {
+  id: number
+  title: string | null
+  author: string | null
+  cover_path: string | null
+  status: string
+  total_chapters: number
+  new_chapter_count: number
+  latest_chapter_title: string | null
+  latest_chapter_date: string | null
+  last_checked_at: string | null
+}
+
 export interface SerialChapter {
   id: number
   serial_id: number

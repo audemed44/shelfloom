@@ -1095,6 +1095,158 @@ def _job_snapshot_expired(job: _ChapterFetchJob) -> bool:
     )
 
 
+# ---------------------------------------------------------------------------
+# Serial update checking
+# ---------------------------------------------------------------------------
+
+
+async def check_serial_for_updates(session: AsyncSession, serial: WebSerial) -> int:
+    """Re-fetch chapter list for a serial and insert any new chapters.
+
+    Returns the number of new chapters found.
+    """
+    adapter = get_adapter_by_name(serial.source)
+    if adapter is None:
+        serial.status = "error"
+        serial.last_error = f"No adapter named {serial.source!r}"
+        serial.last_checked_at = datetime.utcnow()
+        await session.commit()
+        return 0
+
+    try:
+        remote_chapters = await adapter.fetch_chapter_list(serial.url)
+    except Exception as exc:
+        serial.status = "error"
+        serial.last_error = str(exc)
+        serial.last_checked_at = datetime.utcnow()
+        await session.commit()
+        log.warning("Failed to fetch chapter list for serial %d: %s", serial.id, exc)
+        return 0
+
+    # Get existing chapter numbers
+    result = await session.execute(
+        select(SerialChapter.chapter_number).where(SerialChapter.serial_id == serial.id)
+    )
+    existing_numbers = set(result.scalars().all())
+
+    new_count = 0
+    for ch in remote_chapters:
+        if ch.chapter_number not in existing_numbers:
+            session.add(
+                SerialChapter(
+                    serial_id=serial.id,
+                    chapter_number=ch.chapter_number,
+                    title=ch.title,
+                    source_url=ch.source_url,
+                    publish_date=ch.publish_date,
+                )
+            )
+            new_count += 1
+
+    serial.total_chapters = len(remote_chapters)
+    serial.last_checked_at = datetime.utcnow()
+    if serial.status == "error":
+        serial.status = "ongoing"
+        serial.last_error = None
+    await session.commit()
+
+    if new_count > 0:
+        log.info("Serial %d (%s): found %d new chapters", serial.id, serial.title, new_count)
+    return new_count
+
+
+async def check_all_serials_for_updates(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> dict[str, int]:
+    """Check all non-paused serials for new chapters.
+
+    Returns dict with 'checked' and 'new_chapters' counts.
+    """
+    async with session_factory() as session:
+        result = await session.execute(select(WebSerial).where(WebSerial.status == "ongoing"))
+        serials = list(result.scalars().all())
+
+    total_new = 0
+    for serial in serials:
+        async with session_factory() as session:
+            # Re-fetch to get attached instance
+            s = await session.scalar(select(WebSerial).where(WebSerial.id == serial.id))
+            if s is not None:
+                total_new += await check_serial_for_updates(session, s)
+
+    return {"checked": len(serials), "new_chapters": total_new}
+
+
+async def acknowledge_serial(session: AsyncSession, serial_id: int) -> None:
+    """Mark a serial as viewed, clearing the 'new chapters' indicator."""
+    serial = await session.scalar(select(WebSerial).where(WebSerial.id == serial_id))
+    if serial is None:
+        raise SerialNotFound(f"Serial {serial_id} not found")
+    serial.last_viewed_at = datetime.utcnow()
+    await session.commit()
+
+
+@dataclass
+class SerialDashboardEntry:
+    id: int
+    title: str | None
+    author: str | None
+    cover_path: str | None
+    status: str
+    total_chapters: int
+    new_chapter_count: int
+    latest_chapter_title: str | None
+    latest_chapter_date: datetime | None
+    last_checked_at: datetime | None
+
+
+async def list_serials_for_dashboard(
+    session: AsyncSession,
+) -> list[SerialDashboardEntry]:
+    """Return all serials with new-chapter counts for the dashboard widget."""
+    result = await session.execute(
+        select(WebSerial).order_by(WebSerial.last_checked_at.desc().nullslast())
+    )
+    serials = list(result.scalars().all())
+
+    entries: list[SerialDashboardEntry] = []
+    for serial in serials:
+        # Count new chapters (created after last_viewed_at, or all if never viewed)
+        count_q = (
+            select(sa_func.count())
+            .select_from(SerialChapter)
+            .where(SerialChapter.serial_id == serial.id)
+        )
+        if serial.last_viewed_at is not None:
+            count_q = count_q.where(SerialChapter.publish_date > serial.last_viewed_at)
+        new_count = await session.scalar(count_q) or 0
+
+        # Get latest chapter
+        latest = await session.scalar(
+            select(SerialChapter)
+            .where(SerialChapter.serial_id == serial.id)
+            .order_by(SerialChapter.chapter_number.desc())
+            .limit(1)
+        )
+
+        entries.append(
+            SerialDashboardEntry(
+                id=serial.id,
+                title=serial.title,
+                author=serial.author,
+                cover_path=serial.cover_path,
+                status=serial.status,
+                total_chapters=serial.total_chapters,
+                new_chapter_count=new_count,
+                latest_chapter_title=latest.title if latest else None,
+                latest_chapter_date=latest.publish_date if latest else None,
+                last_checked_at=serial.last_checked_at,
+            )
+        )
+
+    return entries
+
+
 async def _require_serial(session: AsyncSession, serial_id: int) -> None:
     exists = await session.scalar(select(WebSerial.id).where(WebSerial.id == serial_id))
     if exists is None:
