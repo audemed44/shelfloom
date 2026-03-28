@@ -260,12 +260,13 @@ describe('Library', () => {
     )
 
     const firstCard = screen.getAllByTestId('book-card')[0]
-    await user.click(within(firstCard).getByRole('button', { name: 'Rate' }))
     const ratingButtons = within(firstCard).getAllByLabelText('Rate 4 stars')
-    await user.click(ratingButtons[ratingButtons.length - 1])
+    await user.click(ratingButtons[0])
 
+    expect(screen.getByTestId('quick-rate-toast')).toBeInTheDocument()
     expect(await screen.findByText('Rated 4.0 Stars')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add Note' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument()
   })
 
   it('shows loading skeletons while fetching', () => {

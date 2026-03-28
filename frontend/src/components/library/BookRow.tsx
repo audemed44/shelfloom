@@ -35,7 +35,6 @@ export default function BookRow({
   const genres = book.genres ?? []
   const [rating, setRating] = useState<number | null>(book.rating)
   const [savingRating, setSavingRating] = useState(false)
-  const [mobileRateOpen, setMobileRateOpen] = useState(false)
 
   useEffect(() => {
     setRating(book.rating)
@@ -109,12 +108,20 @@ export default function BookRow({
           </p>
         )}
         <div className="flex items-center gap-2 mt-1">
-          {showRatings && rating != null ? (
+          {showRatings ? (
             <div className="flex items-center gap-1.5">
-              <StarRating value={rating} readOnly size={12} />
-              <span className="text-[10px] font-black tracking-widest text-white/35">
-                {rating.toFixed(1)}
-              </span>
+              <StarRating
+                value={rating}
+                onChange={
+                  !isSelecting ? (value) => void handleRate(value) : undefined
+                }
+                size={12}
+              />
+              {rating != null && (
+                <span className="text-[10px] font-black tracking-widest text-white/35">
+                  {rating.toFixed(1)}
+                </span>
+              )}
             </div>
           ) : null}
           {isDnf && (
@@ -126,6 +133,11 @@ export default function BookRow({
           {book.has_review && (
             <span className="text-[10px] font-black tracking-widest text-white/25">
               NOTE
+            </span>
+          )}
+          {savingRating && (
+            <span className="text-[9px] font-black tracking-widest text-white/25">
+              SAVING
             </span>
           )}
         </div>
@@ -193,33 +205,6 @@ export default function BookRow({
           </div>
         ) : null}
       </div>
-
-      {!isSelecting && showRatings && (
-        <div
-          className="hidden lg:flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-          }}
-        >
-          <span className="text-[9px] font-black tracking-widest uppercase text-white/25">
-            Quick Rate
-          </span>
-          <StarRating
-            value={rating}
-            onChange={(value) => void handleRate(value)}
-          />
-          {savingRating && (
-            <span className="text-[9px] font-black tracking-widest text-white/25">
-              Saving
-            </span>
-          )}
-        </div>
-      )}
     </>
   )
 
@@ -246,34 +231,6 @@ export default function BookRow({
       data-testid="book-row"
     >
       {rowContent}
-      {!isSelecting && showRatings && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            setMobileRateOpen((prev) => !prev)
-          }}
-          className="lg:hidden ml-auto text-[9px] font-black tracking-widest uppercase text-white/40 border border-white/10 px-2 py-1"
-        >
-          Rate
-        </button>
-      )}
-      {!isSelecting && showRatings && mobileRateOpen && (
-        <div
-          className="lg:hidden ml-2"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-          }}
-        >
-          <StarRating
-            value={rating}
-            onChange={(value) => void handleRate(value)}
-            size={16}
-          />
-        </div>
-      )}
     </Link>
   )
 }

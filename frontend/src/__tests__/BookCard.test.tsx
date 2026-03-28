@@ -111,10 +111,10 @@ describe('BookCard', () => {
 
   it('shows a DNF badge for dropped books', () => {
     renderCard({ ...BOOK, status: 'dnf' })
-    expect(screen.getAllByText('DNF').length).toBeGreaterThan(0)
+    expect(screen.getByTestId('book-card-dnf-badge')).toBeInTheDocument()
   })
 
-  it('submits a quick rating from the mobile control', async () => {
+  it('submits a quick rating from the inline stars', async () => {
     const user = userEvent.setup()
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
@@ -123,9 +123,8 @@ describe('BookCard', () => {
     } as Response)
 
     renderCard()
-    await user.click(screen.getByRole('button', { name: 'Rate' }))
     const ratingButtons = screen.getAllByLabelText('Rate 4 stars')
-    await user.click(ratingButtons[ratingButtons.length - 1])
+    await user.click(ratingButtons[0])
 
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/books/test-uuid-1',
