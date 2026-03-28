@@ -1204,9 +1204,11 @@ class SerialDashboardEntry:
 async def list_serials_for_dashboard(
     session: AsyncSession,
 ) -> list[SerialDashboardEntry]:
-    """Return all serials with new-chapter counts for the dashboard widget."""
+    """Return ongoing/error serials with new-chapter counts for the dashboard widget."""
     result = await session.execute(
-        select(WebSerial).order_by(WebSerial.last_checked_at.desc().nullslast())
+        select(WebSerial)
+        .where(WebSerial.status.in_(["ongoing", "error"]))
+        .order_by(WebSerial.last_checked_at.desc().nullslast())
     )
     serials = list(result.scalars().all())
 
