@@ -64,9 +64,15 @@ export default function SerialCard({ serial }: SerialCardProps) {
 
         {/* Chapter count */}
         <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
-          <span className="text-[9px] font-black tracking-widest text-white/60">
+          <span className="text-[9px] font-black tracking-widest text-white/60 block">
             {serial.total_chapters} ch
           </span>
+          {serial.stubbed_chapter_count > 0 && (
+            <span className="text-[8px] font-black tracking-widest text-amber-300/90 block mt-0.5">
+              {serial.live_chapter_count} live · {serial.stubbed_chapter_count}{' '}
+              stubbed
+            </span>
+          )}
         </div>
       </div>
 

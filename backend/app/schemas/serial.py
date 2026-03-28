@@ -30,6 +30,8 @@ class SerialResponse(BaseModel):
     cover_url: str | None
     status: str
     total_chapters: int
+    live_chapter_count: int
+    stubbed_chapter_count: int
     last_checked_at: datetime | None
     last_error: str | None
     created_at: datetime
@@ -43,6 +45,8 @@ class SerialDashboardResponse(BaseModel):
     cover_path: str | None
     status: str
     total_chapters: int
+    live_chapter_count: int
+    stubbed_chapter_count: int
     fetched_count: int
     new_chapter_count: int
     latest_chapter_title: str | None
@@ -57,6 +61,8 @@ class ChapterResponse(BaseModel):
     chapter_number: int
     title: str | None
     source_url: str
+    is_stubbed: bool = False
+    stubbed_at: datetime | None = None
     publish_date: datetime | None
     word_count: int | None
     estimated_pages: int | None = None
@@ -85,6 +91,8 @@ class ChapterResponse(BaseModel):
             chapter_number=obj.chapter_number,
             title=obj.title,
             source_url=obj.source_url,
+            is_stubbed=obj.is_stubbed,
+            stubbed_at=obj.stubbed_at,
             publish_date=obj.publish_date,
             word_count=obj.word_count,
             estimated_pages=estimated_pages,
@@ -171,6 +179,10 @@ class VolumeResponse(BaseModel):
     chapter_end: int
     generated_at: datetime | None
     is_stale: bool
+    chapter_count: int = 0
+    fetched_chapter_count: int = 0
+    is_partial: bool = False
+    stubbed_missing_count: int = 0
     estimated_pages: int | None = None
     total_words: int | None = None
 
@@ -184,3 +196,4 @@ class VolumePreviewResponse(BaseModel):
     total_words: int = 0
     estimated_pages: int | None = None
     is_partial: bool = False
+    stubbed_missing_count: int = 0

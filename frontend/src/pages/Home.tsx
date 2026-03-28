@@ -333,6 +333,11 @@ function NewChaptersCard({ serial }: { serial: SerialDashboardEntry }) {
           <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
             {serial.fetched_count}/{serial.total_chapters} fetched
           </span>
+          {serial.stubbed_chapter_count > 0 && (
+            <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-amber-300 normal-case leading-tight">
+              {serial.stubbed_chapter_count} stubbed
+            </span>
+          )}
         </div>
       </div>
       <div className="mt-2 px-0.5">

@@ -30,6 +30,7 @@ from app.schemas.serial import (
     VolumeRange,
     VolumeUpdate,
 )
+from app.scrapers.base import ChapterInfo, normalize_url
 from app.scrapers.registry import get_adapter, get_adapter_by_name
 
 log = logging.getLogger(__name__)
@@ -244,6 +245,103 @@ def _covers_dir() -> Path:
     return Path(get_settings().covers_dir)
 
 
+@dataclass(frozen=True)
+class VolumeMetrics:
+    total_words: int
+    fetched_chapter_count: int
+    chapter_count: int
+    is_partial: bool
+    stubbed_missing_count: int
+
+
+def _chapter_source_key(source_url: str) -> str:
+    return normalize_url(source_url)
+
+
+async def _mark_generated_volumes_stale(
+    session: AsyncSession, serial_id: int, changed_numbers: set[int]
+) -> None:
+    if not changed_numbers:
+        return
+
+    vol_result = await session.execute(
+        select(SerialVolume).where(
+            SerialVolume.serial_id == serial_id,
+            SerialVolume.generated_at.isnot(None),
+        )
+    )
+    for vol in vol_result.scalars().all():
+        if any(vol.chapter_start <= n <= vol.chapter_end for n in changed_numbers):
+            vol.is_stale = True
+
+
+async def _sync_remote_chapter_list(
+    session: AsyncSession,
+    serial: WebSerial,
+    remote_chapters: list[ChapterInfo],
+) -> tuple[int, set[int]]:
+    existing_result = await session.execute(
+        select(SerialChapter)
+        .where(SerialChapter.serial_id == serial.id)
+        .order_by(SerialChapter.chapter_number)
+    )
+    existing_chapters = list(existing_result.scalars().all())
+    existing_by_key = {chapter.source_key: chapter for chapter in existing_chapters}
+    next_number = max((chapter.chapter_number for chapter in existing_chapters), default=0) + 1
+
+    now = datetime.now(UTC)
+    seen_keys: set[str] = set()
+    changed_numbers: set[int] = set()
+    new_count = 0
+
+    for remote in remote_chapters:
+        source_key = _chapter_source_key(remote.source_url)
+        if source_key in seen_keys:
+            continue
+        seen_keys.add(source_key)
+
+        existing = existing_by_key.get(source_key)
+        if existing is None:
+            session.add(
+                SerialChapter(
+                    serial_id=serial.id,
+                    chapter_number=next_number,
+                    source_key=source_key,
+                    title=remote.title,
+                    source_url=remote.source_url,
+                    publish_date=remote.publish_date,
+                    is_stubbed=False,
+                )
+            )
+            changed_numbers.add(next_number)
+            next_number += 1
+            new_count += 1
+            continue
+
+        existing.title = remote.title
+        existing.source_url = remote.source_url
+        existing.publish_date = remote.publish_date
+        if existing.is_stubbed:
+            existing.is_stubbed = False
+            existing.stubbed_at = None
+            changed_numbers.add(existing.chapter_number)
+
+    live_chapter_count = 0
+    for chapter in existing_chapters:
+        if chapter.source_key in seen_keys:
+            live_chapter_count += 1
+            continue
+        if not chapter.is_stubbed:
+            chapter.is_stubbed = True
+            chapter.stubbed_at = now
+            changed_numbers.add(chapter.chapter_number)
+
+    serial.total_chapters = max(next_number - 1, 0)
+    serial.live_chapter_count = live_chapter_count + new_count
+
+    return new_count, changed_numbers
+
+
 # ---------------------------------------------------------------------------
 # Serial CRUD
 # ---------------------------------------------------------------------------
@@ -295,23 +393,15 @@ async def add_serial(
         cover_path=cover_path,
         cover_url=metadata.cover_url,
         status=metadata.status,
-        total_chapters=len(chapters),
+        total_chapters=0,
+        live_chapter_count=0,
         last_checked_at=datetime.now(UTC),
         series_id=series.id,
     )
     session.add(serial)
     await session.flush()  # get serial.id
 
-    for ch in chapters:
-        session.add(
-            SerialChapter(
-                serial_id=serial.id,
-                chapter_number=ch.chapter_number,
-                title=ch.title,
-                source_url=ch.source_url,
-                publish_date=ch.publish_date,
-            )
-        )
+    await _sync_remote_chapter_list(session, serial, chapters)
 
     await session.commit()
     await session.refresh(serial)
@@ -542,6 +632,12 @@ async def fetch_chapters_content(
             if progress is not None:
                 await progress.mark_chapter_skipped(chapter)
             continue
+        if chapter.is_stubbed:
+            message = "chapter is stubbed upstream and has no cached content"
+            log.warning("Skipping stubbed chapter %d: %s", chapter.chapter_number, message)
+            if progress is not None:
+                await progress.mark_chapter_failed(chapter, message)
+            continue
         try:
             log.info("Fetching chapter %d: %s", chapter.chapter_number, chapter.source_url)
             if progress is not None:
@@ -566,16 +662,8 @@ async def fetch_chapters_content(
             if progress is not None:
                 await progress.mark_chapter_failed(chapter, str(exc))
 
-    # Mark volumes covering fetched chapters as stale
     if newly_fetched_numbers:
-        vol_result = await session.execute(
-            select(SerialVolume).where(SerialVolume.serial_id == serial_id)
-        )
-        for vol in vol_result.scalars().all():
-            if any(vol.chapter_start <= n <= vol.chapter_end for n in newly_fetched_numbers):
-                if vol.generated_at is not None:
-                    vol.is_stale = True
-
+        await _mark_generated_volumes_stale(session, serial_id, newly_fetched_numbers)
         await session.commit()
     return fetched
 
@@ -599,45 +687,16 @@ async def update_from_source(session: AsyncSession, serial_id: int) -> dict:
         await session.commit()
         raise ScrapingError(str(exc)) from exc
 
-    # Find existing chapter numbers
-    existing_result = await session.execute(
-        select(SerialChapter.chapter_number).where(SerialChapter.serial_id == serial_id)
-    )
-    existing_numbers = {row[0] for row in existing_result.all()}
-
-    new_chapters = [ch for ch in chapters if ch.chapter_number not in existing_numbers]
-    for ch in new_chapters:
-        session.add(
-            SerialChapter(
-                serial_id=serial_id,
-                chapter_number=ch.chapter_number,
-                title=ch.title,
-                source_url=ch.source_url,
-                publish_date=ch.publish_date,
-            )
-        )
-
-    serial.total_chapters = len(chapters)
+    new_count, changed_numbers = await _sync_remote_chapter_list(session, serial, chapters)
     serial.last_checked_at = datetime.now(UTC)
     serial.last_error = None
     if serial.status == "error":
         serial.status = "ongoing"
 
-    # Mark volumes as stale if new chapters fall within their range
-    if new_chapters:
-        new_numbers = {ch.chapter_number for ch in new_chapters}
-        vol_result = await session.execute(
-            select(SerialVolume).where(
-                SerialVolume.serial_id == serial_id,
-                SerialVolume.generated_at.isnot(None),
-            )
-        )
-        for vol in vol_result.scalars().all():
-            if any(vol.chapter_start <= n <= vol.chapter_end for n in new_numbers):
-                vol.is_stale = True
+    await _mark_generated_volumes_stale(session, serial_id, changed_numbers)
 
     await session.commit()
-    return {"new_chapters": len(new_chapters), "total_chapters": len(chapters)}
+    return {"new_chapters": new_count, "total_chapters": serial.total_chapters}
 
 
 # ---------------------------------------------------------------------------
@@ -995,23 +1054,68 @@ async def add_single_volume(
 # ---------------------------------------------------------------------------
 
 
-async def get_volume_word_counts(session: AsyncSession, serial_id: int) -> dict[int, int]:
-    """Return {volume_id: total_words} for all volumes of the serial."""
+async def get_volume_metrics(session: AsyncSession, serial_id: int) -> dict[int, VolumeMetrics]:
+    """Return derived metrics for all configured volumes of a serial."""
+    volumes = await list_volumes(session, serial_id)
+    if not volumes:
+        return {}
+
+    min_chapter = min(volume.chapter_start for volume in volumes)
+    max_chapter = max(volume.chapter_end for volume in volumes)
     result = await session.execute(
         select(
-            SerialVolume.id,
-            sa_func.coalesce(sa_func.sum(SerialChapter.word_count), 0),
+            SerialChapter.chapter_number,
+            SerialChapter.word_count,
+            SerialChapter.content,
+            SerialChapter.is_stubbed,
         )
-        .join(
-            SerialChapter,
-            (SerialChapter.serial_id == SerialVolume.serial_id)
-            & (SerialChapter.chapter_number >= SerialVolume.chapter_start)
-            & (SerialChapter.chapter_number <= SerialVolume.chapter_end),
+        .where(
+            SerialChapter.serial_id == serial_id,
+            SerialChapter.chapter_number >= min_chapter,
+            SerialChapter.chapter_number <= max_chapter,
         )
-        .where(SerialVolume.serial_id == serial_id)
-        .group_by(SerialVolume.id)
+        .order_by(SerialChapter.chapter_number)
     )
-    return {row[0]: int(row[1]) for row in result.all()}
+    chapter_data = {
+        int(row[0]): {
+            "word_count": row[1],
+            "has_content": row[2] is not None,
+            "is_stubbed": bool(row[3]),
+        }
+        for row in result.all()
+    }
+
+    metrics: dict[int, VolumeMetrics] = {}
+    for volume in volumes:
+        total_words = 0
+        fetched_chapter_count = 0
+        stubbed_missing_count = 0
+        is_partial = False
+
+        for chapter_number in range(volume.chapter_start, volume.chapter_end + 1):
+            data = chapter_data.get(chapter_number)
+            if data is None or data["word_count"] is None:
+                is_partial = True
+                if data is not None and data["is_stubbed"] and not data["has_content"]:
+                    stubbed_missing_count += 1
+                continue
+            fetched_chapter_count += 1
+            total_words += int(data["word_count"])
+
+        metrics[volume.id] = VolumeMetrics(
+            total_words=total_words,
+            fetched_chapter_count=fetched_chapter_count,
+            chapter_count=max(0, volume.chapter_end - volume.chapter_start + 1),
+            is_partial=is_partial,
+            stubbed_missing_count=stubbed_missing_count,
+        )
+
+    return metrics
+
+
+async def get_volume_word_counts(session: AsyncSession, serial_id: int) -> dict[int, int]:
+    metrics = await get_volume_metrics(session, serial_id)
+    return {volume_id: metric.total_words for volume_id, metric in metrics.items()}
 
 
 async def preview_volume_ranges(
@@ -1027,7 +1131,12 @@ async def preview_volume_ranges(
     min_chapter = min(split.start for split in splits)
     max_chapter = max(split.end for split in splits)
     result = await session.execute(
-        select(SerialChapter.chapter_number, SerialChapter.word_count)
+        select(
+            SerialChapter.chapter_number,
+            SerialChapter.word_count,
+            SerialChapter.content,
+            SerialChapter.is_stubbed,
+        )
         .where(
             SerialChapter.serial_id == serial_id,
             SerialChapter.chapter_number >= min_chapter,
@@ -1035,7 +1144,7 @@ async def preview_volume_ranges(
         )
         .order_by(SerialChapter.chapter_number)
     )
-    chapter_word_counts = {int(row[0]): row[1] for row in result.all()}
+    chapter_word_counts = {int(row[0]): (row[1], row[2], bool(row[3])) for row in result.all()}
 
     previews: list[VolumePreviewResponse] = []
     for split in splits:
@@ -1043,11 +1152,15 @@ async def preview_volume_ranges(
         total_words = 0
         fetched_chapter_count = 0
         is_partial = False
+        stubbed_missing_count = 0
 
         for chapter_number in chapter_numbers:
-            word_count = chapter_word_counts.get(chapter_number)
+            row = chapter_word_counts.get(chapter_number)
+            word_count = row[0] if row is not None else None
             if word_count is None:
                 is_partial = True
+                if row is not None and row[2] and row[1] is None:
+                    stubbed_missing_count += 1
                 continue
             fetched_chapter_count += 1
             total_words += int(word_count)
@@ -1063,6 +1176,7 @@ async def preview_volume_ranges(
                 total_words=total_words,
                 estimated_pages=_estimate_pages(total_words),
                 is_partial=is_partial,
+                stubbed_missing_count=stubbed_missing_count,
             )
         )
 
@@ -1123,31 +1237,13 @@ async def check_serial_for_updates(session: AsyncSession, serial: WebSerial) -> 
         log.warning("Failed to fetch chapter list for serial %d: %s", serial.id, exc)
         return 0
 
-    # Get existing chapter numbers
-    result = await session.execute(
-        select(SerialChapter.chapter_number).where(SerialChapter.serial_id == serial.id)
-    )
-    existing_numbers = set(result.scalars().all())
-
-    new_count = 0
-    for ch in remote_chapters:
-        if ch.chapter_number not in existing_numbers:
-            session.add(
-                SerialChapter(
-                    serial_id=serial.id,
-                    chapter_number=ch.chapter_number,
-                    title=ch.title,
-                    source_url=ch.source_url,
-                    publish_date=ch.publish_date,
-                )
-            )
-            new_count += 1
-
-    serial.total_chapters = len(remote_chapters)
+    new_count, changed_numbers = await _sync_remote_chapter_list(session, serial, remote_chapters)
     serial.last_checked_at = datetime.now(UTC)
+    serial.last_error = None
     if serial.status == "error":
         serial.status = "ongoing"
-        serial.last_error = None
+
+    await _mark_generated_volumes_stale(session, serial.id, changed_numbers)
     await session.commit()
 
     if new_count > 0:
@@ -1194,6 +1290,8 @@ class SerialDashboardEntry:
     cover_path: str | None
     status: str
     total_chapters: int
+    live_chapter_count: int
+    stubbed_chapter_count: int
     fetched_count: int
     new_chapter_count: int
     latest_chapter_title: str | None
@@ -1218,7 +1316,10 @@ async def list_serials_for_dashboard(
         count_q = (
             select(sa_func.count())
             .select_from(SerialChapter)
-            .where(SerialChapter.serial_id == serial.id)
+            .where(
+                SerialChapter.serial_id == serial.id,
+                SerialChapter.is_stubbed.is_(False),
+            )
         )
         if serial.last_viewed_at is not None:
             count_q = count_q.where(SerialChapter.publish_date > serial.last_viewed_at)
@@ -1240,7 +1341,10 @@ async def list_serials_for_dashboard(
         # Get latest chapter
         latest = await session.scalar(
             select(SerialChapter)
-            .where(SerialChapter.serial_id == serial.id)
+            .where(
+                SerialChapter.serial_id == serial.id,
+                SerialChapter.is_stubbed.is_(False),
+            )
             .order_by(SerialChapter.chapter_number.desc())
             .limit(1)
         )
@@ -1253,6 +1357,8 @@ async def list_serials_for_dashboard(
                 cover_path=serial.cover_path,
                 status=serial.status,
                 total_chapters=serial.total_chapters,
+                live_chapter_count=serial.live_chapter_count,
+                stubbed_chapter_count=serial.stubbed_chapter_count,
                 fetched_count=fetched,
                 new_chapter_count=new_count,
                 latest_chapter_title=latest.title if latest else None,
