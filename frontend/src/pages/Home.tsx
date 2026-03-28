@@ -213,7 +213,7 @@ function CurrentlyReadingCard({
           }}
         />
         <div className="absolute top-2 right-2">
-          <span className="bg-black/70 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white/50">
+          <span className="bg-black/80 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
             {Math.round(progress)}%
           </span>
         </div>
@@ -317,18 +317,20 @@ function NewChaptersCard({ serial }: { serial: SerialDashboardEntry }) {
             </span>
           </div>
         )}
-        {/* Status badge */}
-        <div className="absolute top-2 right-2">
-          <span className="bg-black/70 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white/50">
-            {serial.status.toUpperCase()}
-          </span>
-        </div>
+        {/* Error badge — only shown for error status */}
+        {serial.status === 'error' && (
+          <div className="absolute top-2 right-2">
+            <span className="bg-red-500/90 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white">
+              ERROR
+            </span>
+          </div>
+        )}
         {/* Bottom badges: chapter count + fetched progress */}
-        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
-          <span className="bg-white/20 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
+        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/90 to-transparent">
+          <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
             {serial.total_chapters} ch
           </span>
-          <span className="bg-white/20 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
+          <span className="bg-black/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight">
             {serial.fetched_count}/{serial.total_chapters} fetched
           </span>
         </div>
