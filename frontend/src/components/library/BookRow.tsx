@@ -124,17 +124,6 @@ export default function BookRow({
               )}
             </div>
           ) : null}
-          {isDnf && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-black tracking-widest text-red-400">
-              <AlertTriangle size={10} />
-              DNF
-            </span>
-          )}
-          {book.has_review && (
-            <span className="text-[10px] font-black tracking-widest text-white/25">
-              NOTE
-            </span>
-          )}
           {savingRating && (
             <span className="text-[9px] font-black tracking-widest text-white/25">
               SAVING

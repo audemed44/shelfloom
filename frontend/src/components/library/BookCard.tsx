@@ -177,7 +177,7 @@ export default function BookCard({
           {book.author}
         </p>
       )}
-      <div className="mt-1.5 space-y-2">
+      <div className="mt-1.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
           {showRatings ? (
             <div className="flex items-center gap-1.5">
@@ -194,16 +194,7 @@ export default function BookCard({
                 </span>
               )}
             </div>
-          ) : isDnf ? (
-            <span className="text-[10px] font-black tracking-widest text-red-400">
-              DNF
-            </span>
           ) : null}
-          {book.has_review && (
-            <span className="text-[10px] font-black tracking-widest text-white/25">
-              NOTE
-            </span>
-          )}
           {savingRating && (
             <span className="text-[9px] font-black tracking-widest text-white/25">
               SAVING
