@@ -290,6 +290,12 @@ export default function SerialDetail() {
               <p className="text-xl font-black">
                 {displaySerial.total_chapters}
               </p>
+              {displaySerial.stubbed_chapter_count > 0 && (
+                <p className="text-[10px] font-black tracking-widest uppercase text-amber-300/80 mt-1">
+                  {displaySerial.live_chapter_count} live ·{' '}
+                  {displaySerial.stubbed_chapter_count} stubbed
+                </p>
+              )}
             </div>
             <div className="h-8 w-px bg-white/10" />
             <div>
@@ -410,6 +416,8 @@ export default function SerialDetail() {
           </h2>
           <span className="text-[10px] text-white/30 ml-auto">
             {displaySerial.total_chapters} total
+            {displaySerial.stubbed_chapter_count > 0 &&
+              ` · ${displaySerial.stubbed_chapter_count} stubbed`}
           </span>
         </div>
         <ChapterList

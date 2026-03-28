@@ -507,6 +507,11 @@ export default function VolumeList({
                     <p>
                       {item.fetched_chapter_count}/{item.chapter_count} fetched
                     </p>
+                    {item.stubbed_missing_count > 0 && (
+                      <p className="text-amber-300/90">
+                        {item.stubbed_missing_count} stubbed missing
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -516,7 +521,8 @@ export default function VolumeList({
           <p className="border-t border-white/10 px-4 py-3 text-[10px] text-white/30 normal-case">
             Preview totals use fetched chapter word counts only. Entries marked
             with `*` are partial because some chapters in the range still need
-            content.
+            content. Stubbed missing counts show chapters removed upstream
+            before they were cached locally.
           </p>
         </div>
       )}
@@ -610,6 +616,14 @@ export default function VolumeList({
                           </span>
                         )}
                     </p>
+                    <p className="text-[10px] text-white/30 tracking-widest uppercase mt-1">
+                      {vol.fetched_chapter_count}/{vol.chapter_count} fetched
+                      {vol.stubbed_missing_count > 0 && (
+                        <span className="text-amber-300/90 ml-2">
+                          {vol.stubbed_missing_count} stubbed missing
+                        </span>
+                      )}
+                    </p>
                   </div>
 
                   {/* Status */}
@@ -617,6 +631,11 @@ export default function VolumeList({
                     {vol.is_stale && (
                       <span className="text-[9px] font-black tracking-widest px-1.5 py-0.5 bg-amber-500/20 text-amber-400">
                         STALE
+                      </span>
+                    )}
+                    {vol.is_partial && (
+                      <span className="text-[9px] font-black tracking-widest px-1.5 py-0.5 bg-white/10 text-white/70">
+                        PARTIAL
                       </span>
                     )}
                     {vol.generated_at && (

@@ -23,6 +23,7 @@ class WebSerial(Base):
         Text, default="ongoing", nullable=False
     )  # ongoing|completed|paused|error
     total_chapters: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    live_chapter_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_metadata: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob
@@ -42,6 +43,10 @@ class WebSerial(Base):
     )
     series: Mapped["Series | None"] = relationship("Series")  # type: ignore[name-defined]  # noqa: F821
 
+    @property
+    def stubbed_chapter_count(self) -> int:
+        return max(self.total_chapters - self.live_chapter_count, 0)
+
 
 class SerialChapter(Base):
     __tablename__ = "serial_chapters"
@@ -52,6 +57,12 @@ class SerialChapter(Base):
             "chapter_number",
             unique=True,
         ),
+        Index(
+            "ix_serial_chapters_serial_id_source_key",
+            "serial_id",
+            "source_key",
+            unique=True,
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -59,6 +70,7 @@ class SerialChapter(Base):
         Integer, ForeignKey("web_serials.id", ondelete="CASCADE"), nullable=False
     )
     chapter_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-based
+    source_key: Mapped[str] = mapped_column(Text, nullable=False)
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
     publish_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -67,6 +79,8 @@ class SerialChapter(Base):
     )  # cleaned HTML, null until fetched
     word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     fetched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_stubbed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    stubbed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     serial: Mapped["WebSerial"] = relationship("WebSerial", back_populates="chapters")
 

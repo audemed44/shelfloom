@@ -356,6 +356,8 @@ export interface WebSerial {
   cover_url: string | null
   status: string // "ongoing" | "completed" | "paused" | "error"
   total_chapters: number
+  live_chapter_count: number
+  stubbed_chapter_count: number
   last_checked_at: string | null
   last_error: string | null
   created_at: string
@@ -369,6 +371,8 @@ export interface SerialDashboardEntry {
   cover_path: string | null
   status: string
   total_chapters: number
+  live_chapter_count: number
+  stubbed_chapter_count: number
   fetched_count: number
   new_chapter_count: number
   latest_chapter_title: string | null
@@ -382,6 +386,8 @@ export interface SerialChapter {
   chapter_number: number
   title: string | null
   source_url: string
+  is_stubbed: boolean
+  stubbed_at: string | null
   publish_date: string | null
   word_count: number | null
   estimated_pages: number | null
@@ -437,6 +443,10 @@ export interface SerialVolume {
   chapter_end: number
   generated_at: string | null
   is_stale: boolean
+  chapter_count: number
+  fetched_chapter_count: number
+  is_partial: boolean
+  stubbed_missing_count: number
   estimated_pages: number | null
   total_words: number | null
 }
@@ -450,4 +460,5 @@ export interface SerialVolumePreview {
   total_words: number
   estimated_pages: number | null
   is_partial: boolean
+  stubbed_missing_count: number
 }

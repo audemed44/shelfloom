@@ -454,6 +454,11 @@ export default function ChapterList({
                       <p className="text-white/80 normal-case break-words">
                         {chapter.title ?? `Chapter ${chapter.chapter_number}`}
                       </p>
+                      {chapter.is_stubbed && (
+                        <span className="inline-flex mt-1 text-[9px] font-black tracking-widest px-1.5 py-0.5 bg-amber-500/15 text-amber-300">
+                          STUBBED
+                        </span>
+                      )}
                       <div className="mt-1 space-y-1 lg:hidden">
                         <p className="text-[10px] text-white/35 normal-case">
                           Published {fmtDate(chapter.publish_date)} · Fetched{' '}
