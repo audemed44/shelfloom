@@ -1,6 +1,13 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, BookOpen, Flame, RefreshCw } from 'lucide-react'
+import {
+  Clock,
+  BookOpen,
+  Flame,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import { ReadingHeatmap } from '../components/ReadingHeatmap'
@@ -72,6 +79,78 @@ const WEEK_START = (() => {
   d.setUTCHours(0, 0, 0, 0)
   return d.toISOString()
 })()
+
+// ---------------------------------------------------------------------------
+// Scroll row with arrow buttons
+// ---------------------------------------------------------------------------
+
+function ScrollRow({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const updateArrows = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 0)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1)
+  }, [])
+
+  useEffect(() => {
+    updateArrows()
+    const el = ref.current
+    if (!el) return
+    el.addEventListener('scroll', updateArrows, { passive: true })
+    let ro: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(updateArrows)
+      ro.observe(el)
+    }
+    return () => {
+      el.removeEventListener('scroll', updateArrows)
+      ro?.disconnect()
+    }
+  }, [updateArrows])
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = ref.current
+    if (!el) return
+    const cardWidth = el.querySelector(':scope > *')?.clientWidth ?? 200
+    const gap = 16
+    el.scrollBy({
+      left: dir === 'left' ? -(cardWidth + gap) * 2 : (cardWidth + gap) * 2,
+      behavior: 'smooth',
+    })
+  }
+
+  return (
+    <div className="relative group/scroll">
+      {canScrollLeft && (
+        <button
+          onClick={() => scroll('left')}
+          className="absolute left-0 top-0 bottom-0 z-10 w-10 flex items-center justify-center bg-gradient-to-r from-black to-transparent opacity-0 group-hover/scroll:opacity-100 transition-opacity"
+        >
+          <ChevronLeft size={20} className="text-white" />
+        </button>
+      )}
+      <div
+        ref={ref}
+        className="flex gap-3 sm:gap-4 overflow-x-auto"
+        style={{ scrollbarWidth: 'none' }}
+      >
+        {children}
+      </div>
+      {canScrollRight && (
+        <button
+          onClick={() => scroll('right')}
+          className="absolute right-0 top-0 bottom-0 z-10 w-10 flex items-center justify-center bg-gradient-to-l from-black to-transparent opacity-0 group-hover/scroll:opacity-100 transition-opacity"
+        >
+          <ChevronRight size={20} className="text-white" />
+        </button>
+      )}
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Stat card
@@ -275,7 +354,7 @@ function NewChaptersCard({ serial }: { serial: SerialDashboardEntry }) {
 export default function Home() {
   const { data: booksData } = useApi<
     PaginatedResponse<Book & { reading_progress?: number }>
-  >('/api/books?status=reading&sort=last_read&per_page=6')
+  >('/api/books?status=reading&sort=last_read&per_page=200')
 
   const { data: overview } = useApi<StatsOverview>('/api/stats/overview')
 
@@ -318,7 +397,7 @@ export default function Home() {
     }
   }, [])
 
-  const currentlyReading = (booksData?.items ?? []).slice(0, 6)
+  const currentlyReading = booksData?.items ?? []
   const streak = overview?.current_streak_days ?? 0
   const thisWeekSeconds = weekTimeData?.reduce((a, b) => a + b.value, 0) ?? 0
   const thisWeekPages = weekPagesData?.reduce((a, b) => a + b.value, 0) ?? 0
@@ -366,11 +445,16 @@ export default function Home() {
               <h4 className="text-sm font-black tracking-widest text-white mb-4">
                 Currently Reading
               </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+              <ScrollRow>
                 {currentlyReading.map((book) => (
-                  <CurrentlyReadingCard key={book.id} book={book} />
+                  <div
+                    key={book.id}
+                    className="w-[calc(50%-6px)] sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(20%-13px)] xl:w-[calc(16.667%-13px)] flex-shrink-0"
+                  >
+                    <CurrentlyReadingCard book={book} />
+                  </div>
                 ))}
-              </div>
+              </ScrollRow>
             </>
           )}
         </section>
@@ -394,11 +478,16 @@ export default function Home() {
                 />
               </button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-              {serialsDashboard.slice(0, 6).map((serial) => (
-                <NewChaptersCard key={serial.id} serial={serial} />
+            <ScrollRow>
+              {serialsDashboard.map((serial) => (
+                <div
+                  key={serial.id}
+                  className="w-[calc(50%-6px)] sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(20%-13px)] xl:w-[calc(16.667%-13px)] flex-shrink-0"
+                >
+                  <NewChaptersCard serial={serial} />
+                </div>
               ))}
-            </div>
+            </ScrollRow>
           </section>
         )}
 
