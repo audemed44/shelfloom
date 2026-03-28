@@ -5,6 +5,7 @@ import {
   waitFor,
   createEvent,
   fireEvent,
+  within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
@@ -26,6 +27,9 @@ const MOCK_BOOKS = [
     id: 1,
     title: 'Dune',
     author: 'Frank Herbert',
+    status: 'unread',
+    rating: 4.5,
+    has_review: true,
     format: 'epub',
     page_count: 412,
     shelf_id: 1,
@@ -49,6 +53,9 @@ const MOCK_BOOKS = [
     id: 2,
     title: 'Foundation',
     author: 'Isaac Asimov',
+    status: 'reading',
+    rating: null,
+    has_review: false,
     format: 'epub',
     page_count: 255,
     shelf_id: 1,
@@ -72,6 +79,9 @@ const MOCK_BOOKS = [
     id: 3,
     title: 'Neuromancer',
     author: 'William Gibson',
+    status: 'dnf',
+    rating: null,
+    has_review: false,
     format: 'pdf',
     page_count: 271,
     shelf_id: 1,
@@ -228,6 +238,34 @@ describe('Library', () => {
     expect(
       screen.getByRole('heading', { name: /library/i })
     ).toBeInTheDocument()
+  })
+
+  it('toggles ratings visibility on the library page', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() =>
+      expect(screen.getAllByTestId('book-card')).toHaveLength(3)
+    )
+
+    expect(screen.getByText('4.5')).toBeInTheDocument()
+    await user.click(screen.getByTestId('ratings-toggle'))
+    expect(screen.queryByText('4.5')).not.toBeInTheDocument()
+  })
+
+  it('shows a quick-rate toast with add note action', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() =>
+      expect(screen.getAllByTestId('book-card')).toHaveLength(3)
+    )
+
+    const firstCard = screen.getAllByTestId('book-card')[0]
+    await user.click(within(firstCard).getByRole('button', { name: 'Rate' }))
+    const ratingButtons = within(firstCard).getAllByLabelText('Rate 4 stars')
+    await user.click(ratingButtons[ratingButtons.length - 1])
+
+    expect(await screen.findByText('Rated 4.0 Stars')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Note' })).toBeInTheDocument()
   })
 
   it('shows loading skeletons while fetching', () => {

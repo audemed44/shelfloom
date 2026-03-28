@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -31,6 +31,10 @@ class Book(Base):
     language: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    review: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    reading_state: Mapped[str | None] = mapped_column(Text, nullable=True)
     date_added: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), nullable=False
     )

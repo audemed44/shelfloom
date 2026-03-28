@@ -34,7 +34,10 @@ export default function SeriesCard({
 
   const count = totalBookCount ?? books.length
   const readCount = books.filter(
-    (b) => b.reading_progress != null && b.reading_progress >= 100
+    (b) =>
+      b.status !== 'dnf' &&
+      b.reading_progress != null &&
+      b.reading_progress >= 100
   ).length
 
   // Sequence range

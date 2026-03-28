@@ -18,6 +18,12 @@ interface GroupedBookContentProps {
   groupBySeries: boolean
   expandedSeriesIds: Set<number>
   onToggleSeriesExpanded: (seriesId: number) => void
+  showRatings?: boolean
+  onQuickRate?: (payload: {
+    bookId: string
+    title: string
+    rating: number
+  }) => void
   isSelecting?: boolean
   selectedIds?: Set<string>
   onToggleSelection?: (id: string) => void
@@ -63,6 +69,8 @@ export default function GroupedBookContent({
   groupBySeries,
   expandedSeriesIds,
   onToggleSeriesExpanded,
+  showRatings = true,
+  onQuickRate,
   isSelecting = false,
   selectedIds,
   onToggleSelection,
@@ -140,6 +148,8 @@ export default function GroupedBookContent({
                 <BookCard
                   key={book.id}
                   book={book}
+                  showRatings={showRatings}
+                  onQuickRate={onQuickRate}
                   isSelecting={isSelecting}
                   isSelected={selectedIds?.has(book.id)}
                   onToggle={onToggleSelection}
@@ -152,6 +162,8 @@ export default function GroupedBookContent({
             <BookCard
               key={book.id}
               book={book}
+              showRatings={showRatings}
+              onQuickRate={onQuickRate}
               isSelecting={isSelecting}
               isSelected={selectedIds?.has(book.id)}
               onToggle={onToggleSelection}
@@ -221,6 +233,8 @@ export default function GroupedBookContent({
               <BookRow
                 key={book.id}
                 book={book}
+                showRatings={showRatings}
+                onQuickRate={onQuickRate}
                 isSelecting={isSelecting}
                 isSelected={selectedIds?.has(book.id)}
                 onToggle={onToggleSelection}
@@ -233,6 +247,8 @@ export default function GroupedBookContent({
           <BookRow
             key={book.id}
             book={book}
+            showRatings={showRatings}
+            onQuickRate={onQuickRate}
             isSelecting={isSelecting}
             isSelected={selectedIds?.has(book.id)}
             onToggle={onToggleSelection}

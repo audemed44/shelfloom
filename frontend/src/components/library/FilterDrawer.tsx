@@ -38,8 +38,30 @@ const EMPTY_FILTERS: FilterState = {
   seriesIds: [],
   authors: [],
   formats: [],
+  minRating: null,
+  hasRating: null,
+  hasReview: null,
   mode: 'and',
 }
+
+const RATING_OPTIONS = [
+  { value: 'all', label: 'All Ratings' },
+  { value: 'rated', label: 'Rated' },
+  { value: 'unrated', label: 'Unrated' },
+  ...Array.from({ length: 10 }).map((_, index) => {
+    const rating = (index + 1) * 0.5
+    return {
+      value: `min:${rating}`,
+      label: `${rating.toFixed(1)}+`,
+    }
+  }),
+]
+
+const REVIEW_OPTIONS = [
+  { value: 'all', label: 'All Reviews' },
+  { value: 'has', label: 'Has Review' },
+  { value: 'none', label: 'No Review' },
+]
 
 // ---------------------------------------------------------------------------
 // Accordion section
@@ -281,13 +303,58 @@ export default function FilterDrawer({
   )
   const selectedAuthors = useMemo(() => new Set(draft.authors), [draft.authors])
   const selectedFormats = useMemo(() => new Set(draft.formats), [draft.formats])
+  const ratingSelection = useMemo(() => {
+    if (draft.hasRating === true) return 'rated'
+    if (draft.hasRating === false) return 'unrated'
+    if (draft.minRating != null) return `min:${draft.minRating}`
+    return 'all'
+  }, [draft.hasRating, draft.minRating])
+  const reviewSelection = useMemo(() => {
+    if (draft.hasReview === true) return 'has'
+    if (draft.hasReview === false) return 'none'
+    return 'all'
+  }, [draft.hasReview])
 
   const activeFilterCount =
     draft.genres.length +
     draft.tags.length +
     draft.seriesIds.length +
     draft.authors.length +
-    draft.formats.length
+    draft.formats.length +
+    (draft.minRating != null || draft.hasRating != null ? 1 : 0) +
+    (draft.hasReview != null ? 1 : 0)
+
+  const handleRatingSelect = (value: string | number | null) => {
+    const ratingValue = String(value)
+    if (ratingValue === 'all') {
+      setDraft((prev) => ({ ...prev, minRating: null, hasRating: null }))
+      return
+    }
+    if (ratingValue === 'rated') {
+      setDraft((prev) => ({ ...prev, minRating: null, hasRating: true }))
+      return
+    }
+    if (ratingValue === 'unrated') {
+      setDraft((prev) => ({ ...prev, minRating: null, hasRating: false }))
+      return
+    }
+    if (ratingValue.startsWith('min:')) {
+      setDraft((prev) => ({
+        ...prev,
+        minRating: Number(ratingValue.slice(4)),
+        hasRating: null,
+      }))
+    }
+  }
+
+  const handleReviewSelect = (value: string | number | null) => {
+    const reviewValue = String(value)
+    if (reviewValue === 'all') {
+      setDraft((prev) => ({ ...prev, hasReview: null }))
+      return
+    }
+    setDraft((prev) => ({ ...prev, hasReview: reviewValue === 'has' }))
+  }
 
   const handleApply = () => {
     // Build labels for chips
@@ -474,6 +541,36 @@ export default function FilterDrawer({
               searchable={false}
             />
           </AccordionSection>
+
+          <AccordionSection
+            number="08"
+            label="Rating"
+            count={draft.minRating != null || draft.hasRating != null ? 1 : 0}
+          >
+            <RadioList
+              items={RATING_OPTIONS.map((o) => ({
+                value: o.value,
+                label: o.label,
+              }))}
+              selected={ratingSelection}
+              onSelect={handleRatingSelect}
+            />
+          </AccordionSection>
+
+          <AccordionSection
+            number="09"
+            label="Review"
+            count={draft.hasReview != null ? 1 : 0}
+          >
+            <RadioList
+              items={REVIEW_OPTIONS.map((o) => ({
+                value: o.value,
+                label: o.label,
+              }))}
+              selected={reviewSelection}
+              onSelect={handleReviewSelect}
+            />
+          </AccordionSection>
         </div>
 
         {/* Footer */}
@@ -512,6 +609,9 @@ export default function FilterDrawer({
             series_ids: draft.seriesIds,
             authors: draft.authors,
             formats: draft.formats,
+            min_rating: draft.minRating,
+            has_rating: draft.hasRating,
+            has_review: draft.hasReview,
             mode: draft.mode,
             shelf_id: draftShelf,
             status: draftStatus,

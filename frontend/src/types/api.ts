@@ -75,6 +75,9 @@ export interface FilterState {
   seriesIds: number[]
   authors: string[]
   formats: string[]
+  minRating: number | null
+  hasRating: boolean | null
+  hasReview: boolean | null
   mode: 'and' | 'or'
 }
 
@@ -126,6 +129,9 @@ export interface Book {
   id: string
   title: string
   author: string | null
+  status: 'unread' | 'reading' | 'completed' | 'dnf'
+  rating: number | null
+  has_review: boolean
   format: string | null
   publisher: string | null
   language: string | null
@@ -148,11 +154,9 @@ export interface Book {
   tags: Tag[]
 }
 
-export interface BookDetail extends Omit<Book, 'reading_progress'> {
-  series: BookSeries[]
-  reading_sessions: ReadingSession[]
-  highlights: Highlight[]
-  reading_progress: ReadingProgress[]
+export interface BookDetail extends Book {
+  review: string | null
+  review_updated_at: string | null
 }
 
 export interface PaginatedResponse<T> {
@@ -214,6 +218,9 @@ export interface LensFilterState {
   series_ids: number[]
   authors: string[]
   formats: string[]
+  min_rating: number | null
+  has_rating: boolean | null
+  has_review: boolean | null
   mode: 'and' | 'or'
   shelf_id: number | null
   status: string | null

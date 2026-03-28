@@ -146,6 +146,25 @@ async def test_overview_dismissed_excluded(
     assert data["total_pages_read"] == 0
 
 
+@pytest.mark.asyncio
+async def test_overview_excludes_dnf_books_from_completed_count(
+    client: AsyncClient, db_session: AsyncSession, shelf: Shelf
+) -> None:
+    book = await _make_book(db_session, shelf.id, "Dropped Finish")
+    book.reading_state = "dnf"
+    await db_session.commit()
+
+    now = datetime.now(UTC)
+    await _make_session(db_session, book.id, now, duration=1800, pages_read=20)
+    await _make_progress(db_session, book.id, 100.0)
+
+    resp = await client.get("/api/stats/overview")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["books_owned"] == 1
+    assert data["books_read"] == 0
+
+
 # ---------------------------------------------------------------------------
 # /api/stats/reading-time
 # ---------------------------------------------------------------------------

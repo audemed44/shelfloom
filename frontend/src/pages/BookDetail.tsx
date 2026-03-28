@@ -1,27 +1,30 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Link, useParams, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useParams, useNavigate } from 'react-router-dom'
 import {
+  AlertTriangle,
   Download,
   Edit2,
   Trash2,
   ChevronRight,
   BookOpen,
   Clock,
-  AlertTriangle,
   CheckCircle2,
   ArrowRight,
   RefreshCw,
   Loader2,
   Upload,
   PlusCircle,
+  MessageSquareText,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import EditBookModal from '../components/book-detail/EditBookModal'
 import DeleteBookModal from '../components/book-detail/DeleteBookModal'
 import LogSessionModal from '../components/book-detail/LogSessionModal'
+import VerdictModal from '../components/book-detail/VerdictModal'
 import type { BookDetail, Shelf, ReadingSession, Highlight } from '../types'
 import type { SeriesBook } from '../types/api'
+import StarRating from '../components/shared/StarRating'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -117,6 +120,7 @@ interface SeriesInfo {
 
 export default function BookDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const navigate = useNavigate()
 
   const [book, setBook] = useState<BookDetail | null>(null)
@@ -125,6 +129,7 @@ export default function BookDetailPage() {
   const [showEdit, setShowEdit] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
   const [showLogSession, setShowLogSession] = useState(false)
+  const [showVerdict, setShowVerdict] = useState(false)
   const [seriesRefreshKey, setSeriesRefreshKey] = useState(0)
   const [moveOpen, setMoveOpen] = useState(false)
   const [movingTo, setMovingTo] = useState<number | null>(null)
@@ -192,6 +197,14 @@ export default function BookDetailPage() {
     fetchBook()
   }, [fetchBook])
 
+  useEffect(() => {
+    const state = location.state as { openVerdict?: boolean } | null
+    if (state?.openVerdict) {
+      setShowVerdict(true)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location.pathname, location.state, navigate])
+
   const handleRefreshCover = async () => {
     if (!id) return
     setCoverRefreshing(true)
@@ -243,6 +256,7 @@ export default function BookDetailPage() {
       } else {
         await api.delete(`/api/books/${id}/mark-read`)
       }
+      await fetchBook()
       setSummaryKey((k) => k + 1)
     } catch {
       // silently ignore
@@ -341,6 +355,7 @@ export default function BookDetailPage() {
       : null
   const sessions = sessionsData?.items ?? []
   const highlights = highlightsData?.items ?? []
+  const isDnf = book.status === 'dnf'
   const genres = book.genres ?? []
 
   // Breadcrumb — Library → ancestor0 → … → ancestorN (direct series) → Book
@@ -822,6 +837,15 @@ export default function BookDetailPage() {
             </button>
 
             <button
+              onClick={() => setShowVerdict(true)}
+              data-testid="review-btn"
+              className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 rounded-lg transition-all"
+            >
+              <MessageSquareText size={13} />
+              Your Verdict
+            </button>
+
+            <button
               onClick={() => handleMarkRead(percent == null || percent < 100)}
               disabled={markingRead}
               data-testid="mark-read-btn"
@@ -832,7 +856,9 @@ export default function BookDetailPage() {
               }`}
             >
               <CheckCircle2 size={13} />
-              {percent != null && percent >= 100 ? 'Unmark' : 'Mark Read'}
+              {percent != null && percent >= 100 && !isDnf
+                ? 'Unmark'
+                : 'Mark Read'}
             </button>
 
             <button
@@ -851,6 +877,79 @@ export default function BookDetailPage() {
             >
               <Trash2 size={13} />
             </button>
+          </div>
+
+          {/* Metadata grid */}
+          <div className="mb-10 border border-white/10 bg-slate-900/40 p-6">
+            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-6">
+              <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
+                Your Verdict
+              </p>
+              <button
+                onClick={() => setShowVerdict(true)}
+                className="text-[10px] font-black tracking-widest uppercase text-primary hover:underline"
+              >
+                Edit
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
+                    Rating
+                  </p>
+                  {book.rating != null ? (
+                    <div className="flex items-center gap-2">
+                      <StarRating value={book.rating} readOnly size={16} />
+                      <span className="text-sm font-black tracking-widest text-white/70">
+                        {book.rating.toFixed(1)} / 5
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-white/30 normal-case">Unrated</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
+                    Outcome
+                  </p>
+                  {isDnf ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black tracking-widest uppercase bg-red-500/10 border border-red-400/30 text-red-400">
+                      <AlertTriangle size={12} />
+                      DNF
+                    </span>
+                  ) : (
+                    <span className="text-sm text-white/50 normal-case">
+                      {percent != null && percent >= 100
+                        ? 'Completed'
+                        : percent != null && percent > 0
+                          ? 'In progress'
+                          : 'No verdict yet'}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">
+                  Review
+                </p>
+                {book.review ? (
+                  <p className="text-sm text-white/70 normal-case leading-relaxed whitespace-pre-wrap">
+                    {book.review}
+                  </p>
+                ) : (
+                  <p className="text-sm text-white/30 normal-case">
+                    No review yet.
+                  </p>
+                )}
+                {book.review_updated_at && (
+                  <p className="mt-3 text-[10px] font-black tracking-widest uppercase text-white/30">
+                    Updated {fmtDate(book.review_updated_at)}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Metadata grid */}
@@ -1024,6 +1123,16 @@ export default function BookDetailPage() {
             setShowEdit(false)
           }}
           onSeriesChange={() => setSeriesRefreshKey((k) => k + 1)}
+        />
+      )}
+      {showVerdict && (
+        <VerdictModal
+          book={book}
+          onClose={() => setShowVerdict(false)}
+          onSaved={(updated) => {
+            setBook(updated)
+            setShowVerdict(false)
+          }}
         />
       )}
       {showDelete && (

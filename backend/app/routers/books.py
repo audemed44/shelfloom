@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
 from app.schemas.book import (
+    BookDetailResponse,
     BookListResponse,
     BookMoveRequest,
     BookResponse,
@@ -37,6 +38,19 @@ from app.services.book_service import (
 router = APIRouter(prefix="/books", tags=["books"])
 
 
+def _compute_status(
+    reading_progress: float | None,
+    reading_state: str | None,
+) -> str:
+    if reading_state == "dnf":
+        return "dnf"
+    if reading_progress is not None and reading_progress >= 100:
+        return "completed"
+    if reading_progress is not None and reading_progress > 0:
+        return "reading"
+    return "unread"
+
+
 def _book_response(
     book: "Book",  # noqa: F821
     reading_progress: float | None = None,
@@ -46,18 +60,26 @@ def _book_response(
     series_sequence: float | None = None,
     tags: list[dict] | None = None,
     genres: list[dict] | None = None,
-) -> BookResponse:
+    include_review: bool = False,
+) -> BookResponse | BookDetailResponse:
     """Build BookResponse from ORM object without triggering lazy relationship loads."""
     col_data = {
         attr.key: getattr(book, attr.key) for attr in sa_inspect(type(book)).mapper.column_attrs
     }
+    has_review = bool(book.review and book.review.strip())
     col_data["reading_progress"] = reading_progress
     col_data["last_read"] = last_read
     col_data["series_id"] = series_id
     col_data["series_name"] = series_name
     col_data["series_sequence"] = series_sequence
+    col_data["status"] = _compute_status(reading_progress, book.reading_state)
+    col_data["has_review"] = has_review
     col_data["tags"] = tags or []
     col_data["genres"] = genres or []
+    if include_review:
+        return BookDetailResponse.model_validate(col_data)
+    col_data.pop("review", None)
+    col_data.pop("review_updated_at", None)
     return BookResponse.model_validate(col_data)
 
 
@@ -105,6 +127,9 @@ async def list_books_endpoint(
     author: str | None = Query(None),
     series_id: int | None = Query(None),
     status: str | None = Query(None),
+    min_rating: float | None = Query(None, ge=0.5, le=5),
+    has_rating: bool | None = Query(None),
+    has_review: bool | None = Query(None),
     sort: str = Query("created_at"),
     filter_mode: str = Query("and"),
     group_by_series: bool = Query(False),
@@ -122,6 +147,9 @@ async def list_books_endpoint(
         author=author,
         series_id=series_id,
         status=status,
+        min_rating=min_rating,
+        has_rating=has_rating,
+        has_review=has_review,
         sort=sort,
         filter_mode=filter_mode,
         group_by_series=group_by_series,
@@ -267,7 +295,7 @@ async def get_book_series_endpoint(book_id: str, session: AsyncSession = Depends
     return await get_book_series_memberships(session, book_id)
 
 
-@router.get("/{book_id}", response_model=BookResponse)
+@router.get("/{book_id}", response_model=BookDetailResponse)
 async def get_book_endpoint(book_id: str, session: AsyncSession = Depends(get_session)):
     from app.models.reading import ReadingProgress, ReadingSession
 
@@ -297,6 +325,7 @@ async def get_book_endpoint(book_id: str, session: AsyncSession = Depends(get_se
         last_read=last_read,
         tags=tags_map.get(book_id, []),
         genres=genres_map.get(book_id, []),
+        include_review=True,
     )
 
 
