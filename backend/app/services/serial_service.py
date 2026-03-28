@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -78,7 +78,7 @@ class _ChapterFetchJob:
     failed: int = 0
     current_chapter_number: int | None = None
     current_chapter_title: str | None = None
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
     logs: list[ChapterFetchLogEntry] = field(default_factory=list)
     error: str | None = None
@@ -134,7 +134,7 @@ class _ChapterFetchProgressReporter:
         async with _chapter_fetch_jobs_lock:
             self.job.logs.append(
                 ChapterFetchLogEntry(
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(UTC),
                     level=level,
                     message=message,
                     chapter_number=chapter_number,
@@ -204,7 +204,7 @@ class _ChapterFetchProgressReporter:
     async def mark_completed(self) -> None:
         async with _chapter_fetch_jobs_lock:
             self.job.state = "completed"
-            self.job.finished_at = datetime.utcnow()
+            self.job.finished_at = datetime.now(UTC)
             self.job.current_chapter_number = None
             self.job.current_chapter_title = None
         await self._append_log("info", "Finished fetching requested chapter range")
@@ -213,7 +213,7 @@ class _ChapterFetchProgressReporter:
         async with _chapter_fetch_jobs_lock:
             self.job.state = "error"
             self.job.error = error
-            self.job.finished_at = datetime.utcnow()
+            self.job.finished_at = datetime.now(UTC)
             self.job.current_chapter_number = None
             self.job.current_chapter_title = None
         await self._append_log("error", error)
@@ -296,7 +296,7 @@ async def add_serial(
         cover_url=metadata.cover_url,
         status=metadata.status,
         total_chapters=len(chapters),
-        last_checked_at=datetime.utcnow(),
+        last_checked_at=datetime.now(UTC),
         series_id=series.id,
     )
     session.add(serial)
@@ -549,7 +549,7 @@ async def fetch_chapters_content(
             content = await adapter.fetch_chapter_content(chapter.source_url)
             chapter.content = content.html_content
             chapter.word_count = content.word_count
-            chapter.fetched_at = datetime.utcnow()
+            chapter.fetched_at = datetime.now(UTC)
             if content.title and not chapter.title:
                 chapter.title = content.title
             fetched.append(chapter)
@@ -618,7 +618,7 @@ async def update_from_source(session: AsyncSession, serial_id: int) -> dict:
         )
 
     serial.total_chapters = len(chapters)
-    serial.last_checked_at = datetime.utcnow()
+    serial.last_checked_at = datetime.now(UTC)
     serial.last_error = None
     if serial.status == "error":
         serial.status = "ongoing"
@@ -873,7 +873,7 @@ async def generate_volume(
 
     # Link volume to book
     vol.book_id = book.id
-    vol.generated_at = datetime.utcnow()
+    vol.generated_at = datetime.now(UTC)
     vol.is_stale = False
 
     # Add book to serial's series
@@ -1091,7 +1091,7 @@ def _job_snapshot_expired(job: _ChapterFetchJob) -> bool:
     return (
         job.state != "running"
         and job.finished_at is not None
-        and (datetime.utcnow() - job.finished_at).total_seconds() > _FETCH_JOB_RETENTION_SECONDS
+        and (datetime.now(UTC) - job.finished_at).total_seconds() > _FETCH_JOB_RETENTION_SECONDS
     )
 
 
@@ -1109,7 +1109,7 @@ async def check_serial_for_updates(session: AsyncSession, serial: WebSerial) -> 
     if adapter is None:
         serial.status = "error"
         serial.last_error = f"No adapter named {serial.source!r}"
-        serial.last_checked_at = datetime.utcnow()
+        serial.last_checked_at = datetime.now(UTC)
         await session.commit()
         return 0
 
@@ -1118,7 +1118,7 @@ async def check_serial_for_updates(session: AsyncSession, serial: WebSerial) -> 
     except Exception as exc:
         serial.status = "error"
         serial.last_error = str(exc)
-        serial.last_checked_at = datetime.utcnow()
+        serial.last_checked_at = datetime.now(UTC)
         await session.commit()
         log.warning("Failed to fetch chapter list for serial %d: %s", serial.id, exc)
         return 0
@@ -1144,7 +1144,7 @@ async def check_serial_for_updates(session: AsyncSession, serial: WebSerial) -> 
             new_count += 1
 
     serial.total_chapters = len(remote_chapters)
-    serial.last_checked_at = datetime.utcnow()
+    serial.last_checked_at = datetime.now(UTC)
     if serial.status == "error":
         serial.status = "ongoing"
         serial.last_error = None
@@ -1182,7 +1182,7 @@ async def acknowledge_serial(session: AsyncSession, serial_id: int) -> None:
     serial = await session.scalar(select(WebSerial).where(WebSerial.id == serial_id))
     if serial is None:
         raise SerialNotFound(f"Serial {serial_id} not found")
-    serial.last_viewed_at = datetime.utcnow()
+    serial.last_viewed_at = datetime.now(UTC)
     await session.commit()
 
 
