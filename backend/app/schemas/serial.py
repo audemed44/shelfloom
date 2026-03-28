@@ -43,6 +43,7 @@ class SerialDashboardResponse(BaseModel):
     cover_path: str | None
     status: str
     total_chapters: int
+    fetched_count: int
     new_chapter_count: int
     latest_chapter_title: str | None
     latest_chapter_date: datetime | None
