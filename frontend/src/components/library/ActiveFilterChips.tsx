@@ -5,14 +5,30 @@ interface ActiveFilterChipsProps {
   filters: FilterState
   labels: FilterLabels
   onRemove: (
-    category: 'genres' | 'tags' | 'seriesIds' | 'authors' | 'formats',
+    category:
+      | 'genres'
+      | 'tags'
+      | 'seriesIds'
+      | 'authors'
+      | 'formats'
+      | 'minRating'
+      | 'hasRating'
+      | 'hasReview',
     value: string | number
   ) => void
   onClearAll: () => void
 }
 
 interface Chip {
-  category: 'genres' | 'tags' | 'seriesIds' | 'authors' | 'formats'
+  category:
+    | 'genres'
+    | 'tags'
+    | 'seriesIds'
+    | 'authors'
+    | 'formats'
+    | 'minRating'
+    | 'hasRating'
+    | 'hasReview'
   value: string | number
   label: string
 }
@@ -49,6 +65,49 @@ export default function ActiveFilterChips({
       value: fmt,
       label: `Format: ${fmt.toUpperCase()}`,
     })),
+    ...(filters.minRating != null
+      ? [
+          {
+            category: 'minRating' as const,
+            value: filters.minRating,
+            label: `Rating: ${filters.minRating.toFixed(1)}+`,
+          },
+        ]
+      : []),
+    ...(filters.hasRating === true
+      ? [
+          {
+            category: 'hasRating' as const,
+            value: 1,
+            label: 'Rating: Rated',
+          },
+        ]
+      : filters.hasRating === false
+        ? [
+            {
+              category: 'hasRating' as const,
+              value: 0,
+              label: 'Rating: Unrated',
+            },
+          ]
+        : []),
+    ...(filters.hasReview === true
+      ? [
+          {
+            category: 'hasReview' as const,
+            value: 1,
+            label: 'Review: Has review',
+          },
+        ]
+      : filters.hasReview === false
+        ? [
+            {
+              category: 'hasReview' as const,
+              value: 0,
+              label: 'Review: No review',
+            },
+          ]
+        : []),
   ]
 
   if (chips.length === 0) return null

@@ -1,6 +1,9 @@
-import { Check } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { api } from '../../api/client'
 import type { Book } from '../../types'
+import StarRating from '../shared/StarRating'
 
 function fmtFormat(format: string | null | undefined): string {
   if (!format) return ''
@@ -12,6 +15,12 @@ interface BookRowProps {
   isSelecting?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
+  showRatings?: boolean
+  onQuickRate?: (payload: {
+    bookId: string
+    title: string
+    rating: number
+  }) => void
 }
 
 export default function BookRow({
@@ -19,9 +28,34 @@ export default function BookRow({
   isSelecting,
   isSelected,
   onToggle,
+  showRatings = true,
+  onQuickRate,
 }: BookRowProps) {
   const coverSrc = `/api/books/${book.id}/cover`
   const genres = book.genres ?? []
+  const [rating, setRating] = useState<number | null>(book.rating)
+  const [savingRating, setSavingRating] = useState(false)
+  const [mobileRateOpen, setMobileRateOpen] = useState(false)
+
+  useEffect(() => {
+    setRating(book.rating)
+  }, [book.rating])
+
+  const isDnf = book.status === 'dnf'
+
+  const handleRate = async (nextRating: number) => {
+    const previous = rating
+    setRating(nextRating)
+    setSavingRating(true)
+    try {
+      await api.patch(`/api/books/${book.id}`, { rating: nextRating })
+      onQuickRate?.({ bookId: book.id, title: book.title, rating: nextRating })
+    } catch {
+      setRating(previous)
+    } finally {
+      setSavingRating(false)
+    }
+  }
 
   const rowContent = (
     <>
@@ -74,6 +108,27 @@ export default function BookRow({
             {book.author}
           </p>
         )}
+        <div className="flex items-center gap-2 mt-1">
+          {showRatings && rating != null ? (
+            <div className="flex items-center gap-1.5">
+              <StarRating value={rating} readOnly size={12} />
+              <span className="text-[10px] font-black tracking-widest text-white/35">
+                {rating.toFixed(1)}
+              </span>
+            </div>
+          ) : null}
+          {isDnf && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-black tracking-widest text-red-400">
+              <AlertTriangle size={10} />
+              DNF
+            </span>
+          )}
+          {book.has_review && (
+            <span className="text-[10px] font-black tracking-widest text-white/25">
+              NOTE
+            </span>
+          )}
+        </div>
         {(genres.length > 0 || book.tags?.length > 0) && (
           <div className="flex flex-wrap gap-1 mt-1">
             {genres.slice(0, 3).map((genre) => (
@@ -108,7 +163,12 @@ export default function BookRow({
             {book.page_count} Pages
           </span>
         )}
-        {book.reading_progress != null && book.reading_progress >= 100 ? (
+        {isDnf ? (
+          <span className="inline-flex items-center gap-1 text-[10px] font-black tracking-widest text-red-400">
+            <AlertTriangle size={10} />
+            DNF
+          </span>
+        ) : book.reading_progress != null && book.reading_progress >= 100 ? (
           <Check
             size={14}
             className="text-primary"
@@ -133,6 +193,33 @@ export default function BookRow({
           </div>
         ) : null}
       </div>
+
+      {!isSelecting && showRatings && (
+        <div
+          className="hidden lg:flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+        >
+          <span className="text-[9px] font-black tracking-widest uppercase text-white/25">
+            Quick Rate
+          </span>
+          <StarRating
+            value={rating}
+            onChange={(value) => void handleRate(value)}
+          />
+          {savingRating && (
+            <span className="text-[9px] font-black tracking-widest text-white/25">
+              Saving
+            </span>
+          )}
+        </div>
+      )}
     </>
   )
 
@@ -159,6 +246,34 @@ export default function BookRow({
       data-testid="book-row"
     >
       {rowContent}
+      {!isSelecting && showRatings && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setMobileRateOpen((prev) => !prev)
+          }}
+          className="lg:hidden ml-auto text-[9px] font-black tracking-widest uppercase text-white/40 border border-white/10 px-2 py-1"
+        >
+          Rate
+        </button>
+      )}
+      {!isSelecting && showRatings && mobileRateOpen && (
+        <div
+          className="lg:hidden ml-2"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+        >
+          <StarRating
+            value={rating}
+            onChange={(value) => void handleRate(value)}
+            size={16}
+          />
+        </div>
+      )}
     </Link>
   )
 }

@@ -1,6 +1,9 @@
-import { Check } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { api } from '../../api/client'
 import type { Book } from '../../types'
+import StarRating from '../shared/StarRating'
 
 function fmtFormat(format: string | null | undefined): string {
   if (!format) return ''
@@ -12,6 +15,12 @@ interface BookCardProps {
   isSelecting?: boolean
   isSelected?: boolean
   onToggle?: (id: string) => void
+  showRatings?: boolean
+  onQuickRate?: (payload: {
+    bookId: string
+    title: string
+    rating: number
+  }) => void
 }
 
 export default function BookCard({
@@ -19,17 +28,47 @@ export default function BookCard({
   isSelecting,
   isSelected,
   onToggle,
+  showRatings = true,
+  onQuickRate,
 }: BookCardProps) {
   const coverSrc = `/api/books/${book.id}/cover`
   const progress = book.reading_progress
-  const isComplete = progress != null && progress >= 100
-  const isInProgress = progress != null && progress > 0 && progress < 100
+  const isDnf = book.status === 'dnf'
+  const isComplete = !isDnf && progress != null && progress >= 100
+  const isInProgress =
+    !isDnf && progress != null && progress > 0 && progress < 100
   const genres = book.genres ?? []
+  const [rating, setRating] = useState<number | null>(book.rating)
+  const [savingRating, setSavingRating] = useState(false)
+  const [mobileRateOpen, setMobileRateOpen] = useState(false)
+
+  useEffect(() => {
+    setRating(book.rating)
+  }, [book.rating])
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
     onToggle?.(book.id)
+  }
+
+  const handleRate = async (
+    nextRating: number,
+    e?: React.MouseEvent | React.KeyboardEvent
+  ) => {
+    e?.preventDefault()
+    e?.stopPropagation()
+    const previous = rating
+    setRating(nextRating)
+    setSavingRating(true)
+    try {
+      await api.patch(`/api/books/${book.id}`, { rating: nextRating })
+      onQuickRate?.({ bookId: book.id, title: book.title, rating: nextRating })
+    } catch {
+      setRating(previous)
+    } finally {
+      setSavingRating(false)
+    }
   }
 
   const coverContent = (
@@ -96,6 +135,12 @@ export default function BookCard({
         </div>
       )}
 
+      {isDnf && (
+        <div className="absolute bottom-2 right-2 size-5 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
+          <X size={10} strokeWidth={3} className="text-white" />
+        </div>
+      )}
+
       {/* Complete checkmark — moves to bottom-right when checkbox occupies top-left */}
       {!onToggle && isComplete && (
         <div className="absolute top-2 left-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
@@ -129,6 +174,86 @@ export default function BookCard({
         <p className="text-xs text-white/40 mt-0.5 normal-case truncate">
           {book.author}
         </p>
+      )}
+      <div className="mt-1.5 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          {showRatings && rating != null ? (
+            <div className="flex items-center gap-1.5">
+              <StarRating value={rating} readOnly size={12} />
+              <span className="text-[10px] font-black tracking-widest text-white/40">
+                {rating.toFixed(1)}
+              </span>
+            </div>
+          ) : isDnf ? (
+            <span className="text-[10px] font-black tracking-widest text-red-400">
+              DNF
+            </span>
+          ) : null}
+          {book.has_review && (
+            <span className="text-[10px] font-black tracking-widest text-white/25">
+              NOTE
+            </span>
+          )}
+        </div>
+
+        {!isSelecting && showRatings && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setMobileRateOpen((prev) => !prev)
+            }}
+            className="sm:hidden text-[9px] font-black tracking-widest uppercase text-white/40 border border-white/10 px-2 py-1"
+          >
+            Rate
+          </button>
+        )}
+      </div>
+
+      {!isSelecting && showRatings && (
+        <>
+          <div
+            className="hidden sm:flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+            }}
+          >
+            <span className="text-[9px] font-black tracking-widest uppercase text-white/25">
+              Quick Rate
+            </span>
+            <StarRating
+              value={rating}
+              onChange={(value) => void handleRate(value)}
+            />
+            {savingRating && (
+              <span className="text-[9px] font-black tracking-widest text-white/25">
+                SAVING
+              </span>
+            )}
+          </div>
+
+          {mobileRateOpen && (
+            <div
+              className="sm:hidden flex items-center gap-2 mt-2"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+            >
+              <StarRating
+                value={rating}
+                onChange={(value) => void handleRate(value)}
+                size={16}
+              />
+            </div>
+          )}
+        </>
       )}
     </div>
   )

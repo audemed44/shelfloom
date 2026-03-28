@@ -7,6 +7,7 @@ from ebooklib import epub
 
 from app.models.book import Book
 from app.models.genre import BookGenre, Genre
+from app.models.reading import ReadingProgress
 from app.models.series import BookSeries, Series
 from app.models.shelf import Shelf
 from app.models.tag import BookTag, Tag
@@ -269,6 +270,9 @@ async def test_get_book(client, db_session, tmp_path):
     resp = await client.get(f"/api/books/{book.id}")
     assert resp.status_code == 200
     assert resp.json()["title"] == "Test Book"
+    assert resp.json()["status"] == "unread"
+    assert resp.json()["rating"] is None
+    assert resp.json()["has_review"] is False
 
 
 async def test_get_book_not_found(client):
@@ -296,6 +300,63 @@ async def test_update_book_metadata(client, db_session, tmp_path):
     assert data["title"] == "New Title"
     assert data["author"] == "New Author"
     assert data["publisher"] == "New Publisher"
+
+
+async def test_update_book_rating_and_review(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book = await _create_book(db_session, shelf.id, "Opinionated")
+
+    resp = await client.patch(
+        f"/api/books/{book.id}",
+        json={"rating": 3.5, "review": "Great opening, weak finish."},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["rating"] == 3.5
+    assert data["has_review"] is True
+
+    detail = await client.get(f"/api/books/{book.id}")
+    assert detail.status_code == 200
+    assert detail.json()["review"] == "Great opening, weak finish."
+    assert detail.json()["review_updated_at"] is not None
+
+
+async def test_list_books_filters_dnf_rating_and_review(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    dnf_book = await _create_book(db_session, shelf.id, "Dropped")
+    rated_book = await _create_book(db_session, shelf.id, "Favorite")
+    plain_book = await _create_book(db_session, shelf.id, "Plain")
+
+    dnf_book.reading_state = "dnf"
+    dnf_book.rating = 2.5
+    dnf_book.review = "Not for me."
+    rated_book.rating = 4.5
+    rated_book.review = "Excellent."
+    db_session.add_all(
+        [
+            ReadingProgress(book_id=dnf_book.id, progress=65.0),
+            ReadingProgress(book_id=rated_book.id, progress=100.0),
+            ReadingProgress(book_id=plain_book.id, progress=20.0),
+        ]
+    )
+    await db_session.commit()
+
+    dnf_resp = await client.get("/api/books?status=dnf")
+    assert dnf_resp.status_code == 200
+    assert dnf_resp.json()["total"] == 1
+    assert dnf_resp.json()["items"][0]["title"] == "Dropped"
+    assert dnf_resp.json()["items"][0]["status"] == "dnf"
+
+    rating_resp = await client.get("/api/books?min_rating=4.5")
+    assert rating_resp.status_code == 200
+    assert [item["title"] for item in rating_resp.json()["items"]] == ["Favorite"]
+
+    review_resp = await client.get("/api/books?has_review=true")
+    assert review_resp.status_code == 200
+    assert {item["title"] for item in review_resp.json()["items"]} == {
+        "Dropped",
+        "Favorite",
+    }
 
 
 async def test_update_book_not_found(client):

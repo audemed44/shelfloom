@@ -10,6 +10,9 @@ const EMPTY_FILTERS: FilterState = {
   seriesIds: [],
   authors: [],
   formats: [],
+  minRating: null,
+  hasRating: null,
+  hasReview: null,
   mode: 'and',
 }
 

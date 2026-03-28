@@ -10,6 +10,9 @@ class LensFilterState(BaseModel):
     series_ids: list[int] = []
     authors: list[str] = []
     formats: list[str] = []
+    min_rating: float | None = None
+    has_rating: bool | None = None
+    has_review: bool | None = None
     mode: Literal["and", "or"] = "and"
     shelf_id: int | None = None
     status: str | None = None

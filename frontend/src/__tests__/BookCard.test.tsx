@@ -9,6 +9,9 @@ const BOOK: Book = {
   id: 'test-uuid-1',
   title: 'The Way of Kings',
   author: 'Brandon Sanderson',
+  status: 'unread',
+  rating: null,
+  has_review: false,
   format: 'epub',
   page_count: 1007,
   shelf_id: 1,
@@ -104,5 +107,34 @@ describe('BookCard', () => {
     const card = screen.getByTestId('book-card')
     expect(card.tagName).toBe('DIV')
     expect(card.getAttribute('href')).toBeNull()
+  })
+
+  it('shows a DNF badge for dropped books', () => {
+    renderCard({ ...BOOK, status: 'dnf' })
+    expect(screen.getAllByText('DNF').length).toBeGreaterThan(0)
+  })
+
+  it('submits a quick rating from the mobile control', async () => {
+    const user = userEvent.setup()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    } as Response)
+
+    renderCard()
+    await user.click(screen.getByRole('button', { name: 'Rate' }))
+    const ratingButtons = screen.getAllByLabelText('Rate 4 stars')
+    await user.click(ratingButtons[ratingButtons.length - 1])
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      '/api/books/test-uuid-1',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ rating: 4 }),
+      })
+    )
+
+    fetchSpy.mockRestore()
   })
 })

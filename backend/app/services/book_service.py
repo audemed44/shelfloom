@@ -98,6 +98,9 @@ async def list_books(
     author: str | None = None,
     series_id: int | None = None,
     status: str | None = None,
+    min_rating: float | None = None,
+    has_rating: bool | None = None,
+    has_review: bool | None = None,
     sort: str = "created_at",
     filter_mode: str = "and",
     group_by_series: bool = False,
@@ -179,9 +182,26 @@ async def list_books(
         if author_names:
             query = query.where(Book.author.in_(author_names))
 
+    if min_rating is not None:
+        query = query.where(Book.rating.is_not(None), Book.rating >= min_rating)
+
+    if has_rating is True:
+        query = query.where(Book.rating.is_not(None))
+    elif has_rating is False:
+        query = query.where(Book.rating.is_(None))
+
+    if has_review is True:
+        query = query.where(Book.review.is_not(None), func.trim(Book.review) != "")
+    elif has_review is False:
+        query = query.where(Book.review.is_(None) | (func.trim(Book.review) == ""))
+
     if status is not None:
         from app.models.reading import ReadingProgress as RP
 
+        if status == "dnf":
+            query = query.where(Book.reading_state == "dnf")
+        else:
+            query = query.where(Book.reading_state.is_(None) | (Book.reading_state != "dnf"))
         progress_subq = (
             select(func.max(RP.progress))
             .where(RP.book_id == Book.id)
@@ -337,8 +357,23 @@ async def get_book_series_memberships(session: AsyncSession, book_id: str) -> li
 
 async def update_book(session: AsyncSession, book_id: str, data: BookUpdate) -> Book:
     book = await get_book(session, book_id)
-    for field, value in data.model_dump(exclude_none=True).items():
+    clearable_fields = {
+        "author",
+        "isbn",
+        "publisher",
+        "language",
+        "description",
+        "date_published",
+        "rating",
+        "review",
+    }
+
+    for field, value in data.model_dump(exclude_unset=True).items():
+        if value is None and field not in clearable_fields:
+            continue
         setattr(book, field, value)
+        if field == "review":
+            book.review_updated_at = None if not value else func.now()
     await session.commit()
     await session.refresh(book)
     return book

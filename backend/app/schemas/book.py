@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class TagOut(BaseModel):
@@ -34,6 +34,9 @@ class BookResponse(BaseModel):
     language: str | None
     description: str | None
     page_count: int | None
+    rating: float | None = None
+    has_review: bool = False
+    status: str
     date_added: datetime
     date_published: str | None
     genres: list[GenreOut] = []
@@ -45,6 +48,11 @@ class BookResponse(BaseModel):
     tags: list[TagOut] = []
 
 
+class BookDetailResponse(BookResponse):
+    review: str | None = None
+    review_updated_at: datetime | None = None
+
+
 class BookUpdate(BaseModel):
     title: str | None = None
     author: str | None = None
@@ -53,6 +61,20 @@ class BookUpdate(BaseModel):
     language: str | None = None
     description: str | None = None
     date_published: str | None = None
+    rating: float | None = None
+    review: str | None = None
+
+    @field_validator("rating")
+    @classmethod
+    def validate_rating(cls, value: float | None) -> float | None:
+        if value is None:
+            return value
+        if value < 0.5 or value > 5:
+            raise ValueError("Rating must be between 0.5 and 5.0")
+        doubled = value * 2
+        if abs(doubled - round(doubled)) > 1e-9:
+            raise ValueError("Rating must be in 0.5 increments")
+        return float(value)
 
 
 class BookListResponse(BaseModel):
