@@ -109,7 +109,7 @@ async def add_serial_endpoint(body: SerialCreate, session: AsyncSession = Depend
     except SerialAlreadyExists as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     except ScrapingError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     return SerialResponse.model_validate(serial)
 
 
@@ -285,7 +285,7 @@ async def fetch_chapters_endpoint(
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except ScrapingError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     return job
 
 
@@ -329,7 +329,7 @@ async def update_from_source_endpoint(serial_id: int, session: AsyncSession = De
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except ScrapingError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     return result
 
 
@@ -450,7 +450,7 @@ async def generate_volume_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except VolumeGenerationError as exc:
         log.error("Volume generation error: %s", exc)
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     except Exception as exc:
         log.exception("Unexpected error generating volume %d for serial %d", volume_id, serial_id)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
@@ -483,6 +483,6 @@ async def rebuild_volume_endpoint(
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except VolumeGenerationError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc))
     metrics = await get_volume_metrics(session, serial_id)
     return _enrich_volumes([vol], metrics)[0]

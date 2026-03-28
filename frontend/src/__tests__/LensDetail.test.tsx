@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import LensDetail from '../pages/LensDetail'
+import { TestMemoryRouter } from '../test-utils/router'
 
 const MOCK_LENS = {
   id: 1,
@@ -86,11 +87,11 @@ afterEach(() => {
 
 function renderDetail(id = '1') {
   return render(
-    <MemoryRouter initialEntries={[`/lenses/${id}`]}>
+    <TestMemoryRouter initialEntries={[`/lenses/${id}`]}>
       <Routes>
         <Route path="/lenses/:id" element={<LensDetail />} />
       </Routes>
-    </MemoryRouter>
+    </TestMemoryRouter>
   )
 }
 

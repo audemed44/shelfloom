@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
 import Home from '../pages/Home'
+import { TestMemoryRouter } from '../test-utils/router'
 
 const MOCK_BOOKS_RESPONSE = {
   items: [
@@ -87,12 +87,21 @@ function mockFetch(url: string): Promise<Response> {
   } as Response)
 }
 
-function renderHome() {
-  return render(
-    <MemoryRouter>
+async function renderHome() {
+  render(
+    <TestMemoryRouter>
       <Home />
-    </MemoryRouter>
+    </TestMemoryRouter>
   )
+
+  await screen.findByText('25 books in library')
+  await screen.findByText('1h 30m')
+  await waitFor(() => {
+    expect(
+      screen.queryByTestId('currently-reading-card') ??
+        screen.queryByText(/nothing in progress/i)
+    ).not.toBeNull()
+  })
 }
 
 describe('Home', () => {
@@ -109,15 +118,15 @@ describe('Home', () => {
     globalThis.fetch = originalFetch
   })
 
-  it('renders the dashboard heading', () => {
-    renderHome()
+  it('renders the dashboard heading', async () => {
+    await renderHome()
     expect(
       screen.getByRole('heading', { name: /dashboard/i })
     ).toBeInTheDocument()
   })
 
   it('shows currently reading card when book is in progress', async () => {
-    renderHome()
+    await renderHome()
     await waitFor(() => {
       expect(screen.getByTestId('currently-reading-card')).toBeInTheDocument()
       expect(screen.getAllByText('The Way of Kings').length).toBeGreaterThan(0)
@@ -145,21 +154,21 @@ describe('Home', () => {
       return mockFetch(String(url))
     })
 
-    renderHome()
+    await renderHome()
     await waitFor(() =>
       expect(screen.getByText(/nothing in progress/i)).toBeInTheDocument()
     )
   })
 
   it('shows streak from overview', async () => {
-    renderHome()
+    await renderHome()
     await waitFor(() =>
       expect(screen.getByText('7 Day Streak')).toBeInTheDocument()
     )
   })
 
   it('shows library totals in status row', async () => {
-    renderHome()
+    await renderHome()
     await waitFor(() => {
       expect(screen.getByText('25 books in library')).toBeInTheDocument()
       expect(screen.getByText('8 completed')).toBeInTheDocument()
@@ -167,7 +176,7 @@ describe('Home', () => {
   })
 
   it('shows recent activity feed', async () => {
-    renderHome()
+    await renderHome()
     await waitFor(() => {
       expect(screen.getAllByTestId('activity-item').length).toBeGreaterThan(0)
       expect(screen.getByText('Mistborn')).toBeInTheDocument()
@@ -175,7 +184,7 @@ describe('Home', () => {
   })
 
   it('shows this week stat cards', async () => {
-    renderHome()
+    await renderHome()
     await waitFor(() =>
       expect(screen.getAllByText('This Week').length).toBeGreaterThan(0)
     )

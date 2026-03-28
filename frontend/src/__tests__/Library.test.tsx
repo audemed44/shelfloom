@@ -220,8 +220,11 @@ describe('Library', () => {
   })
   afterEach(() => fetchSpy.mockRestore())
 
-  it('renders the library heading', () => {
+  it('renders the library heading', async () => {
     renderLibrary()
+    await waitFor(() =>
+      expect(screen.getAllByTestId('book-card')).toHaveLength(3)
+    )
     expect(
       screen.getByRole('heading', { name: /library/i })
     ).toBeInTheDocument()

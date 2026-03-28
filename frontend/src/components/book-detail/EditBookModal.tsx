@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Search, Plus, Trash2, Check } from 'lucide-react'
 import { api } from '../../api/client'
 import type { BookDetail } from '../../types'
@@ -53,7 +53,7 @@ function GenreCombobox({
     })
   }, [])
 
-  const assignedIds = new Set(genres.map((g) => g.id))
+  const assignedIds = useMemo(() => new Set(genres.map((g) => g.id)), [genres])
   const suggestions = allGenres.filter(
     (g) =>
       g.name.toLowerCase().includes(input.toLowerCase()) &&
@@ -225,7 +225,7 @@ function TagCombobox({
     })
   }, [])
 
-  const assignedIds = new Set(tags.map((t) => t.id))
+  const assignedIds = useMemo(() => new Set(tags.map((t) => t.id)), [tags])
   const suggestions = allTags.filter(
     (t) =>
       t.name.toLowerCase().includes(input.toLowerCase()) &&
