@@ -31,11 +31,16 @@ describe('Layout', () => {
 
   it('renders main content area', () => {
     renderLayout()
-    expect(document.querySelector('main')).toBeInTheDocument()
+    const main = document.querySelector('main')
+    expect(main).toBeInTheDocument()
+    expect(main?.className).toContain('pb-mobile-bottom-nav')
   })
 
   it('renders bottom nav for mobile', () => {
     renderLayout()
-    expect(screen.getByTestId('bottom-nav')).toBeInTheDocument()
+    const bottomNav = screen.getByTestId('bottom-nav')
+    expect(bottomNav).toBeInTheDocument()
+    expect(bottomNav.className).toContain('h-mobile-bottom-nav')
+    expect(bottomNav.className).toContain('z-30')
   })
 })

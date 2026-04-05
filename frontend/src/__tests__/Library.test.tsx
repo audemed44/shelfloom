@@ -263,7 +263,11 @@ describe('Library', () => {
     const ratingButtons = within(firstCard).getAllByLabelText('Rate 4 stars')
     await user.click(ratingButtons[0])
 
-    expect(screen.getByTestId('quick-rate-toast')).toBeInTheDocument()
+    const toast = screen.getByTestId('quick-rate-toast')
+    expect(toast).toBeInTheDocument()
+    expect(toast.className).toContain(
+      'bottom-[calc(var(--mobile-bottom-nav-offset)+1rem)]'
+    )
     expect(await screen.findByText('Rated 4.0 Stars')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add Note' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeInTheDocument()
@@ -857,6 +861,12 @@ describe('Bulk Selection', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('bulk-toolbar')).toBeInTheDocument()
+    )
+    expect(screen.getByTestId('bulk-toolbar').className).toContain(
+      'bottom-mobile-bottom-nav'
+    )
+    expect(screen.getByTestId('library-page-shell').className).toContain(
+      'pb-mobile-bottom-toolbar'
     )
     expect(screen.getByText('1 selected')).toBeInTheDocument()
   })

@@ -399,7 +399,7 @@ export default function FilterDrawer({
       />
 
       {/* Panel */}
-      <div className="absolute inset-x-2 bottom-[calc(57px+env(safe-area-inset-bottom,0px)+0.5rem)] max-h-[calc(100dvh-57px-env(safe-area-inset-bottom,0px)-1rem)] bg-black border border-white/10 rounded-2xl shadow-2xl flex flex-col sm:inset-y-0 sm:left-auto sm:right-0 sm:inset-x-auto sm:max-h-none sm:w-80 sm:rounded-none sm:border-t-0 sm:border-r-0 sm:border-b-0 sm:border-l sm:shadow-none">
+      <div className="absolute inset-x-2 bottom-[calc(var(--mobile-bottom-nav-offset)+0.5rem)] max-h-[calc(100dvh-var(--mobile-bottom-nav-offset)-1rem)] bg-black border border-white/10 rounded-2xl shadow-2xl flex flex-col sm:inset-y-0 sm:left-auto sm:right-0 sm:inset-x-auto sm:max-h-none sm:w-80 sm:rounded-none sm:border-t-0 sm:border-r-0 sm:border-b-0 sm:border-l sm:shadow-none">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-white/10 shrink-0 sm:px-5">
           <h3 className="text-sm font-black tracking-widest text-white">

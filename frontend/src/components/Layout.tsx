@@ -9,7 +9,7 @@ export default function Layout() {
       <Sidebar />
 
       {/* Main content: full-width on mobile, offset by sidebar on sm+ */}
-      <main className="min-h-screen min-h-dvh flex-1 pb-20 sm:ml-20 sm:pb-0 lg:ml-64">
+      <main className="min-h-screen min-h-dvh flex-1 pb-mobile-bottom-nav sm:ml-20 sm:pb-0 lg:ml-64">
         <Outlet />
       </main>
 

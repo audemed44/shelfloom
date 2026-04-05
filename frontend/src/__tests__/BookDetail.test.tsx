@@ -297,6 +297,13 @@ describe('BookDetail', () => {
     expect(
       screen.getByRole('heading', { name: /edit book/i })
     ).toBeInTheDocument()
+    expect(screen.getByTestId('edit-book-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('edit-book-modal-body').className).toContain(
+      'overflow-y-auto'
+    )
+    expect(screen.getByTestId('edit-book-modal-footer').className).toContain(
+      'sticky'
+    )
   })
 
   it('closes edit modal on cancel', async () => {

@@ -31,7 +31,7 @@ export default function MoreMenu({ open, onClose }: MoreMenuProps) {
       {/* Bottom sheet */}
       <div
         className="fixed left-0 right-0 z-[60] border-t border-white/10 bg-black rounded-t-xl sm:hidden"
-        style={{ bottom: 'calc(57px + env(safe-area-inset-bottom, 0px))' }}
+        style={{ bottom: 'var(--mobile-bottom-nav-offset)' }}
         data-testid="more-menu"
       >
         <div className="px-4 pt-4 pb-safe-bottom pb-2">
