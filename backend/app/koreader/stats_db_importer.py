@@ -137,6 +137,9 @@ async def import_stats_db(
 
         book_sessions = sessions_by_book.get(stats_book.id, [])
 
+        if stats_book.ko_total_pages:
+            shelfloom_book.page_count = stats_book.ko_total_pages
+
         # Upsert ReadingProgress with real last-read timestamp.
         # Use max_page_reached / ko_total_pages as the progress metric — this is the
         # furthest page reached, matching what KOReader's own stats plugin displays.
@@ -167,21 +170,22 @@ async def import_stats_db(
             existing = await session.execute(
                 select(ReadingSession).where(ReadingSession.source_key == sess.source_key)
             )
-            if existing.scalar_one_or_none() is not None:
+            existing_session = existing.scalar_one_or_none()
+            if existing_session is not None:
+                # Repair stale imports from older logic that rescaled KOReader pages
+                # into Shelfloom metadata page counts.
+                if existing_session.source == "stats_db":
+                    existing_session.start_time = sess.start_time
+                    existing_session.duration = sess.duration
+                    existing_session.pages_read = sess.pages_read
                 skipped += 1
                 continue
-
-            pages_read = sess.pages_read
-            if shelfloom_book.page_count and stats_book.ko_total_pages:
-                pages_read = round(
-                    sess.pages_read * shelfloom_book.page_count / stats_book.ko_total_pages
-                )
 
             reading_session = ReadingSession(
                 book_id=shelfloom_book.id,
                 start_time=sess.start_time,
                 duration=sess.duration,
-                pages_read=pages_read,
+                pages_read=sess.pages_read,
                 source="stats_db",
                 source_key=sess.source_key,
                 dismissed=False,

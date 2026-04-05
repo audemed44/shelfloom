@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -145,16 +146,18 @@ def test_read_stats_db_not_found(tmp_path):
 async def test_import_stats_db_by_md5(tmp_path, db_session, book_factory, shelf_factory):
     """Match and import by MD5."""
     from app.koreader.stats_db_importer import import_stats_db
+    from app.models.reading import ReadingProgress
 
     await shelf_factory()
     book = await book_factory()
     book.file_hash_md5 = "aabbccdd"
+    book.page_count = 40
     await db_session.commit()
 
     db = _create_stats_db(
         tmp_path / "statistics.sqlite3",
         books=[(1, book.title, book.author, "aabbccdd", None, None, 0, 0, 0)],
-        page_stats=[(1, 1, 1705359000, 60, 100)],
+        page_stats=[(1, page, 1705359000 + ((page - 1) * 60), 60, 100) for page in range(1, 76)],
     )
 
     result = await import_stats_db(db_session, db)
@@ -168,6 +171,21 @@ async def test_import_stats_db_by_md5(tmp_path, db_session, book_factory, shelf_
     )
     assert len(sessions) == 1
     assert sessions[0].source == "stats_db"
+    assert sessions[0].pages_read == 75
+
+    await db_session.refresh(book)
+    assert book.page_count == 100
+
+    progress = (
+        (
+            await db_session.execute(
+                select(ReadingProgress).where(ReadingProgress.book_id == book.id)
+            )
+        )
+        .scalars()
+        .one()
+    )
+    assert progress.progress == pytest.approx(75.0)
 
 
 async def test_import_stats_db_by_historical_md5(tmp_path, db_session, book_factory, shelf_factory):
@@ -305,3 +323,52 @@ async def test_import_stats_db_multiple_books_same_shelfloom_book(
         .all()
     )
     assert len(sessions) == 2
+
+
+async def test_import_stats_db_repairs_existing_scaled_session(
+    tmp_path, db_session, book_factory, shelf_factory
+):
+    """Re-import updates old stats_db sessions to raw KOReader page counts."""
+    from app.koreader.stats_db_importer import import_stats_db
+
+    await shelf_factory()
+    book = await book_factory()
+    book.file_hash_md5 = "repair_md5"
+    book.page_count = 40
+    db_session.add(
+        ReadingSession(
+            book_id=book.id,
+            start_time=datetime.fromtimestamp(1705359000, tz=UTC).replace(tzinfo=None),
+            duration=60,
+            pages_read=1,
+            source="stats_db",
+            source_key="stats_db:repair_md5:1705359000",
+            dismissed=False,
+        )
+    )
+    await db_session.commit()
+
+    db = _create_stats_db(
+        tmp_path / "statistics.sqlite3",
+        books=[(1, book.title, book.author, "repair_md5", None, None, 0, 0, 0)],
+        page_stats=[
+            (1, 1, 1705359000, 60, 100),
+            (1, 2, 1705359060, 55, 100),
+            (1, 3, 1705359120, 50, 100),
+        ],
+    )
+
+    result = await import_stats_db(db_session, db)
+    assert result["imported"] == 0
+    assert result["skipped"] == 1
+
+    session = (
+        (await db_session.execute(select(ReadingSession).where(ReadingSession.book_id == book.id)))
+        .scalars()
+        .one()
+    )
+    assert session.pages_read == 3
+    assert session.duration == 165
+
+    await db_session.refresh(book)
+    assert book.page_count == 100
