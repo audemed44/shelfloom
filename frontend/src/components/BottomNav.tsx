@@ -18,10 +18,10 @@ export default function BottomNav() {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-black/95 backdrop-blur-md sm:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/10 bg-black/95 backdrop-blur-md sm:hidden h-mobile-bottom-nav"
         data-testid="bottom-nav"
       >
-        <div className="flex items-center justify-around safe-area-pb">
+        <div className="flex h-full min-h-[var(--mobile-bottom-nav-height)] items-center justify-around pb-mobile-safe">
           {NAV_ITEMS.map(({ to, icon: Icon, label, end }) => (
             <NavLink key={to} to={to} end={end} className={NAV_LINK_CLASS}>
               <Icon size={22} />

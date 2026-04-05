@@ -10,6 +10,11 @@
 @layer base {
   :root {
     color-scheme: dark;
+    --mobile-bottom-nav-height: 57px;
+    --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --mobile-bottom-nav-offset: calc(
+      var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom)
+    );
   }
 
   html {
@@ -36,6 +41,26 @@
 }
 
 @layer utilities {
+  .h-mobile-bottom-nav {
+    height: var(--mobile-bottom-nav-offset);
+  }
+
+  .pb-mobile-safe {
+    padding-bottom: var(--mobile-safe-bottom);
+  }
+
+  .pb-mobile-bottom-nav {
+    padding-bottom: var(--mobile-bottom-nav-offset);
+  }
+
+  .pb-mobile-bottom-toolbar {
+    padding-bottom: calc(var(--mobile-bottom-nav-offset) + 4.5rem);
+  }
+
+  .bottom-mobile-bottom-nav {
+    bottom: var(--mobile-bottom-nav-offset);
+  }
+
   .safe-area-pb {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }

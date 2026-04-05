@@ -88,11 +88,14 @@ export default function BulkEditModal({
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/80" onClick={onClose} />
-      <div className="relative w-full max-w-2xl max-h-[85vh] bg-black border border-white/10 flex flex-col">
+      <div
+        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden border border-white/10 bg-black"
+        data-testid="bulk-edit-modal"
+      >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 shrink-0">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-black px-6 py-4 shrink-0">
           <h2 className="text-lg font-black tracking-tighter">
             Edit {selectedIds.size} Books
           </h2>
@@ -106,7 +109,10 @@ export default function BulkEditModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto px-6 py-6 space-y-8"
+          data-testid="bulk-edit-modal-body"
+        >
           {phase === 'result' ? (
             <div data-testid="bulk-result-summary">
               <p className="text-sm text-white/80 normal-case mb-4">
@@ -202,7 +208,10 @@ export default function BulkEditModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10 shrink-0">
+        <div
+          className="sticky bottom-0 z-10 flex items-center justify-end gap-3 border-t border-white/10 bg-black px-6 py-4 shrink-0"
+          data-testid="bulk-edit-modal-footer"
+        >
           {phase === 'result' ? (
             <button
               onClick={onSuccess}

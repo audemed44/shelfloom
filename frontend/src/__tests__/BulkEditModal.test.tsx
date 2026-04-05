@@ -129,6 +129,13 @@ describe('BulkEditModal', () => {
     expect(screen.getByText('Edit 2 Books')).toBeInTheDocument()
     expect(screen.getByText('01 Metadata')).toBeInTheDocument()
     expect(screen.getByText('02 Move to Shelf')).toBeInTheDocument()
+    expect(screen.getByTestId('bulk-edit-modal')).toBeInTheDocument()
+    expect(screen.getByTestId('bulk-edit-modal-body').className).toContain(
+      'overflow-y-auto'
+    )
+    expect(screen.getByTestId('bulk-edit-modal-footer').className).toContain(
+      'sticky'
+    )
   })
 
   it('apply button is disabled when no changes are made', async () => {

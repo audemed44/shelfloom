@@ -18,7 +18,7 @@ export default function BulkActionToolbar({
 }: BulkActionToolbarProps) {
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 border-t border-white/10 backdrop-blur-sm"
+      className="fixed inset-x-0 bottom-mobile-bottom-nav z-40 bg-slate-900/95 border-t border-white/10 backdrop-blur-sm sm:bottom-0"
       data-testid="bulk-toolbar"
     >
       <div className="flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-12 py-3">

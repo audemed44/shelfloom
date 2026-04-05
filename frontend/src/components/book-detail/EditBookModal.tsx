@@ -616,12 +616,15 @@ export default function EditBookModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto"
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 overflow-y-auto"
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose()
         }}
       >
-        <div className="relative w-full max-w-2xl bg-black border border-white/10 shadow-2xl my-auto">
+        <div
+          className="relative my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden border border-white/10 bg-black shadow-2xl"
+          data-testid="edit-book-modal"
+        >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-black z-10">
             <div>
@@ -641,7 +644,10 @@ export default function EditBookModal({
             </button>
           </div>
 
-          <div className="px-6 py-6 max-h-[80vh] overflow-y-auto space-y-10">
+          <div
+            className="min-h-0 flex-1 overflow-y-auto px-6 py-6 space-y-10"
+            data-testid="edit-book-modal-body"
+          >
             {/* ── 01 Basic Information ── */}
             <section>
               <SectionHeader num="01" title="Basic Information" />
@@ -896,7 +902,10 @@ export default function EditBookModal({
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t border-white/10 flex justify-end gap-3 bg-black">
+          <div
+            className="sticky bottom-0 flex justify-end gap-3 border-t border-white/10 bg-black px-6 py-4"
+            data-testid="edit-book-modal-footer"
+          >
             <button
               type="button"
               onClick={onClose}

@@ -583,7 +583,12 @@ export default function Library() {
   }, [quickRateToast])
 
   return (
-    <div className="p-4 sm:p-6 lg:p-12">
+    <div
+      className={`p-4 sm:p-6 lg:p-12 ${
+        isSelecting ? 'pb-mobile-bottom-toolbar sm:pb-6 lg:pb-12' : ''
+      }`}
+      data-testid="library-page-shell"
+    >
       {/* Header */}
       <header className="mb-6 sm:mb-8">
         <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
@@ -754,7 +759,7 @@ export default function Library() {
 
       {quickRateToast && (
         <div
-          className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 border border-white/10 bg-black/95 p-4 shadow-2xl sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[24rem]"
+          className="fixed inset-x-4 bottom-[calc(var(--mobile-bottom-nav-offset)+1rem)] z-50 border border-white/10 bg-black/95 p-4 shadow-2xl sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[24rem]"
           data-testid="quick-rate-toast"
         >
           <button
