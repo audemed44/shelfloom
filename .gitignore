@@ -30,6 +30,7 @@ htmlcov/
 .env
 .env.local
 .env.*.local
+docker-compose.yml
 
 node_modules/
 dist/

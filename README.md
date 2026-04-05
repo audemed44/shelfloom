@@ -8,7 +8,17 @@ Self-hosted book library manager with deep KOReader integration and rich reading
 
 Images are published automatically to GHCR on every push to `main` and on version tags (`v*`).
 
-Create a `docker-compose.yml`:
+Copy the example compose file and edit it for your machine:
+
+```bash
+cp docker-compose.example.yml docker-compose.yml
+```
+
+The tracked example file is `docker-compose.example.yml`. Your local
+`docker-compose.yml` is ignored so machine-specific paths do not keep showing up
+as unstaged changes.
+
+Example:
 
 ```yaml
 services:
@@ -51,7 +61,7 @@ Open **http://localhost:8000** — the setup wizard will guide you through creat
 
 ### Volumes
 
-The default `docker-compose.yml` uses a `.data/` directory in the repo root:
+The default `docker-compose.example.yml` uses a `.data/` directory in the repo root:
 
 | Host path       | Container path | Purpose                   |
 | --------------- | -------------- | ------------------------- |
