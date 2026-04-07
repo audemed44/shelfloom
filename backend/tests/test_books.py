@@ -448,11 +448,34 @@ async def test_cover_not_found(client, db_session, tmp_path):
 
     resp = await client.get(f"/api/books/{book.id}/cover")
     assert resp.status_code == 404
+    assert resp.headers["cache-control"] == "no-cache"
 
 
 async def test_cover_book_not_found(client):
     resp = await client.get(f"/api/books/{uuid.uuid4()}/cover")
     assert resp.status_code == 404
+    assert resp.headers["cache-control"] == "no-cache"
+
+
+async def test_cover_uses_revalidating_cache_headers(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    cover = tmp_path / "cover.jpg"
+    cover.write_bytes(b"coverdata")
+    book = Book(
+        id=str(uuid.uuid4()),
+        title="Covered",
+        format="epub",
+        file_path="covered.epub",
+        shelf_id=shelf.id,
+        cover_path=str(cover),
+    )
+    db_session.add(book)
+    await db_session.commit()
+
+    resp = await client.get(f"/api/books/{book.id}/cover")
+
+    assert resp.status_code == 200
+    assert resp.headers["cache-control"] == "no-cache"
 
 
 async def test_download_book(client, db_session, tmp_path):

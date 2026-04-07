@@ -36,6 +36,7 @@ from app.services.book_service import (
 )
 
 router = APIRouter(prefix="/books", tags=["books"])
+_BOOK_COVER_HEADERS = {"Cache-Control": "no-cache"}
 
 
 def _compute_status(
@@ -413,10 +414,18 @@ async def get_cover_endpoint(book_id: str, session: AsyncSession = Depends(get_s
     try:
         book = await get_book(session, book_id)
     except BookNotFound as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e), headers=_BOOK_COVER_HEADERS)
     if not book.cover_path or not os.path.exists(book.cover_path):
-        raise HTTPException(status_code=404, detail="No cover available")
-    return FileResponse(book.cover_path, media_type="image/jpeg")
+        raise HTTPException(
+            status_code=404,
+            detail="No cover available",
+            headers=_BOOK_COVER_HEADERS,
+        )
+    return FileResponse(
+        book.cover_path,
+        media_type="image/jpeg",
+        headers=_BOOK_COVER_HEADERS,
+    )
 
 
 @router.get("/{book_id}/download")
