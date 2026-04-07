@@ -10,6 +10,10 @@ class LensFilterState(BaseModel):
     series_ids: list[int] = []
     authors: list[str] = []
     formats: list[str] = []
+    has_genre: bool | None = None
+    has_tag: bool | None = None
+    has_author: bool | None = None
+    has_series: bool | None = None
     min_rating: float | None = None
     has_rating: bool | None = None
     has_review: bool | None = None

@@ -30,6 +30,14 @@ def _fs_to_kwargs(fs: LensFilterState) -> dict:
         kwargs["author"] = ",".join(fs.authors)
     if fs.formats:
         kwargs["format"] = ",".join(fs.formats)
+    if fs.has_genre is not None:
+        kwargs["has_genre"] = fs.has_genre
+    if fs.has_tag is not None:
+        kwargs["has_tag"] = fs.has_tag
+    if fs.has_author is not None:
+        kwargs["has_author"] = fs.has_author
+    if fs.has_series is not None:
+        kwargs["has_series"] = fs.has_series
     if fs.min_rating is not None:
         kwargs["min_rating"] = fs.min_rating
     if fs.has_rating is not None:

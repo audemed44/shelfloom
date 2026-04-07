@@ -43,7 +43,9 @@ async def _create_shelf(
     return shelf
 
 
-async def _create_book(db_session, shelf_id: int, title: str = "Book", author: str = "A") -> Book:
+async def _create_book(
+    db_session, shelf_id: int, title: str = "Book", author: str | None = "A"
+) -> Book:
     book = Book(
         id=str(uuid.uuid4()),
         title=title,
@@ -821,6 +823,22 @@ async def test_list_books_filter_genre(client, db_session, tmp_path):
     assert resp.json()["items"][0]["title"] == "Fantasy Book"
 
 
+async def test_list_books_filter_missing_genre(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    tagged = await _create_book(db_session, shelf.id, "Fantasy Book")
+    await _create_book(db_session, shelf.id, "No Genre Book")
+    genre = Genre(name="Fantasy")
+    db_session.add(genre)
+    await db_session.flush()
+    db_session.add(BookGenre(book_id=tagged.id, genre_id=genre.id))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?has_genre=false")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["title"] == "No Genre Book"
+
+
 async def test_list_books_filter_multiple_genres_or(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)
     book1 = await _create_book(db_session, shelf.id, "Fantasy Book")
@@ -877,6 +895,22 @@ async def test_list_books_filter_multiple_tags_or(client, db_session, tmp_path):
     assert resp.json()["total"] == 2
 
 
+async def test_list_books_filter_missing_tag(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    tagged = await _create_book(db_session, shelf.id, "Tagged Book")
+    await _create_book(db_session, shelf.id, "No Tag Book")
+    tag = Tag(name="tagged")
+    db_session.add(tag)
+    await db_session.flush()
+    db_session.add(BookTag(book_id=tagged.id, tag_id=tag.id))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?has_tag=false")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["title"] == "No Tag Book"
+
+
 async def test_list_books_filter_multiple_tags_and(client, db_session, tmp_path):
     shelf = await _create_shelf(db_session, tmp_path)
     book1 = await _create_book(db_session, shelf.id, "Both Tags")
@@ -907,6 +941,47 @@ async def test_list_books_filter_author(client, db_session, tmp_path):
     assert resp.json()["total"] == 2
     titles = {i["title"] for i in resp.json()["items"]}
     assert titles == {"Book A", "Book B"}
+
+
+async def test_list_books_filter_missing_author(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    await _create_book(db_session, shelf.id, "No Author", author=None)
+    await _create_book(db_session, shelf.id, "Blank Author", author="")
+    await _create_book(db_session, shelf.id, "Named Author", author="Alice")
+
+    resp = await client.get("/api/books?has_author=false")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 2
+    titles = {i["title"] for i in resp.json()["items"]}
+    assert titles == {"No Author", "Blank Author"}
+
+
+async def test_list_books_filter_author_or_missing_author(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    await _create_book(db_session, shelf.id, "No Author", author=None)
+    await _create_book(db_session, shelf.id, "Book A", author="Alice")
+    await _create_book(db_session, shelf.id, "Book B", author="Bob")
+
+    resp = await client.get("/api/books?author=Alice&has_author=false")
+    assert resp.status_code == 200
+    titles = {i["title"] for i in resp.json()["items"]}
+    assert titles == {"No Author", "Book A"}
+
+
+async def test_list_books_filter_missing_series(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    in_series = await _create_book(db_session, shelf.id, "Series Book")
+    await _create_book(db_session, shelf.id, "Standalone Book")
+    series = Series(name="My Series")
+    db_session.add(series)
+    await db_session.flush()
+    db_session.add(BookSeries(book_id=in_series.id, series_id=series.id, sequence=1))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?has_series=false")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["title"] == "Standalone Book"
 
 
 async def test_list_books_filter_format_multi(client, db_session, tmp_path):

@@ -11,6 +11,7 @@ import type {
   FilterLabels,
   Lens,
 } from '../../types/api'
+import { normalizeFilterState } from '../../utils/filterState'
 import SaveLensModal from '../lenses/SaveLensModal'
 
 interface FilterDrawerProps {
@@ -33,17 +34,10 @@ const STATUS_OPTIONS = [
   { value: 'dnf', label: 'DNF' },
 ]
 
-const EMPTY_FILTERS: FilterState = {
-  genres: [],
-  tags: [],
-  seriesIds: [],
-  authors: [],
-  formats: [],
-  minRating: null,
-  hasRating: null,
-  hasReview: null,
-  mode: 'and',
-}
+const NO_GENRE_ID = '__no_genre__'
+const NO_TAG_ID = '__no_tag__'
+const NO_SERIES_ID = '__no_series__'
+const NO_AUTHOR_ID = '__no_author__'
 
 const RATING_OPTIONS = [
   { value: 'all', label: 'All Ratings' },
@@ -237,7 +231,7 @@ export default function FilterDrawer({
   onStatusChange,
 }: FilterDrawerProps) {
   // Draft state — committed on Apply
-  const [draft, setDraft] = useState<FilterState>(filters)
+  const [draft, setDraft] = useState<FilterState>(normalizeFilterState(filters))
   const [draftShelf, setDraftShelf] = useState<number | null>(shelfId)
   const [draftStatus, setDraftStatus] = useState<string | null>(status)
 
@@ -253,7 +247,7 @@ export default function FilterDrawer({
   // Reset draft when drawer opens
   useEffect(() => {
     if (open) {
-      setDraft(filters)
+      setDraft(normalizeFilterState(filters))
       setDraftShelf(shelfId)
       setDraftStatus(status)
     }
@@ -296,13 +290,26 @@ export default function FilterDrawer({
     []
   )
 
-  const selectedGenres = useMemo(() => new Set(draft.genres), [draft.genres])
-  const selectedTags = useMemo(() => new Set(draft.tags), [draft.tags])
-  const selectedSeries = useMemo(
-    () => new Set(draft.seriesIds),
-    [draft.seriesIds]
-  )
-  const selectedAuthors = useMemo(() => new Set(draft.authors), [draft.authors])
+  const selectedGenreItems = useMemo(() => {
+    const next = new Set<string | number>(draft.genres)
+    if (draft.hasGenre === false) next.add(NO_GENRE_ID)
+    return next
+  }, [draft.genres, draft.hasGenre])
+  const selectedTagItems = useMemo(() => {
+    const next = new Set<string | number>(draft.tags)
+    if (draft.hasTag === false) next.add(NO_TAG_ID)
+    return next
+  }, [draft.tags, draft.hasTag])
+  const selectedSeriesItems = useMemo(() => {
+    const next = new Set<string | number>(draft.seriesIds)
+    if (draft.hasSeries === false) next.add(NO_SERIES_ID)
+    return next
+  }, [draft.seriesIds, draft.hasSeries])
+  const selectedAuthorItems = useMemo(() => {
+    const next = new Set<string | number>(draft.authors)
+    if (draft.hasAuthor === false) next.add(NO_AUTHOR_ID)
+    return next
+  }, [draft.authors, draft.hasAuthor])
   const selectedFormats = useMemo(() => new Set(draft.formats), [draft.formats])
   const ratingSelection = useMemo(() => {
     if (draft.hasRating === true) return 'rated'
@@ -322,6 +329,10 @@ export default function FilterDrawer({
     draft.seriesIds.length +
     draft.authors.length +
     draft.formats.length +
+    (draft.hasGenre === false ? 1 : 0) +
+    (draft.hasTag === false ? 1 : 0) +
+    (draft.hasAuthor === false ? 1 : 0) +
+    (draft.hasSeries === false ? 1 : 0) +
     (draft.minRating != null || draft.hasRating != null ? 1 : 0) +
     (draft.hasReview != null ? 1 : 0)
 
@@ -382,7 +393,7 @@ export default function FilterDrawer({
   }
 
   const handleClear = () => {
-    setDraft(EMPTY_FILTERS)
+    setDraft(normalizeFilterState(undefined))
     setDraftShelf(null)
     setDraftStatus(null)
   }
@@ -482,21 +493,49 @@ export default function FilterDrawer({
           <AccordionSection
             number="03"
             label="Genre"
-            count={draft.genres.length}
+            count={draft.genres.length + (draft.hasGenre === false ? 1 : 0)}
           >
             <CheckboxList
-              items={genres.map((g) => ({ id: g.id, name: g.name }))}
-              selected={selectedGenres}
-              onToggle={(id) => toggleSet('genres', id as number)}
+              items={[
+                { id: NO_GENRE_ID, name: 'No Genre' },
+                ...genres.map((g) => ({ id: g.id, name: g.name })),
+              ]}
+              selected={selectedGenreItems}
+              onToggle={(id) => {
+                if (id === NO_GENRE_ID) {
+                  setDraft((prev) => ({
+                    ...prev,
+                    hasGenre: prev.hasGenre === false ? null : false,
+                  }))
+                  return
+                }
+                toggleSet('genres', id as number)
+              }}
             />
           </AccordionSection>
 
           {/* 04 Tags */}
-          <AccordionSection number="04" label="Tags" count={draft.tags.length}>
+          <AccordionSection
+            number="04"
+            label="Tags"
+            count={draft.tags.length + (draft.hasTag === false ? 1 : 0)}
+          >
             <CheckboxList
-              items={tags.map((t) => ({ id: t.id, name: t.name }))}
-              selected={selectedTags}
-              onToggle={(id) => toggleSet('tags', id as number)}
+              items={[
+                { id: NO_TAG_ID, name: 'No Tag' },
+                ...tags.map((t) => ({ id: t.id, name: t.name })),
+              ]}
+              selected={selectedTagItems}
+              onToggle={(id) => {
+                if (id === NO_TAG_ID) {
+                  setDraft((prev) => ({
+                    ...prev,
+                    hasTag: prev.hasTag === false ? null : false,
+                  }))
+                  return
+                }
+                toggleSet('tags', id as number)
+              }}
             />
           </AccordionSection>
 
@@ -504,12 +543,24 @@ export default function FilterDrawer({
           <AccordionSection
             number="05"
             label="Series"
-            count={draft.seriesIds.length}
+            count={draft.seriesIds.length + (draft.hasSeries === false ? 1 : 0)}
           >
             <CheckboxList
-              items={seriesList.map((s) => ({ id: s.id, name: s.name }))}
-              selected={selectedSeries}
-              onToggle={(id) => toggleSet('seriesIds', id as number)}
+              items={[
+                { id: NO_SERIES_ID, name: 'No Series' },
+                ...seriesList.map((s) => ({ id: s.id, name: s.name })),
+              ]}
+              selected={selectedSeriesItems}
+              onToggle={(id) => {
+                if (id === NO_SERIES_ID) {
+                  setDraft((prev) => ({
+                    ...prev,
+                    hasSeries: prev.hasSeries === false ? null : false,
+                  }))
+                  return
+                }
+                toggleSet('seriesIds', id as number)
+              }}
             />
           </AccordionSection>
 
@@ -517,12 +568,24 @@ export default function FilterDrawer({
           <AccordionSection
             number="06"
             label="Author"
-            count={draft.authors.length}
+            count={draft.authors.length + (draft.hasAuthor === false ? 1 : 0)}
           >
             <CheckboxList
-              items={authorList.map((a) => ({ id: a.name, name: a.name }))}
-              selected={selectedAuthors}
-              onToggle={(id) => toggleSet('authors', id as string)}
+              items={[
+                { id: NO_AUTHOR_ID, name: 'No Author' },
+                ...authorList.map((a) => ({ id: a.name, name: a.name })),
+              ]}
+              selected={selectedAuthorItems}
+              onToggle={(id) => {
+                if (id === NO_AUTHOR_ID) {
+                  setDraft((prev) => ({
+                    ...prev,
+                    hasAuthor: prev.hasAuthor === false ? null : false,
+                  }))
+                  return
+                }
+                toggleSet('authors', id as string)
+              }}
             />
           </AccordionSection>
 
@@ -618,6 +681,10 @@ export default function FilterDrawer({
             series_ids: draft.seriesIds,
             authors: draft.authors,
             formats: draft.formats,
+            has_genre: draft.hasGenre,
+            has_tag: draft.hasTag,
+            has_author: draft.hasAuthor,
+            has_series: draft.hasSeries,
             min_rating: draft.minRating,
             has_rating: draft.hasRating,
             has_review: draft.hasReview,

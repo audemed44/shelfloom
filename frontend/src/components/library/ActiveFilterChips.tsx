@@ -11,6 +11,10 @@ interface ActiveFilterChipsProps {
       | 'seriesIds'
       | 'authors'
       | 'formats'
+      | 'hasGenre'
+      | 'hasTag'
+      | 'hasAuthor'
+      | 'hasSeries'
       | 'minRating'
       | 'hasRating'
       | 'hasReview',
@@ -26,6 +30,10 @@ interface Chip {
     | 'seriesIds'
     | 'authors'
     | 'formats'
+    | 'hasGenre'
+    | 'hasTag'
+    | 'hasAuthor'
+    | 'hasSeries'
     | 'minRating'
     | 'hasRating'
     | 'hasReview'
@@ -65,6 +73,42 @@ export default function ActiveFilterChips({
       value: fmt,
       label: `Format: ${fmt.toUpperCase()}`,
     })),
+    ...(filters.hasGenre === false
+      ? [
+          {
+            category: 'hasGenre' as const,
+            value: 0,
+            label: 'Genre: No genre',
+          },
+        ]
+      : []),
+    ...(filters.hasTag === false
+      ? [
+          {
+            category: 'hasTag' as const,
+            value: 0,
+            label: 'Tag: No tag',
+          },
+        ]
+      : []),
+    ...(filters.hasSeries === false
+      ? [
+          {
+            category: 'hasSeries' as const,
+            value: 0,
+            label: 'Series: No series',
+          },
+        ]
+      : []),
+    ...(filters.hasAuthor === false
+      ? [
+          {
+            category: 'hasAuthor' as const,
+            value: 0,
+            label: 'Author: No author',
+          },
+        ]
+      : []),
     ...(filters.minRating != null
       ? [
           {

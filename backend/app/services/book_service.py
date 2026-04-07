@@ -97,6 +97,10 @@ async def list_books(
     genre: str | None = None,
     author: str | None = None,
     series_id: int | None = None,
+    has_genre: bool | None = None,
+    has_tag: bool | None = None,
+    has_author: bool | None = None,
+    has_series: bool | None = None,
     status: str | None = None,
     min_rating: float | None = None,
     has_rating: bool | None = None,
@@ -121,10 +125,15 @@ async def list_books(
             query = query.where(Book.format.in_(formats))
 
     # Series filter — supports comma-separated IDs
-    if series_id is not None:
+    if series_id is not None or has_series is not None:
         from app.models.series import BookSeries
 
-        series_ids = [int(s.strip()) for s in str(series_id).split(",") if s.strip()]
+        series_ids = (
+            [int(s.strip()) for s in str(series_id).split(",") if s.strip()]
+            if series_id is not None
+            else []
+        )
+        missing_series = select(BookSeries.book_id).where(BookSeries.book_id == Book.id).exists()
         if series_ids:
             if filter_mode == "and":
                 for sid in series_ids:
@@ -132,18 +141,28 @@ async def list_books(
                         BookSeries.series_id == sid, BookSeries.book_id == Book.id
                     )
                     query = query.where(subq.exists())
+                if has_series is False:
+                    query = query.where(~missing_series)
             else:
-                subq = select(BookSeries.book_id).where(
-                    BookSeries.series_id.in_(series_ids),
-                    BookSeries.book_id == Book.id,
-                )
-                query = query.where(subq.exists())
+                clauses = [
+                    select(BookSeries.book_id)
+                    .where(BookSeries.series_id.in_(series_ids), BookSeries.book_id == Book.id)
+                    .exists()
+                ]
+                if has_series is False:
+                    clauses.append(~missing_series)
+                query = query.where(clauses[0] if len(clauses) == 1 else clauses[0] | clauses[1])
+        elif has_series is True:
+            query = query.where(missing_series)
+        elif has_series is False:
+            query = query.where(~missing_series)
 
     # Tag filter — supports comma-separated IDs
-    if tag is not None:
+    if tag is not None or has_tag is not None:
         from app.models.tag import BookTag
 
-        tag_ids = [int(t.strip()) for t in tag.split(",") if t.strip()]
+        tag_ids = [int(t.strip()) for t in tag.split(",") if t.strip()] if tag else []
+        missing_tag = select(BookTag.book_id).where(BookTag.book_id == Book.id).exists()
         if tag_ids:
             if filter_mode == "and":
                 for tid in tag_ids:
@@ -151,17 +170,28 @@ async def list_books(
                         BookTag.tag_id == tid, BookTag.book_id == Book.id
                     )
                     query = query.where(subq.exists())
+                if has_tag is False:
+                    query = query.where(~missing_tag)
             else:
-                subq = select(BookTag.book_id).where(
-                    BookTag.tag_id.in_(tag_ids), BookTag.book_id == Book.id
-                )
-                query = query.where(subq.exists())
+                clauses = [
+                    select(BookTag.book_id)
+                    .where(BookTag.tag_id.in_(tag_ids), BookTag.book_id == Book.id)
+                    .exists()
+                ]
+                if has_tag is False:
+                    clauses.append(~missing_tag)
+                query = query.where(clauses[0] if len(clauses) == 1 else clauses[0] | clauses[1])
+        elif has_tag is True:
+            query = query.where(missing_tag)
+        elif has_tag is False:
+            query = query.where(~missing_tag)
 
     # Genre filter — supports comma-separated IDs
-    if genre is not None:
+    if genre is not None or has_genre is not None:
         from app.models.genre import BookGenre
 
-        genre_ids = [int(g.strip()) for g in genre.split(",") if g.strip()]
+        genre_ids = [int(g.strip()) for g in genre.split(",") if g.strip()] if genre else []
+        missing_genre = select(BookGenre.book_id).where(BookGenre.book_id == Book.id).exists()
         if genre_ids:
             if filter_mode == "and":
                 for gid in genre_ids:
@@ -169,18 +199,34 @@ async def list_books(
                         BookGenre.genre_id == gid, BookGenre.book_id == Book.id
                     )
                     query = query.where(subq.exists())
+                if has_genre is False:
+                    query = query.where(~missing_genre)
             else:
-                subq = select(BookGenre.book_id).where(
-                    BookGenre.genre_id.in_(genre_ids),
-                    BookGenre.book_id == Book.id,
-                )
-                query = query.where(subq.exists())
+                clauses = [
+                    select(BookGenre.book_id)
+                    .where(BookGenre.genre_id.in_(genre_ids), BookGenre.book_id == Book.id)
+                    .exists()
+                ]
+                if has_genre is False:
+                    clauses.append(~missing_genre)
+                query = query.where(clauses[0] if len(clauses) == 1 else clauses[0] | clauses[1])
+        elif has_genre is True:
+            query = query.where(missing_genre)
+        elif has_genre is False:
+            query = query.where(~missing_genre)
 
     # Author filter — supports comma-separated names
-    if author is not None:
-        author_names = [a.strip() for a in author.split(",") if a.strip()]
-        if author_names:
+    if author is not None or has_author is not None:
+        author_names = [a.strip() for a in author.split(",") if a.strip()] if author else []
+        missing_author = Book.author.is_(None) | (func.trim(Book.author) == "")
+        if author_names and has_author is False:
+            query = query.where(Book.author.in_(author_names) | missing_author)
+        elif author_names:
             query = query.where(Book.author.in_(author_names))
+        elif has_author is True:
+            query = query.where(~missing_author)
+        elif has_author is False:
+            query = query.where(missing_author)
 
     if min_rating is not None:
         query = query.where(Book.rating.is_not(None), Book.rating >= min_rating)

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../../api/client'
 import type { LensFilterState, Lens } from '../../types/api'
+import { normalizeLensFilterState } from '../../utils/filterState'
 
 interface SaveLensModalProps {
   /** When provided, the modal is in edit mode. */
@@ -13,20 +14,29 @@ interface SaveLensModalProps {
 }
 
 function summarize(fs: LensFilterState): string {
+  const normalized = normalizeLensFilterState(fs)
   const parts: string[] = []
-  if (fs.genres.length > 0) parts.push(`${fs.genres.length} genre(s)`)
-  if (fs.tags.length > 0) parts.push(`${fs.tags.length} tag(s)`)
-  if (fs.series_ids.length > 0) parts.push(`${fs.series_ids.length} series`)
-  if (fs.authors.length > 0) parts.push(`${fs.authors.length} author(s)`)
-  if (fs.formats.length > 0)
-    parts.push(fs.formats.map((f) => f.toUpperCase()).join(', '))
-  if (fs.has_rating === true) parts.push('rated')
-  if (fs.has_rating === false) parts.push('unrated')
-  if (fs.min_rating != null) parts.push(`rating ${fs.min_rating.toFixed(1)}+`)
-  if (fs.has_review === true) parts.push('has review')
-  if (fs.has_review === false) parts.push('no review')
-  if (fs.shelf_id != null) parts.push('shelf filter')
-  if (fs.status != null) parts.push(`status: ${fs.status}`)
+  if (normalized.genres.length > 0)
+    parts.push(`${normalized.genres.length} genre(s)`)
+  if (normalized.tags.length > 0) parts.push(`${normalized.tags.length} tag(s)`)
+  if (normalized.series_ids.length > 0)
+    parts.push(`${normalized.series_ids.length} series`)
+  if (normalized.authors.length > 0)
+    parts.push(`${normalized.authors.length} author(s)`)
+  if (normalized.formats.length > 0)
+    parts.push(normalized.formats.map((f) => f.toUpperCase()).join(', '))
+  if (normalized.has_genre === false) parts.push('no genre')
+  if (normalized.has_tag === false) parts.push('no tag')
+  if (normalized.has_series === false) parts.push('no series')
+  if (normalized.has_author === false) parts.push('no author')
+  if (normalized.has_rating === true) parts.push('rated')
+  if (normalized.has_rating === false) parts.push('unrated')
+  if (normalized.min_rating != null)
+    parts.push(`rating ${normalized.min_rating.toFixed(1)}+`)
+  if (normalized.has_review === true) parts.push('has review')
+  if (normalized.has_review === false) parts.push('no review')
+  if (normalized.shelf_id != null) parts.push('shelf filter')
+  if (normalized.status != null) parts.push(`status: ${normalized.status}`)
   return parts.length > 0 ? parts.join(' · ') : 'All books'
 }
 
@@ -58,6 +68,10 @@ export default function SaveLensModal({
           series_ids: filterState.series_ids,
           authors: filterState.authors,
           formats: filterState.formats,
+          has_genre: filterState.has_genre,
+          has_tag: filterState.has_tag,
+          has_author: filterState.has_author,
+          has_series: filterState.has_series,
           min_rating: filterState.min_rating,
           has_rating: filterState.has_rating,
           has_review: filterState.has_review,

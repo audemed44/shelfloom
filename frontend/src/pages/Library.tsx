@@ -24,6 +24,10 @@ import CreateManualBookModal from '../components/library/CreateManualBookModal'
 import FilterDrawer from '../components/library/FilterDrawer'
 import ActiveFilterChips from '../components/library/ActiveFilterChips'
 import GroupedBookContent from '../components/shared/GroupedBookContent'
+import {
+  DEFAULT_FILTER_STATE,
+  normalizeFilterState,
+} from '../utils/filterState'
 import type {
   Book,
   Shelf,
@@ -337,19 +341,13 @@ export default function Library() {
     'shelfloom:showRatings',
     true
   )
-  const [filters, setFilters] = usePersistedState<FilterState>(
+  const [storedFilters, setFilters] = usePersistedState<FilterState>(
     'shelfloom:filters',
-    {
-      genres: [],
-      tags: [],
-      seriesIds: [],
-      authors: [],
-      formats: [],
-      minRating: null,
-      hasRating: null,
-      hasReview: null,
-      mode: 'and',
-    }
+    DEFAULT_FILTER_STATE
+  )
+  const filters = useMemo(
+    () => normalizeFilterState(storedFilters),
+    [storedFilters]
   )
   const [filterLabels, setFilterLabels] = useState<FilterLabels>({
     genres: {},
@@ -385,6 +383,26 @@ export default function Library() {
   }, [])
 
   const debouncedSearch = useDebounce(search, 300)
+  useEffect(() => {
+    const keys: (keyof FilterState)[] = [
+      'genres',
+      'tags',
+      'seriesIds',
+      'authors',
+      'formats',
+      'hasGenre',
+      'hasTag',
+      'hasAuthor',
+      'hasSeries',
+      'minRating',
+      'hasRating',
+      'hasReview',
+      'mode',
+    ]
+    if (keys.some((key) => storedFilters[key] === undefined)) {
+      setFilters(filters)
+    }
+  }, [storedFilters, filters, setFilters])
 
   const resetPage = () => setPage(1)
 
@@ -433,6 +451,13 @@ export default function Library() {
       params.set('author', filters.authors.join(','))
     if (filters.formats.length > 0)
       params.set('format', filters.formats.join(','))
+    if (filters.hasGenre != null)
+      params.set('has_genre', String(filters.hasGenre))
+    if (filters.hasTag != null) params.set('has_tag', String(filters.hasTag))
+    if (filters.hasAuthor != null)
+      params.set('has_author', String(filters.hasAuthor))
+    if (filters.hasSeries != null)
+      params.set('has_series', String(filters.hasSeries))
     if (filters.minRating != null)
       params.set('min_rating', String(filters.minRating))
     if (filters.hasRating != null)
@@ -507,6 +532,10 @@ export default function Library() {
     filters.seriesIds.length +
     filters.authors.length +
     filters.formats.length +
+    (filters.hasGenre === false ? 1 : 0) +
+    (filters.hasTag === false ? 1 : 0) +
+    (filters.hasAuthor === false ? 1 : 0) +
+    (filters.hasSeries === false ? 1 : 0) +
     (filters.minRating != null || filters.hasRating != null ? 1 : 0) +
     (filters.hasReview != null ? 1 : 0)
 
@@ -527,24 +556,41 @@ export default function Library() {
         | 'seriesIds'
         | 'authors'
         | 'formats'
+        | 'hasGenre'
+        | 'hasTag'
+        | 'hasAuthor'
+        | 'hasSeries'
         | 'minRating'
         | 'hasRating'
         | 'hasReview',
       value: string | number
     ) => {
       setFilters((prev) => {
+        const next = normalizeFilterState(prev)
+        if (category === 'hasGenre') {
+          return { ...next, hasGenre: null }
+        }
+        if (category === 'hasTag') {
+          return { ...next, hasTag: null }
+        }
+        if (category === 'hasAuthor') {
+          return { ...next, hasAuthor: null }
+        }
+        if (category === 'hasSeries') {
+          return { ...next, hasSeries: null }
+        }
         if (category === 'minRating') {
-          return { ...prev, minRating: null }
+          return { ...next, minRating: null }
         }
         if (category === 'hasRating') {
-          return { ...prev, hasRating: null }
+          return { ...next, hasRating: null }
         }
         if (category === 'hasReview') {
-          return { ...prev, hasReview: null }
+          return { ...next, hasReview: null }
         }
         return {
-          ...prev,
-          [category]: (prev[category] as (string | number)[]).filter(
+          ...next,
+          [category]: (next[category] as (string | number)[]).filter(
             (v) => v !== value
           ),
         }
@@ -556,14 +602,7 @@ export default function Library() {
 
   const handleClearAllFilters = useCallback(() => {
     setFilters({
-      genres: [],
-      tags: [],
-      seriesIds: [],
-      authors: [],
-      formats: [],
-      minRating: null,
-      hasRating: null,
-      hasReview: null,
+      ...DEFAULT_FILTER_STATE,
       mode: filters.mode,
     })
     setFilterLabels({ genres: {}, tags: {}, series: {} })
