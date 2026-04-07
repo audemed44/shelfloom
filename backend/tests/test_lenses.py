@@ -500,3 +500,30 @@ async def test_lens_books_filter_by_genre(client, db_session):
     assert resp.json()["items"][0]["title"] == "Fantasy Book"
 
     _ = other  # unused intentionally
+
+
+async def test_lens_books_filter_by_missing_author(client, db_session):
+    shelf = await _make_shelf(db_session)
+    await _make_book(db_session, shelf.id, title="No Author", author=None)
+    await _make_book(db_session, shelf.id, title="Named Author", author="Alice")
+
+    create = await client.post(
+        "/api/lenses",
+        json={
+            "name": "No Author",
+            "filter_state": {
+                "genres": [],
+                "tags": [],
+                "series_ids": [],
+                "authors": [],
+                "formats": [],
+                "has_author": False,
+                "mode": "and",
+            },
+        },
+    )
+    lid = create.json()["id"]
+
+    resp = await client.get(f"/api/lenses/{lid}/books")
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["title"] == "No Author"

@@ -75,6 +75,10 @@ export interface FilterState {
   seriesIds: number[]
   authors: string[]
   formats: string[]
+  hasGenre: boolean | null
+  hasTag: boolean | null
+  hasAuthor: boolean | null
+  hasSeries: boolean | null
   minRating: number | null
   hasRating: boolean | null
   hasReview: boolean | null
@@ -220,6 +224,10 @@ export interface LensFilterState {
   series_ids: number[]
   authors: string[]
   formats: string[]
+  has_genre: boolean | null
+  has_tag: boolean | null
+  has_author: boolean | null
+  has_series: boolean | null
   min_rating: number | null
   has_rating: boolean | null
   has_review: boolean | null

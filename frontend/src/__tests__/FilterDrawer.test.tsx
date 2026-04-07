@@ -10,6 +10,10 @@ const EMPTY_FILTERS: FilterState = {
   seriesIds: [],
   authors: [],
   formats: [],
+  hasGenre: null,
+  hasTag: null,
+  hasAuthor: null,
+  hasSeries: null,
   minRating: null,
   hasRating: null,
   hasReview: null,
@@ -192,6 +196,24 @@ describe('FilterDrawer', () => {
     expect(onApply).toHaveBeenCalledTimes(1)
     const [appliedFilters] = onApply.mock.calls[0]
     expect(appliedFilters.formats).toEqual(['epub'])
+  })
+
+  it('applies missing metadata filters from the metadata sections', async () => {
+    const user = userEvent.setup()
+    const onApply = vi.fn()
+    await renderDrawer({ onApply })
+
+    await user.click(screen.getByTestId('accordion-genre'))
+    await user.click(await screen.findByRole('checkbox', { name: /no genre/i }))
+
+    await user.click(screen.getByTestId('accordion-author'))
+    await user.click(screen.getByRole('checkbox', { name: /no author/i }))
+
+    await user.click(screen.getByTestId('filter-apply'))
+
+    const [appliedFilters] = onApply.mock.calls[0]
+    expect(appliedFilters.hasGenre).toBe(false)
+    expect(appliedFilters.hasAuthor).toBe(false)
   })
 
   it('Clear All resets all draft filters', async () => {

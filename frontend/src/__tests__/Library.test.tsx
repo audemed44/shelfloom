@@ -958,6 +958,10 @@ describe('Bulk Selection', () => {
               series_ids: [],
               authors: [],
               formats: [],
+              has_genre: null,
+              has_tag: null,
+              has_author: null,
+              has_series: null,
               mode: 'and',
               shelf_id: null,
               status: null,
@@ -1012,5 +1016,28 @@ describe('Bulk Selection', () => {
     await user.click(await screen.findByTestId('save-as-lens-btn'))
 
     expect(screen.getByTestId('save-lens-modal')).toBeInTheDocument()
+  })
+
+  it('requests books with has_genre=false when No Genre is applied', async () => {
+    const user = userEvent.setup()
+    renderLibrary()
+    await waitFor(() => screen.getAllByTestId('book-card'))
+
+    await user.click(screen.getByTestId('filters-button'))
+    await user.click(await screen.findByTestId('accordion-genre'))
+    await user.click(await screen.findByRole('checkbox', { name: /no genre/i }))
+    await user.click(screen.getByTestId('filter-apply'))
+
+    await waitFor(() => {
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.some(
+            ([url]) =>
+              url.toString().includes('/api/books?') &&
+              url.toString().includes('has_genre=false')
+          )
+      ).toBe(true)
+    })
   })
 })
