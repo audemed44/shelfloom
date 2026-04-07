@@ -143,12 +143,21 @@ async def get_series_tree(session: AsyncSession) -> list[dict]:
         .limit(1)
         .scalar_subquery()
     )
+    first_book_cover_sq = (
+        select(Book.cover_path)
+        .join(BookSeries, Book.id == BookSeries.book_id)
+        .where(BookSeries.series_id == Series.id, Book.cover_path.isnot(None))
+        .order_by(nullslast(BookSeries.sequence), BookSeries.book_id)
+        .limit(1)
+        .scalar_subquery()
+    )
 
     result = await session.execute(
         select(
             Series,
             func.count(BookSeries.book_id).label("book_count"),
             first_book_sq.label("first_book_id"),
+            first_book_cover_sq.label("first_book_cover_path"),
             ParentSeries.name.label("parent_name"),
         )
         .outerjoin(BookSeries, Series.id == BookSeries.series_id)
@@ -161,6 +170,7 @@ async def get_series_tree(session: AsyncSession) -> list[dict]:
             "series": row.Series,
             "book_count": row.book_count,
             "first_book_id": row.first_book_id,
+            "first_book_cover_path": row.first_book_cover_path,
             "parent_name": row.parent_name,
         }
         for row in result

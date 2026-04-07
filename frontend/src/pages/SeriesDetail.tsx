@@ -18,6 +18,7 @@ import type {
   ReadingOrder,
   ReadingOrderEntry,
 } from '../types/api'
+import { getBookCoverUrl } from '../utils/bookCover'
 
 interface SeriesDetailData {
   id: number
@@ -517,7 +518,7 @@ export default function SeriesDetail() {
                       {/* Cover thumbnail */}
                       <div className="w-12 h-16 bg-white/5 rounded overflow-hidden flex-shrink-0 border border-white/10">
                         <img
-                          src={`/api/books/${b.book_id}/cover`}
+                          src={getBookCoverUrl(b.book_id, b.cover_path)}
                           alt={b.title}
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -640,7 +641,10 @@ export default function SeriesDetail() {
                         {/* Cover thumbnail */}
                         <div className="w-12 h-16 bg-white/5 rounded overflow-hidden flex-shrink-0 border border-white/10">
                           <img
-                            src={`/api/books/${entry.book_id}/cover`}
+                            src={getBookCoverUrl(
+                              entry.book_id,
+                              entry.cover_path
+                            )}
                             alt={entry.title ?? ''}
                             className="w-full h-full object-cover"
                             onError={(e) => {

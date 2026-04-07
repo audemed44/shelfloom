@@ -19,6 +19,7 @@ const BOOK = {
   isbn: null,
   file_path: 'way-of-kings.epub',
   shelfloom_id: null,
+  cover_path: '/covers/way-of-kings.jpg',
   created_at: '2024-01-15T00:00:00',
   updated_at: '2024-01-15T00:00:00',
 }
@@ -123,8 +124,16 @@ function mockFetch({
   highlights = HIGHLIGHTS,
   series = SERIES,
 }: MockFetchOptions = {}) {
-  return vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation((url, options) => {
     const u = url.toString()
+    const method =
+      (options as RequestInit | undefined)?.method?.toUpperCase() ?? 'GET'
+    if (u.match(/\/api\/books\/[^/]+\/refresh-cover/) && method === 'POST')
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => book,
+      }) as Promise<Response>
     if (u.includes('/api/shelves'))
       return Promise.resolve({
         ok: true,
@@ -258,6 +267,19 @@ describe('BookDetail', () => {
     await waitFor(() =>
       expect(screen.getByText('An epic fantasy novel.')).toBeInTheDocument()
     )
+  })
+
+  it('renders the book cover with a versioned cover path query', async () => {
+    renderDetail()
+    await waitFor(() =>
+      expect(screen.getByAltText('The Way of Kings')).toBeInTheDocument()
+    )
+    const cover = screen.getByAltText('The Way of Kings')
+    expect(cover.getAttribute('src')).toContain('/api/books/1/cover')
+    expect(cover.getAttribute('src')).toContain(
+      'cover=%2Fcovers%2Fway-of-kings.jpg'
+    )
+    expect(cover.getAttribute('src')).toContain('v=0')
   })
 
   it('shows not-found state when book returns 404', async () => {
@@ -524,5 +546,17 @@ describe('BookDetail', () => {
     renderDetail()
     await waitFor(() => screen.getByRole('heading', { level: 1 }))
     expect(screen.queryByTestId('series-nav')).not.toBeInTheDocument()
+  })
+
+  it('bumps the cover cache key after refreshing the cover', async () => {
+    const user = userEvent.setup()
+    renderDetail()
+    await waitFor(() => screen.getByTitle('Refresh cover from file'))
+    await user.click(screen.getByTitle('Refresh cover from file'))
+
+    await waitFor(() => {
+      const cover = screen.getByAltText('The Way of Kings')
+      expect(cover.getAttribute('src')).toContain('v=1')
+    })
   })
 })

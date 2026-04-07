@@ -13,6 +13,8 @@ const SERIES_TREE = [
     description: null,
     sort_order: 0,
     cover_path: null,
+    first_book_id: 'book-1',
+    first_book_cover_path: '/covers/book-1.jpg',
   },
   {
     id: 2,
@@ -22,6 +24,8 @@ const SERIES_TREE = [
     description: null,
     sort_order: 0,
     cover_path: null,
+    first_book_id: 'book-2',
+    first_book_cover_path: '/covers/book-2.jpg',
   },
 ]
 
@@ -64,6 +68,8 @@ function mockFetch(overrides: Record<string, any> = {}): any {
           description: null,
           sort_order: 0,
           cover_path: null,
+          first_book_id: null,
+          first_book_cover_path: null,
         }),
       }) as Promise<Response>
     }
@@ -98,6 +104,10 @@ describe('SeriesList', () => {
     renderList()
     await waitFor(() => expect(screen.getByText('Cosmere')).toBeInTheDocument())
     expect(screen.getByText('Stormlight Archive')).toBeInTheDocument()
+    const images = document.querySelectorAll('img')
+    expect(images[0]?.getAttribute('src')).toContain(
+      'cover=%2Fcovers%2Fbook-2.jpg'
+    )
   })
 
   it('create series button opens modal', async () => {

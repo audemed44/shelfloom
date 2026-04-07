@@ -60,6 +60,7 @@ const MOCK_SERIES = [
     cover_path: null,
     book_count: 6,
     first_book_id: '1',
+    first_book_cover_path: null,
   },
 ]
 

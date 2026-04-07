@@ -10,6 +10,7 @@ const MOCK_LENSES = [
     name: 'Fantasy Reads',
     book_count: 12,
     cover_book_id: 'abc123',
+    cover_book_path: '/covers/abc123.jpg',
     filter_state: {
       genres: [1],
       tags: [],
@@ -28,6 +29,7 @@ const MOCK_LENSES = [
     name: 'Unread Sci-Fi',
     book_count: 5,
     cover_book_id: null,
+    cover_book_path: null,
     filter_state: {
       genres: [2],
       tags: [],
@@ -89,6 +91,14 @@ describe('Lenses', () => {
     await screen.findByText('Fantasy Reads')
     const cards = screen.getAllByTestId('lens-card')
     expect(cards).toHaveLength(2)
+  })
+
+  it('uses the cover path to version the cover image URL', async () => {
+    renderLenses()
+    await screen.findByText('Fantasy Reads')
+    const cover = screen.getByAltText('Fantasy Reads')
+    expect(cover.getAttribute('src')).toContain('/api/books/abc123/cover')
+    expect(cover.getAttribute('src')).toContain('cover=%2Fcovers%2Fabc123.jpg')
   })
 
   it('shows empty state when no lenses exist', async () => {

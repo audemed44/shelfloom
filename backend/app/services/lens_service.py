@@ -60,7 +60,7 @@ async def create_lens(
 
 
 async def list_lenses(session: AsyncSession) -> list[dict]:
-    """Return all lenses with computed book_count and cover_book_id."""
+    """Return all lenses with computed book_count and cover-book fields."""
     result = await session.execute(select(Lens).order_by(Lens.sort_order, Lens.created_at))
     lenses = result.scalars().all()
 
@@ -70,6 +70,7 @@ async def list_lenses(session: AsyncSession) -> list[dict]:
         kwargs = _fs_to_kwargs(fs)
         books, total, _pages = await list_books(session, per_page=1, **kwargs)
         cover_book_id = books[0].id if books else None
+        cover_book_path = books[0].cover_path if books else None
         out.append(
             {
                 "id": lens.id,
@@ -77,6 +78,7 @@ async def list_lenses(session: AsyncSession) -> list[dict]:
                 "filter_state": fs,
                 "book_count": total,
                 "cover_book_id": cover_book_id,
+                "cover_book_path": cover_book_path,
                 "created_at": lens.created_at,
                 "updated_at": lens.updated_at,
             }

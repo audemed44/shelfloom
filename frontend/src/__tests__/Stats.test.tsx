@@ -66,6 +66,7 @@ const MOCK_COMPLETED = [
     title: 'The Way of Kings',
     author: 'Brandon Sanderson',
     completed_at: '2026-03-01T00:00:00',
+    cover_path: '/covers/b1.jpg',
   },
 ]
 
@@ -147,6 +148,9 @@ describe('Stats', () => {
       // books_read = 18
       expect(screen.getByText('18 completed')).toBeInTheDocument()
     })
+    const cover = screen.getByAltText('The Way of Kings')
+    expect(cover.getAttribute('src')).toContain('/api/books/b1/cover')
+    expect(cover.getAttribute('src')).toContain('cover=%2Fcovers%2Fb1.jpg')
   })
 
   it('renders empty states when no data is returned', async () => {

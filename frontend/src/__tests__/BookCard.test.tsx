@@ -18,6 +18,7 @@ const BOOK: Book = {
   shelf_name: 'Library',
   file_path: null,
   shelfloom_id: null,
+  cover_path: '/covers/test-uuid-1.jpg',
   publisher: null,
   language: null,
   isbn: null,
@@ -83,6 +84,9 @@ describe('BookCard', () => {
     renderCard()
     const img = screen.getByRole('img')
     expect(img.getAttribute('src')).toContain('/api/books/test-uuid-1/cover')
+    expect(img.getAttribute('src')).toContain(
+      'cover=%2Fcovers%2Ftest-uuid-1.jpg'
+    )
   })
 
   it('does not show checkbox when onToggle is not provided', () => {

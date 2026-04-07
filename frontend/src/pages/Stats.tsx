@@ -4,6 +4,7 @@ import { Flame, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { ReadingHeatmap } from '../components/ReadingHeatmap'
 import type { HeatmapEntry } from '../components/ReadingHeatmap'
+import { getBookCoverUrl } from '../utils/bookCover'
 
 // ===========================================================================
 // Types
@@ -51,6 +52,7 @@ interface CompletedBook {
   title: string
   author: string | null
   completed_at: string
+  cover_path: string | null
 }
 
 interface CalendarBook {
@@ -1617,7 +1619,7 @@ function CompletedBooksCarousel({ books }: { books: CompletedBook[] }) {
           >
             <div className="w-[96px] h-[144px] bg-white/5 mb-2 border border-white/10 group-hover:border-primary transition-colors overflow-hidden">
               <img
-                src={`/api/books/${book.book_id}/cover`}
+                src={getBookCoverUrl(book.book_id, book.cover_path)}
                 alt={book.title}
                 className="w-full h-full object-cover"
                 onError={(e) => {

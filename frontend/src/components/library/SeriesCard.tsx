@@ -1,6 +1,7 @@
 import { Check, ExternalLink } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Book } from '../../types'
+import { getBookCoverUrl } from '../../utils/bookCover'
 
 interface SeriesCardProps {
   seriesId: number
@@ -30,7 +31,9 @@ export default function SeriesCard({
     (a, b) => (a.series_sequence ?? Infinity) - (b.series_sequence ?? Infinity)
   )
   const firstBook = sorted[0]
-  const coverSrc = firstBook ? `/api/books/${firstBook.id}/cover` : undefined
+  const coverSrc = firstBook
+    ? getBookCoverUrl(firstBook.id, firstBook.cover_path)
+    : undefined
 
   const count = totalBookCount ?? books.length
   const readCount = books.filter(

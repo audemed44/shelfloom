@@ -24,6 +24,7 @@ import LogSessionModal from '../components/book-detail/LogSessionModal'
 import VerdictModal from '../components/book-detail/VerdictModal'
 import type { BookDetail, Shelf, ReadingSession, Highlight } from '../types'
 import type { SeriesBook } from '../types/api'
+import { getBookCoverUrl } from '../utils/bookCover'
 import StarRating from '../components/shared/StarRating'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -401,7 +402,7 @@ export default function BookDetailPage() {
           <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 shadow-2xl shadow-primary/5">
             <img
               key={coverKey}
-              src={`/api/books/${book.id}/cover`}
+              src={getBookCoverUrl(book.id, book.cover_path, coverKey)}
               alt={book.title}
               className="w-full h-full object-cover"
               onError={(e) => {

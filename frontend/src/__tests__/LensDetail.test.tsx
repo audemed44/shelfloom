@@ -10,6 +10,7 @@ const MOCK_LENS = {
   name: 'Fantasy Reads',
   book_count: 2,
   cover_book_id: null,
+  cover_book_path: null,
   filter_state: {
     genres: [1],
     tags: [3],
