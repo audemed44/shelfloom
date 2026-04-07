@@ -144,6 +144,7 @@ export interface Book {
   shelf_name: string | null
   file_path: string | null
   shelfloom_id: string | null
+  cover_path: string | null
   created_at: string
   updated_at: string
   reading_progress: number | null // 0–100, null = unread
@@ -182,6 +183,7 @@ export interface SeriesWithCount {
   cover_path: string | null
   book_count: number
   first_book_id: string | null
+  first_book_cover_path: string | null
 }
 
 export interface ReadingOrder {
@@ -232,6 +234,7 @@ export interface Lens {
   filter_state: LensFilterState
   book_count: number
   cover_book_id: string | null
+  cover_book_path: string | null
   created_at: string
   updated_at: string
 }

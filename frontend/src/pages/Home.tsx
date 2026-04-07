@@ -21,6 +21,7 @@ import type {
   PendingChapterBatchStatusResponse,
   PendingChapterFetchResponse,
 } from '../types/api'
+import { getBookCoverUrl } from '../utils/bookCover'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -211,7 +212,7 @@ function CurrentlyReadingCard({
     >
       <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
         <img
-          src={`/api/books/${book.id}/cover`}
+          src={getBookCoverUrl(book.id, book.cover_path)}
           alt={book.title}
           className="w-full h-full object-cover"
           onError={(e) => {

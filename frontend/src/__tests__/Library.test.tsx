@@ -114,6 +114,7 @@ const MOCK_SERIES_TREE = [
     cover_path: null,
     book_count: 6,
     first_book_id: '1',
+    first_book_cover_path: null,
   },
   {
     id: 2,
@@ -125,6 +126,7 @@ const MOCK_SERIES_TREE = [
     cover_path: null,
     book_count: 7,
     first_book_id: '2',
+    first_book_cover_path: null,
   },
   {
     id: 10,
@@ -136,6 +138,7 @@ const MOCK_SERIES_TREE = [
     cover_path: null,
     book_count: 5,
     first_book_id: '1',
+    first_book_cover_path: null,
   },
 ]
 
@@ -948,6 +951,7 @@ describe('Bulk Selection', () => {
             name: 'Test',
             book_count: 0,
             cover_book_id: null,
+            cover_book_path: null,
             filter_state: {
               genres: [],
               tags: [],

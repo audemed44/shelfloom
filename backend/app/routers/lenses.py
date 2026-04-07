@@ -23,7 +23,7 @@ async def create_lens_endpoint(
     session: AsyncSession = Depends(get_session),
 ):
     lens = await create_lens(session, data.name, data.filter_state)
-    return _lens_detail_response(lens, book_count=0, cover_book_id=None)
+    return _lens_detail_response(lens, book_count=0, cover_book_id=None, cover_book_path=None)
 
 
 @router.get("", response_model=list[LensResponse])
@@ -36,6 +36,7 @@ async def list_lenses_endpoint(session: AsyncSession = Depends(get_session)):
             filter_state=item["filter_state"],
             book_count=item["book_count"],
             cover_book_id=item["cover_book_id"],
+            cover_book_path=item["cover_book_path"],
             created_at=item["created_at"],
             updated_at=item["updated_at"],
         )
@@ -64,6 +65,7 @@ async def get_lens_endpoint(lens_id: int, session: AsyncSession = Depends(get_se
         filter_state=fs,
         book_count=total,
         cover_book_id=books[0].id if books else None,
+        cover_book_path=books[0].cover_path if books else None,
         created_at=lens.created_at,
         updated_at=lens.updated_at,
     )
@@ -171,6 +173,7 @@ async def update_lens_endpoint(
         filter_state=fs,
         book_count=total,
         cover_book_id=books[0].id if books else None,
+        cover_book_path=books[0].cover_path if books else None,
         created_at=lens.created_at,
         updated_at=lens.updated_at,
     )
@@ -184,7 +187,12 @@ async def delete_lens_endpoint(lens_id: int, session: AsyncSession = Depends(get
         raise HTTPException(status_code=404, detail=str(e))
 
 
-def _lens_detail_response(lens, book_count: int, cover_book_id: str | None) -> LensResponse:
+def _lens_detail_response(
+    lens,
+    book_count: int,
+    cover_book_id: str | None,
+    cover_book_path: str | None,
+) -> LensResponse:
     import json
 
     fs = LensFilterState.model_validate(json.loads(lens.filter_state))
@@ -194,6 +202,7 @@ def _lens_detail_response(lens, book_count: int, cover_book_id: str | None) -> L
         filter_state=fs,
         book_count=book_count,
         cover_book_id=cover_book_id,
+        cover_book_path=cover_book_path,
         created_at=lens.created_at,
         updated_at=lens.updated_at,
     )

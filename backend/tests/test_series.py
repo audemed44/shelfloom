@@ -200,6 +200,22 @@ async def test_series_tree(client):
     assert "Parent" in names and "Child" in names
 
 
+async def test_series_tree_includes_first_book_cover_path(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book = await _create_book(db_session, shelf.id, "Covered")
+    book.cover_path = "/covers/covered.jpg"
+    await db_session.commit()
+
+    series = (await client.post("/api/series", json={"name": "Series"})).json()
+    await client.post(f"/api/series/{series['id']}/books/{book.id}?sequence=1")
+
+    resp = await client.get("/api/series/tree")
+    assert resp.status_code == 200
+    row = next(item for item in resp.json() if item["id"] == series["id"])
+    assert row["first_book_id"] == book.id
+    assert row["first_book_cover_path"] == "/covers/covered.jpg"
+
+
 # ── reading orders ────────────────────────────────────────────────────────────
 
 

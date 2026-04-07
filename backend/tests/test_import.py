@@ -17,11 +17,30 @@ FIXTURES = Path(__file__).parent / "fixtures"
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
-def _make_epub(path: Path, title: str = "Book", author: str = "Author") -> Path:
+def _make_epub(
+    path: Path,
+    title: str = "Book",
+    author: str = "Author",
+    cover_color: tuple[int, int, int] | None = None,
+) -> Path:
     book = epub.EpubBook()
     book.set_identifier(f"id-{uuid.uuid4()}")
     book.set_title(title)
     book.add_author(author)
+    if cover_color is not None:
+        from io import BytesIO
+
+        from PIL import Image
+
+        img_data = BytesIO()
+        Image.new("RGB", (100, 150), color=cover_color).save(img_data, "JPEG")
+        cover_item = epub.EpubItem(
+            uid="cover-image",
+            file_name="images/cover.jpg",
+            media_type="image/jpeg",
+            content=img_data.getvalue(),
+        )
+        book.add_item(cover_item)
     c1 = epub.EpubHtml(title="C1", file_name="c1.xhtml")
     c1.content = f"<p>{title} content. " + "word " * 50 + "</p>"
     book.add_item(c1)
@@ -258,6 +277,68 @@ async def test_rescan_detects_content_change(tmp_path, db_session):
     result = await db_session.execute(select(Book))
     books = result.scalars().all()
     assert len(books) == 1  # no duplicate
+
+
+async def test_rescan_refreshes_cover_for_changed_file(tmp_path, db_session):
+    from app.services.import_service import import_shelf
+
+    shelf_path = tmp_path / "shelf"
+    shelf_path.mkdir()
+    covers = tmp_path / "covers"
+    book_path = shelf_path / "book.epub"
+    _make_epub(book_path, "Covered Book", cover_color=(200, 40, 40))
+    shelf = await _make_shelf_in_db(db_session, str(shelf_path))
+
+    await import_shelf(db_session, shelf, covers)
+
+    book = await db_session.scalar(select(Book))
+    assert book is not None
+    assert book.cover_path is not None
+    original_cover_bytes = Path(book.cover_path).read_bytes()
+
+    _make_epub(book_path, "Covered Book", cover_color=(40, 40, 200))
+    progress2 = await import_shelf(db_session, shelf, covers)
+
+    assert progress2.updated == 1
+    await db_session.refresh(book)
+    assert book.cover_path is not None
+    assert Path(book.cover_path).read_bytes() != original_cover_bytes
+
+
+async def test_rescan_preserves_ui_metadata_edits(tmp_path, db_session):
+    from app.schemas.book import BookUpdate
+    from app.services.book_service import update_book
+    from app.services.import_service import import_shelf
+
+    shelf_path = tmp_path / "shelf"
+    shelf_path.mkdir()
+    covers = tmp_path / "covers"
+    book_path = shelf_path / "book.epub"
+    _make_epub(book_path, "Original Title", "Original Author", cover_color=(20, 120, 20))
+    shelf = await _make_shelf_in_db(db_session, str(shelf_path))
+
+    await import_shelf(db_session, shelf, covers)
+
+    book = await db_session.scalar(select(Book))
+    assert book is not None
+    original_cover_path = book.cover_path
+
+    await update_book(
+        db_session,
+        book.id,
+        BookUpdate(title="Custom Title", author="Custom Author"),
+    )
+
+    _make_epub(book_path, "File Title", "File Author", cover_color=(120, 20, 120))
+    progress2 = await import_shelf(db_session, shelf, covers)
+
+    assert progress2.updated == 1
+    await db_session.refresh(book)
+    assert book.title == "Custom Title"
+    assert book.author == "Custom Author"
+    assert book.cover_path is not None
+    assert book.cover_path == original_cover_path
+    assert Path(book.cover_path).exists()
 
 
 async def test_import_records_hashes(tmp_path, db_session):

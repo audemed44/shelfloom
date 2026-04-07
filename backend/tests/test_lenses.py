@@ -64,6 +64,7 @@ async def test_create_lens(client):
     assert data["id"] > 0
     assert data["book_count"] == 0
     assert data["cover_book_id"] is None
+    assert data["cover_book_path"] is None
 
 
 async def test_list_lenses_empty(client):
@@ -267,6 +268,7 @@ async def test_lens_no_matching_books_returns_zero_count(client, db_session):
     resp = await client.get(f"/api/lenses/{lid}")
     assert resp.json()["book_count"] == 0
     assert resp.json()["cover_book_id"] is None
+    assert resp.json()["cover_book_path"] is None
 
 
 async def test_list_lenses_includes_book_count(client, db_session):
@@ -289,6 +291,34 @@ async def test_list_lenses_includes_book_count(client, db_session):
     )
     resp = await client.get("/api/lenses")
     assert resp.json()[0]["book_count"] == 1
+
+
+async def test_lens_returns_cover_book_path(client, db_session):
+    shelf = await _make_shelf(db_session)
+    book = await _make_book(db_session, shelf.id, fmt="epub")
+    book.cover_path = "/covers/lens-book.jpg"
+    await db_session.commit()
+
+    create = await client.post(
+        "/api/lenses",
+        json={
+            "name": "EPUBs",
+            "filter_state": {
+                "genres": [],
+                "tags": [],
+                "series_ids": [],
+                "authors": [],
+                "formats": ["epub"],
+                "mode": "and",
+            },
+        },
+    )
+    lid = create.json()["id"]
+
+    resp = await client.get(f"/api/lenses/{lid}")
+    assert resp.status_code == 200
+    assert resp.json()["cover_book_id"] == book.id
+    assert resp.json()["cover_book_path"] == "/covers/lens-book.jpg"
 
 
 # ── /books sub-endpoint ──────────────────────────────────────────────────────

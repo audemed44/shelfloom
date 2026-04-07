@@ -184,12 +184,30 @@ async def _process_file(
         # Existing book — check if content changed
         if book.file_hash == pre_sha:
             return "skipped"
-        # Content changed — update hashes
-        await _record_hash(session, book, pre_sha, pre_md5, None, pre_ko_md5)
+        # Content changed — refresh file-derived state without overwriting UI-edited metadata.
+        await _record_hash(session, book, pre_sha, pre_md5, book.page_count, pre_ko_md5)
+        (
+            _title,
+            _author,
+            _publisher,
+            _language,
+            _description,
+            _page_count,
+            epub_uid,
+            metadata_raw,
+        ) = _extract_metadata(book_path, fmt)
+        cover_path = _extract_cover(book_path, fmt, book.id, covers_dir)
+        if cover_path is None:
+            (Path(covers_dir) / f"{book.id}.jpg").unlink(missing_ok=True)
+
         book.file_hash = pre_sha
         book.file_hash_md5 = pre_md5
         book.file_hash_md5_ko = pre_ko_md5
         book.file_path = str(book_path.relative_to(shelf.path))
+        book.file_size = book_path.stat().st_size
+        book.epub_uid = epub_uid
+        book.metadata_raw = json.dumps(metadata_raw)
+        book.cover_path = cover_path
         await session.commit()
         return "updated"
 

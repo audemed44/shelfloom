@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import type { Lens } from '../../types/api'
+import { getBookCoverUrl } from '../../utils/bookCover'
 
 interface LensCardProps {
   lens: Lens
@@ -14,7 +15,7 @@ export default function LensCard({ lens, onEdit, onDelete }: LensCardProps) {
   const menuRef = useRef<HTMLDivElement>(null)
 
   const coverUrl = lens.cover_book_id
-    ? `/api/books/${lens.cover_book_id}/cover`
+    ? getBookCoverUrl(lens.cover_book_id, lens.cover_book_path)
     : null
 
   return (

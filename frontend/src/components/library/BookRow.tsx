@@ -3,6 +3,7 @@ import { AlertTriangle, Check } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { Book } from '../../types'
+import { getBookCoverUrl } from '../../utils/bookCover'
 import StarRating from '../shared/StarRating'
 
 function fmtFormat(format: string | null | undefined): string {
@@ -31,7 +32,7 @@ export default function BookRow({
   showRatings = true,
   onQuickRate,
 }: BookRowProps) {
-  const coverSrc = `/api/books/${book.id}/cover`
+  const coverSrc = getBookCoverUrl(book.id, book.cover_path)
   const genres = book.genres ?? []
   const [rating, setRating] = useState<number | null>(book.rating)
   const [savingRating, setSavingRating] = useState(false)

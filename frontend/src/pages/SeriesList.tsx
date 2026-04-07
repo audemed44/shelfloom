@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
 import SeriesModal from '../components/series/SeriesModal'
 import type { SeriesWithCount } from '../types/api'
+import { getBookCoverUrl } from '../utils/bookCover'
 
 const PER_PAGE = 20
 
@@ -40,15 +41,17 @@ function buildGroups(flat: SeriesWithCount[]): SeriesGroup[] {
 
 function CoverThumb({
   bookId,
+  coverPath,
   size = 'md',
 }: {
   bookId: string | null
+  coverPath: string | null
   size?: 'sm' | 'md'
 }) {
   const dims = size === 'sm' ? 'w-8 h-[44px]' : 'w-9 h-[52px]'
   return bookId ? (
     <img
-      src={`/api/books/${bookId}/cover`}
+      src={getBookCoverUrl(bookId, coverPath)}
       alt=""
       className={`${dims} object-cover bg-white/5 shrink-0`}
     />
@@ -110,7 +113,10 @@ function GroupCard({
         data-testid={`series-row-${parent.id}`}
       >
         <Link to={`/series/${parent.id}`} className="shrink-0">
-          <CoverThumb bookId={parent.first_book_id} />
+          <CoverThumb
+            bookId={parent.first_book_id}
+            coverPath={parent.first_book_cover_path}
+          />
         </Link>
         <div className="flex-1 min-w-0">
           <Link
@@ -140,6 +146,9 @@ function GroupCard({
           {/* TODO: decide proper parent cover logic (dedicated upload, or inherit from parent's own books) */}
           <CoverThumb
             bookId={children[0]?.first_book_id ?? parent.first_book_id}
+            coverPath={
+              children[0]?.first_book_cover_path ?? parent.first_book_cover_path
+            }
           />
         </Link>
         <div className="flex-1 min-w-0">
@@ -165,7 +174,11 @@ function GroupCard({
           data-testid={`series-row-${child.id}`}
         >
           <Link to={`/series/${child.id}`} className="shrink-0">
-            <CoverThumb bookId={child.first_book_id} size="sm" />
+            <CoverThumb
+              bookId={child.first_book_id}
+              coverPath={child.first_book_cover_path}
+              size="sm"
+            />
           </Link>
           <div className="flex-1 min-w-0">
             <Link

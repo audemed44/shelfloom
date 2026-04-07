@@ -3,6 +3,7 @@ import { Check, X } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { Book } from '../../types'
+import { getBookCoverUrl } from '../../utils/bookCover'
 import StarRating from '../shared/StarRating'
 
 function fmtFormat(format: string | null | undefined): string {
@@ -31,7 +32,7 @@ export default function BookCard({
   showRatings = true,
   onQuickRate,
 }: BookCardProps) {
-  const coverSrc = `/api/books/${book.id}/cover`
+  const coverSrc = getBookCoverUrl(book.id, book.cover_path)
   const progress = book.reading_progress
   const isDnf = book.status === 'dnf'
   const isComplete = !isDnf && progress != null && progress >= 100

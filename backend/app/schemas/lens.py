@@ -36,5 +36,6 @@ class LensResponse(BaseModel):
     filter_state: LensFilterState
     book_count: int = 0
     cover_book_id: str | None = None
+    cover_book_path: str | None = None
     created_at: datetime
     updated_at: datetime
