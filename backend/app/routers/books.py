@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func
 from sqlalchemy import inspect as sa_inspect
@@ -37,6 +37,13 @@ from app.services.book_service import (
 
 router = APIRouter(prefix="/books", tags=["books"])
 _BOOK_COVER_HEADERS = {"Cache-Control": "no-cache"}
+_BOOK_COVER_IMMUTABLE_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+
+def _book_cover_success_headers(request: Request) -> dict[str, str]:
+    if "cover" in request.query_params or "v" in request.query_params:
+        return _BOOK_COVER_IMMUTABLE_HEADERS
+    return _BOOK_COVER_HEADERS
 
 
 def _compute_status(
@@ -410,7 +417,11 @@ async def delete_book_endpoint(
 
 
 @router.get("/{book_id}/cover")
-async def get_cover_endpoint(book_id: str, session: AsyncSession = Depends(get_session)):
+async def get_cover_endpoint(
+    book_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
     try:
         book = await get_book(session, book_id)
     except BookNotFound as e:
@@ -424,7 +435,7 @@ async def get_cover_endpoint(book_id: str, session: AsyncSession = Depends(get_s
     return FileResponse(
         book.cover_path,
         media_type="image/jpeg",
-        headers=_BOOK_COVER_HEADERS,
+        headers=_book_cover_success_headers(request),
     )
 
 

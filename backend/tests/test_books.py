@@ -478,6 +478,29 @@ async def test_cover_uses_revalidating_cache_headers(client, db_session, tmp_pat
     assert resp.headers["cache-control"] == "no-cache"
 
 
+async def test_cover_uses_immutable_cache_headers_for_versioned_requests(
+    client, db_session, tmp_path
+):
+    shelf = await _create_shelf(db_session, tmp_path)
+    cover = tmp_path / "cover.jpg"
+    cover.write_bytes(b"coverdata")
+    book = Book(
+        id=str(uuid.uuid4()),
+        title="Covered",
+        format="epub",
+        file_path="covered.epub",
+        shelf_id=shelf.id,
+        cover_path=str(cover),
+    )
+    db_session.add(book)
+    await db_session.commit()
+
+    resp = await client.get(f"/api/books/{book.id}/cover?cover=/covers/covered.jpg&v=2")
+
+    assert resp.status_code == 200
+    assert resp.headers["cache-control"] == "public, max-age=31536000, immutable"
+
+
 async def test_download_book(client, db_session, tmp_path):
     shelf_path = tmp_path / "shelf"
     shelf_path.mkdir()
