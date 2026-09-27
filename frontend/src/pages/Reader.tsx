@@ -363,6 +363,12 @@ export default function Reader() {
     }
   }, [bookId])
 
+  useEffect(() => {
+    if (!resumedFrom) return
+    const t = setTimeout(() => setResumedFrom(null), 8000)
+    return () => clearTimeout(t)
+  }, [resumedFrom])
+
   const jumpToRemote = async () => {
     if (!remote) return
     knownTimestampRef.current = remote.position.timestamp
@@ -459,6 +465,28 @@ export default function Reader() {
         </div>
       )}
 
+      {/* Where we picked up from (another device); hides itself */}
+      {resumedFrom && status === 'ready' && !remote && (
+        <div
+          className="flex items-center justify-center gap-2 border-b px-4 py-1.5 text-xs"
+          style={{ borderColor: `${theme.fg}22` }}
+          data-testid="reader-resumed"
+        >
+          <RefreshCw size={11} className="opacity-60" />
+          <span className="truncate">
+            Continued from {resumedFrom.device} ·{' '}
+            {timeAgo(resumedFrom.timestamp)}
+          </span>
+          <button
+            onClick={() => setResumedFrom(null)}
+            aria-label="Dismiss"
+            className="opacity-60 hover:opacity-100"
+          >
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
       {/* Book */}
       <div className="relative min-h-0 flex-1">
         <div ref={hostRef} className="absolute inset-0" />
@@ -494,24 +522,6 @@ export default function Reader() {
                 Back to the book
               </Link>
             </div>
-          </div>
-        )}
-
-        {resumedFrom && status === 'ready' && (
-          <div
-            className="absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-2 border px-3 py-1.5 text-xs shadow-sm"
-            style={{ background: theme.bg, borderColor: `${theme.fg}33` }}
-            data-testid="reader-resumed"
-          >
-            Continued from {resumedFrom.device} ·{' '}
-            {timeAgo(resumedFrom.timestamp)}
-            <button
-              onClick={() => setResumedFrom(null)}
-              aria-label="Dismiss"
-              className="opacity-60 hover:opacity-100"
-            >
-              <X size={12} />
-            </button>
           </div>
         )}
 
@@ -692,24 +702,25 @@ function isOnCurrentPage(view: FoliateView | null, xpointer: string): boolean {
 }
 
 function SyncBadge({ state }: { state: SyncState }) {
-  if (state === 'idle') return <span className="opacity-50">Sync on</span>
+  if (state === 'idle')
+    return <span className="whitespace-nowrap opacity-50">Sync on</span>
   if (state === 'saving')
     return (
-      <span className="flex items-center gap-1 opacity-60">
+      <span className="flex items-center gap-1 whitespace-nowrap opacity-60">
         <Loader2 size={11} className="animate-spin" />
         Saving
       </span>
     )
   if (state === 'offline')
     return (
-      <span className="flex items-center gap-1 text-accent">
+      <span className="flex items-center gap-1 whitespace-nowrap text-accent">
         <CloudOff size={11} />
         Not saved — retrying
       </span>
     )
   return (
     <span
-      className="flex items-center gap-1 opacity-60"
+      className="flex items-center gap-1 whitespace-nowrap opacity-60"
       data-testid="reader-synced"
     >
       <Check size={11} />
