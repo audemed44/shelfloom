@@ -37,20 +37,16 @@ function SectionHeader({
   description?: string
 }) {
   return (
-    <div className="flex items-start gap-4 pb-3 border-b border-white/10 mb-6">
-      <span className="text-xs font-black tracking-[0.2em] text-white/20 mt-0.5">
+    <div className="lg:col-span-4">
+      <span className="text-xs font-semibold tabular-nums text-primary-400">
         {num}
       </span>
-      <div>
-        <h2 className="text-base font-bold uppercase tracking-tight text-white">
-          {title}
-        </h2>
-        {description && (
-          <p className="text-xs text-white/40 normal-case mt-0.5">
-            {description}
-          </p>
-        )}
-      </div>
+      <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">
+        {title}
+      </h2>
+      {description && (
+        <p className="mt-1 max-w-xs text-sm text-white/50">{description}</p>
+      )}
     </div>
   )
 }
@@ -427,7 +423,7 @@ export default function Settings() {
   const shelfList = shelves ?? []
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-12">
+    <div className="mx-auto max-w-[1600px] space-y-14 px-4 py-6 sm:px-6 lg:px-12 lg:py-10">
       <header className="mb-4">
         <h2 className="text-5xl sm:text-7xl font-extrabold tracking-tighter leading-[0.9] text-white">
           Settings
@@ -438,372 +434,382 @@ export default function Settings() {
       </header>
 
       {/* ── 01 Shelves ── */}
-      <section>
+      <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
         <SectionHeader
           num="01"
           title="Shelves"
           description="Directories that Shelfloom monitors for book files."
         />
-
-        {deleteError && (
-          <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 mb-4 normal-case">
-            {deleteError}
-          </p>
-        )}
-
-        <div className="space-y-2 mb-4" data-testid="shelf-list">
-          {shelfList.length === 0 ? (
-            <p className="text-xs text-white/30 tracking-widest uppercase text-center py-8 border border-white/10">
-              No shelves configured
+        <div className="min-w-0 lg:col-span-8">
+          {deleteError && (
+            <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 mb-4 normal-case">
+              {deleteError}
             </p>
-          ) : (
-            shelfList.map((shelf) => (
-              <ShelfCard
-                key={shelf.id}
-                shelf={shelf}
-                onEdit={() => setEditingShelf(shelf)}
-                onDelete={() => handleDeleteShelf(shelf)}
-              />
-            ))
           )}
-        </div>
 
-        <button
-          onClick={() => setShowCreateShelf(true)}
-          data-testid="add-shelf-btn"
-          className="flex items-center gap-2 px-4 py-2.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 transition-colors"
-        >
-          <Plus size={13} />
-          Add Shelf
-        </button>
+          <div className="space-y-2 mb-4" data-testid="shelf-list">
+            {shelfList.length === 0 ? (
+              <p className="text-xs text-white/30 tracking-widest uppercase text-center py-8 border border-white/10">
+                No shelves configured
+              </p>
+            ) : (
+              shelfList.map((shelf) => (
+                <ShelfCard
+                  key={shelf.id}
+                  shelf={shelf}
+                  onEdit={() => setEditingShelf(shelf)}
+                  onDelete={() => handleDeleteShelf(shelf)}
+                />
+              ))
+            )}
+          </div>
+
+          <button
+            onClick={() => setShowCreateShelf(true)}
+            data-testid="add-shelf-btn"
+            className="flex items-center gap-2 px-4 py-2.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 transition-colors"
+          >
+            <Plus size={13} />
+            Add Shelf
+          </button>
+        </div>
       </section>
 
       {/* ── 02 File Organization ── */}
-      <section>
+      <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
         <SectionHeader
           num="02"
           title="File Organization"
           description="Rearrange books on disk into a consistent folder structure."
         />
-
-        <div className="space-y-5">
-          {/* Shelf selector */}
-          <div className="space-y-1.5">
-            <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
-              Target Shelf
-            </label>
-            <select
-              value={organizeShelfId}
-              onChange={(e) => {
-                setOrganizeShelfId(e.target.value)
-                setPreviewResults(null)
-                setApplyDone(null)
-              }}
-              data-testid="organize-shelf-select"
-              className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white normal-case focus:outline-none focus:border-primary transition-colors appearance-none"
-            >
-              <option value="">— Select a shelf —</option>
-              {shelfList.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Template input */}
-          <div className="space-y-1.5">
-            <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
-              Path Template
-            </label>
-            <input
-              ref={templateRef}
-              type="text"
-              value={template}
-              onChange={(e) => {
-                setTemplate(e.target.value)
-                setPreviewResults(null)
-                setApplyDone(null)
-              }}
-              data-testid="template-input"
-              className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
-            />
-
-            {/* Token chips */}
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {TOKENS.map(({ label }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => insertToken(label)}
-                  className="text-[10px] font-mono font-black text-primary bg-primary/10 border border-primary/20 px-2 py-1 hover:bg-primary/20 transition-colors"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Sequence padding */}
-          <div className="flex items-center gap-4">
+        <div className="min-w-0 lg:col-span-8">
+          <div className="space-y-5">
+            {/* Shelf selector */}
             <div className="space-y-1.5">
               <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
-                Sequence Padding
+                Target Shelf
+              </label>
+              <select
+                value={organizeShelfId}
+                onChange={(e) => {
+                  setOrganizeShelfId(e.target.value)
+                  setPreviewResults(null)
+                  setApplyDone(null)
+                }}
+                data-testid="organize-shelf-select"
+                className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white normal-case focus:outline-none focus:border-primary transition-colors appearance-none"
+              >
+                <option value="">— Select a shelf —</option>
+                {shelfList.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Template input */}
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
+                Path Template
               </label>
               <input
-                type="number"
-                min={1}
-                max={6}
-                value={seqPad}
-                onChange={(e) => setSeqPad(parseInt(e.target.value, 10) || 2)}
-                className="w-24 bg-black border border-white/10 px-4 py-3 text-sm text-white text-center focus:outline-none focus:border-primary transition-colors"
+                ref={templateRef}
+                type="text"
+                value={template}
+                onChange={(e) => {
+                  setTemplate(e.target.value)
+                  setPreviewResults(null)
+                  setApplyDone(null)
+                }}
+                data-testid="template-input"
+                className="w-full bg-black border border-white/10 px-4 py-3 text-sm text-white font-mono normal-case placeholder:text-white/20 focus:outline-none focus:border-primary transition-colors"
               />
+
+              {/* Token chips */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {TOKENS.map(({ label }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => insertToken(label)}
+                    className="text-[10px] font-mono font-black text-primary bg-primary/10 border border-primary/20 px-2 py-1 hover:bg-primary/20 transition-colors"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Live example path */}
-          <div className="p-4 border border-white/5 bg-white/[0.02]">
-            <p className="text-[10px] font-black tracking-widest uppercase text-white/30 mb-2">
-              Example path
-            </p>
-            <p
-              className="text-xs text-primary font-mono normal-case break-all"
-              data-testid="example-path"
-            >
-              {examplePath}
-            </p>
-          </div>
+            {/* Sequence padding */}
+            <div className="flex items-center gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
+                  Sequence Padding
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={6}
+                  value={seqPad}
+                  onChange={(e) => setSeqPad(parseInt(e.target.value, 10) || 2)}
+                  className="w-24 bg-black border border-white/10 px-4 py-3 text-sm text-white text-center focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+            </div>
 
-          {organizeError && (
-            <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 normal-case">
-              {organizeError}
-            </p>
-          )}
-
-          {/* Preview results */}
-          {previewResults && <OrganizerResultTable results={previewResults} />}
-
-          {/* Apply success */}
-          {applyDone && (
-            <div className="flex items-center gap-2 px-4 py-3 border border-primary/20 bg-primary/5">
-              <CheckCircle2 size={14} className="text-primary shrink-0" />
-              <p className="text-xs text-primary font-black tracking-widest uppercase">
-                {applyDone.moved} files moved successfully
+            {/* Live example path */}
+            <div className="p-4 border border-white/5 bg-white/[0.02]">
+              <p className="text-[10px] font-black tracking-widest uppercase text-white/30 mb-2">
+                Example path
+              </p>
+              <p
+                className="text-xs text-primary font-mono normal-case break-all"
+                data-testid="example-path"
+              >
+                {examplePath}
               </p>
             </div>
-          )}
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handlePreview}
-              disabled={previewLoading || !organizeShelfId}
-              data-testid="preview-btn"
-              className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 disabled:opacity-40 transition-colors"
-            >
-              {previewLoading ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <FolderCog size={13} />
-              )}
-              Dry Run Preview
-            </button>
+            {organizeError && (
+              <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 normal-case">
+                {organizeError}
+              </p>
+            )}
 
-            {previewResults &&
-              previewResults.some((r) => !r.already_correct && !r.error) && (
-                <button
-                  onClick={handleApply}
-                  disabled={applyLoading}
-                  data-testid="apply-btn"
-                  className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-50 transition-colors"
-                >
-                  {applyLoading ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Play size={13} />
-                  )}
-                  Apply
-                </button>
-              )}
+            {/* Preview results */}
+            {previewResults && (
+              <OrganizerResultTable results={previewResults} />
+            )}
+
+            {/* Apply success */}
+            {applyDone && (
+              <div className="flex items-center gap-2 px-4 py-3 border border-primary/20 bg-primary/5">
+                <CheckCircle2 size={14} className="text-primary shrink-0" />
+                <p className="text-xs text-primary font-black tracking-widest uppercase">
+                  {applyDone.moved} files moved successfully
+                </p>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handlePreview}
+                disabled={previewLoading || !organizeShelfId}
+                data-testid="preview-btn"
+                className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 disabled:opacity-40 transition-colors"
+              >
+                {previewLoading ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <FolderCog size={13} />
+                )}
+                Dry Run Preview
+              </button>
+
+              {previewResults &&
+                previewResults.some((r) => !r.already_correct && !r.error) && (
+                  <button
+                    onClick={handleApply}
+                    disabled={applyLoading}
+                    data-testid="apply-btn"
+                    className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-50 transition-colors"
+                  >
+                    {applyLoading ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Play size={13} />
+                    )}
+                    Apply
+                  </button>
+                )}
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── 03 Library Scan ── */}
-      <section>
+      <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
         <SectionHeader
           num="03"
           title="Library Scan"
           description="Discover and import new or changed book files from all shelves."
         />
-
-        <div className="space-y-5">
-          {/* Status card */}
-          {scanStatus && (
-            <div
-              className="p-4 border border-white/10 bg-white/[0.02] space-y-3"
-              data-testid="scan-status"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {scanStatus.is_running ? (
-                    <Loader2 size={14} className="text-primary animate-spin" />
-                  ) : scanStatus.error ? (
-                    <AlertCircle size={14} className="text-red-400" />
-                  ) : (
-                    <CheckCircle2 size={14} className="text-white/30" />
-                  )}
-                  <span className="text-[10px] font-black tracking-widest uppercase text-white/60">
-                    {scanStatus.is_running
-                      ? 'Scanning…'
-                      : scanStatus.error
-                        ? 'Scan error'
-                        : 'Idle'}
-                  </span>
-                </div>
-                {scanStatus.last_scan_at && (
-                  <div className="flex items-center gap-1.5 text-[10px] text-white/30">
-                    <Clock size={11} />
-                    <span className="normal-case">
-                      Last scan{' '}
-                      {new Date(scanStatus.last_scan_at).toLocaleString()}
+        <div className="min-w-0 lg:col-span-8">
+          <div className="space-y-5">
+            {/* Status card */}
+            {scanStatus && (
+              <div
+                className="p-4 border border-white/10 bg-white/[0.02] space-y-3"
+                data-testid="scan-status"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {scanStatus.is_running ? (
+                      <Loader2
+                        size={14}
+                        className="text-primary animate-spin"
+                      />
+                    ) : scanStatus.error ? (
+                      <AlertCircle size={14} className="text-red-400" />
+                    ) : (
+                      <CheckCircle2 size={14} className="text-white/30" />
+                    )}
+                    <span className="text-[10px] font-black tracking-widest uppercase text-white/60">
+                      {scanStatus.is_running
+                        ? 'Scanning…'
+                        : scanStatus.error
+                          ? 'Scan error'
+                          : 'Idle'}
                     </span>
+                  </div>
+                  {scanStatus.last_scan_at && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-white/30">
+                      <Clock size={11} />
+                      <span className="normal-case">
+                        Last scan{' '}
+                        {new Date(scanStatus.last_scan_at).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Progress */}
+                {scanStatus.is_running && scanStatus.progress && (
+                  <div className="space-y-2" data-testid="scan-progress">
+                    <div className="h-1 bg-white/10 w-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary transition-all duration-500"
+                        style={{
+                          width:
+                            scanStatus.progress.total > 0
+                              ? `${Math.round((scanStatus.progress.processed / scanStatus.progress.total) * 100)}%`
+                              : '0%',
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center gap-4 text-[10px] text-white/40 normal-case">
+                      <span>
+                        {scanStatus.progress.processed} /{' '}
+                        {scanStatus.progress.total} files
+                      </span>
+                      <span className="text-primary">
+                        +{scanStatus.progress.created} new
+                      </span>
+                      <span>{scanStatus.progress.updated} updated</span>
+                      {scanStatus.progress.errors > 0 && (
+                        <span className="text-red-400">
+                          {scanStatus.progress.errors} errors
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
+
+                {scanStatus.error && (
+                  <p className="text-xs text-red-400 normal-case">
+                    {scanStatus.error}
+                  </p>
+                )}
               </div>
-
-              {/* Progress */}
-              {scanStatus.is_running && scanStatus.progress && (
-                <div className="space-y-2" data-testid="scan-progress">
-                  <div className="h-1 bg-white/10 w-full overflow-hidden">
-                    <div
-                      className="h-full bg-primary transition-all duration-500"
-                      style={{
-                        width:
-                          scanStatus.progress.total > 0
-                            ? `${Math.round((scanStatus.progress.processed / scanStatus.progress.total) * 100)}%`
-                            : '0%',
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-4 text-[10px] text-white/40 normal-case">
-                    <span>
-                      {scanStatus.progress.processed} /{' '}
-                      {scanStatus.progress.total} files
-                    </span>
-                    <span className="text-primary">
-                      +{scanStatus.progress.created} new
-                    </span>
-                    <span>{scanStatus.progress.updated} updated</span>
-                    {scanStatus.progress.errors > 0 && (
-                      <span className="text-red-400">
-                        {scanStatus.progress.errors} errors
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {scanStatus.error && (
-                <p className="text-xs text-red-400 normal-case">
-                  {scanStatus.error}
-                </p>
-              )}
-            </div>
-          )}
-
-          {scanError && (
-            <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 normal-case">
-              {scanError}
-            </p>
-          )}
-
-          <button
-            onClick={handleScan}
-            disabled={scanLoading || scanStatus?.is_running}
-            data-testid="scan-btn"
-            className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-50 transition-colors"
-          >
-            {scanLoading ? (
-              <Loader2 size={13} className="animate-spin" />
-            ) : (
-              <RefreshCw size={13} />
             )}
-            {scanStatus?.is_running ? 'Scanning…' : 'Trigger Scan'}
-          </button>
 
-          {/* Backfill covers */}
-          <div className="pt-4 border-t border-white/5">
-            <p className="text-[10px] text-white/30 normal-case mb-3">
-              Re-extract cover images for all books that have no cover or a
-              missing cover file.
-            </p>
-            {backfillError && (
-              <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 mb-3 normal-case">
-                {backfillError}
+            {scanError && (
+              <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 normal-case">
+                {scanError}
               </p>
             )}
-            {backfillResult && (
-              <div className="flex items-center gap-2 px-4 py-3 border border-primary/20 bg-primary/5 mb-3">
-                <CheckCircle2 size={14} className="text-primary shrink-0" />
-                <p className="text-xs text-primary font-black tracking-widest uppercase">
-                  {backfillResult.refreshed} refreshed ·{' '}
-                  {backfillResult.skipped} already had cover ·{' '}
-                  {backfillResult.failed} failed
-                </p>
-              </div>
-            )}
+
             <button
-              onClick={handleBackfillCovers}
-              disabled={backfillLoading}
-              data-testid="backfill-covers-btn"
-              className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 disabled:opacity-40 transition-colors"
+              onClick={handleScan}
+              disabled={scanLoading || scanStatus?.is_running}
+              data-testid="scan-btn"
+              className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-50 transition-colors"
             >
-              {backfillLoading ? (
+              {scanLoading ? (
                 <Loader2 size={13} className="animate-spin" />
               ) : (
                 <RefreshCw size={13} />
               )}
-              Backfill Missing Covers
+              {scanStatus?.is_running ? 'Scanning…' : 'Trigger Scan'}
             </button>
+
+            {/* Backfill covers */}
+            <div className="pt-4 border-t border-white/5">
+              <p className="text-[10px] text-white/30 normal-case mb-3">
+                Re-extract cover images for all books that have no cover or a
+                missing cover file.
+              </p>
+              {backfillError && (
+                <p className="text-xs text-red-400 border border-red-400/20 bg-red-400/5 px-3 py-2 mb-3 normal-case">
+                  {backfillError}
+                </p>
+              )}
+              {backfillResult && (
+                <div className="flex items-center gap-2 px-4 py-3 border border-primary/20 bg-primary/5 mb-3">
+                  <CheckCircle2 size={14} className="text-primary shrink-0" />
+                  <p className="text-xs text-primary font-black tracking-widest uppercase">
+                    {backfillResult.refreshed} refreshed ·{' '}
+                    {backfillResult.skipped} already had cover ·{' '}
+                    {backfillResult.failed} failed
+                  </p>
+                </div>
+              )}
+              <button
+                onClick={handleBackfillCovers}
+                disabled={backfillLoading}
+                data-testid="backfill-covers-btn"
+                className="flex items-center gap-2 px-5 py-2.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/60 hover:text-white hover:border-white/40 disabled:opacity-40 transition-colors"
+              >
+                {backfillLoading ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={13} />
+                )}
+                Backfill Missing Covers
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── 04 Data Management ── */}
-      <section>
+      <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
         <SectionHeader
           num="04"
           title="Data Management"
           description="Review duplicate sessions, link unmatched KOReader data, and merge duplicate books."
         />
-        <button
-          onClick={() => navigate('/data-management')}
-          data-testid="data-mgmt-btn"
-          className="flex items-center justify-between w-full px-4 py-4 border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-colors group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="size-9 flex items-center justify-center border border-white/10 shrink-0">
-              <DatabaseZap
-                size={16}
-                className="text-white/40 group-hover:text-primary transition-colors"
-              />
+        <div className="min-w-0 lg:col-span-8">
+          <button
+            onClick={() => navigate('/data-management')}
+            data-testid="data-mgmt-btn"
+            className="flex items-center justify-between w-full px-4 py-4 border border-white/10 bg-white/[0.02] hover:bg-white/[0.04] transition-colors group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="size-9 flex items-center justify-center border border-white/10 shrink-0">
+                <DatabaseZap
+                  size={16}
+                  className="text-white/40 group-hover:text-primary transition-colors"
+                />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-white">
+                  Open Data Management
+                </p>
+                <p className="text-[11px] text-white/30 normal-case mt-0.5">
+                  Duplicate sessions · Unmatched data · Duplicate books · Import
+                  log
+                </p>
+              </div>
             </div>
-            <div className="text-left">
-              <p className="text-sm font-medium text-white">
-                Open Data Management
-              </p>
-              <p className="text-[11px] text-white/30 normal-case mt-0.5">
-                Duplicate sessions · Unmatched data · Duplicate books · Import
-                log
-              </p>
-            </div>
-          </div>
-          <ChevronRight
-            size={16}
-            className="text-white/30 group-hover:text-white/60 transition-colors"
-          />
-        </button>
+            <ChevronRight
+              size={16}
+              className="text-white/30 group-hover:text-white/60 transition-colors"
+            />
+          </button>
+        </div>
       </section>
 
       {/* Modals */}

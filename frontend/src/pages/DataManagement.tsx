@@ -56,17 +56,18 @@ function TabBtn({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2 text-[10px] font-black tracking-widest uppercase border-b-2 transition-colors ${
+      aria-current={active ? 'page' : undefined}
+      className={`-mt-[2px] flex items-center gap-2 whitespace-nowrap border-t-[3px] px-4 pb-3 pt-2.5 text-sm font-semibold transition-colors first:pl-0 ${
         active
-          ? 'border-primary text-primary'
-          : 'border-transparent text-white/40 hover:text-white/60'
+          ? 'border-primary text-white'
+          : 'border-transparent text-white/45 hover:text-white'
       }`}
     >
       {children}
       {count !== undefined && count > 0 && (
         <span
-          className={`text-[9px] font-black px-1.5 py-0.5 ${
-            active ? 'bg-primary/20 text-primary' : 'bg-white/10 text-white/40'
+          className={`px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+            active ? 'bg-primary text-white' : 'bg-white/10 text-white/60'
           }`}
         >
           {count}
@@ -1031,11 +1032,11 @@ export default function DataManagement() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+    <div className="mx-auto max-w-[1600px] space-y-8 px-4 py-6 sm:px-6 lg:px-12 lg:py-10">
       <header>
         <button
           onClick={() => navigate('/settings')}
-          className="flex items-center gap-1.5 text-[10px] font-black tracking-widest uppercase text-white/30 hover:text-white/60 transition-colors mb-4"
+          className="mb-4 flex items-center gap-1.5 text-xs font-semibold text-white/50 transition-colors hover:text-white"
         >
           <ArrowLeft size={11} />
           Settings
@@ -1051,7 +1052,7 @@ export default function DataManagement() {
 
       {/* Tab bar */}
       <div
-        className="flex items-center gap-0 border-b border-white/10 overflow-x-auto"
+        className="flex items-center overflow-x-auto border-y-2 border-white no-scrollbar"
         data-testid="tab-bar"
       >
         {TABS.map((tab) => (
