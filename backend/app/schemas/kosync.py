@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class KoSyncUserCreate(BaseModel):
@@ -26,3 +26,15 @@ class KoSyncProgressOut(BaseModel):
     device: str
     device_id: str | None = None
     timestamp: int
+
+
+class SyncAccountOut(BaseModel):
+    username: str
+    last_synced_at: int | None = None  # unix seconds
+    last_device: str | None = None
+    last_book_title: str | None = None
+
+
+class SyncAccountCreate(BaseModel):
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1)

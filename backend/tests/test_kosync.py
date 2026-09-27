@@ -343,3 +343,30 @@ async def test_web_session_is_extended_not_duplicated(client, db_session, tmp_pa
     ]
     summary = (await client.get(f"/api/books/{book_id}/reading-summary")).json()
     assert summary["total_time_seconds"] == 720
+
+
+# ── accounts from the settings page ───────────────────────────────────────────
+
+
+async def test_manage_accounts_from_settings(client, db_session, tmp_path):
+    book_id = await _book(db_session, tmp_path, ko_hash="d1")
+    resp = await client.post("/api/sync-accounts", json={"username": "kindle", "password": "pw"})
+    assert resp.status_code == 201
+    assert (
+        await client.post("/api/sync-accounts", json={"username": "kindle", "password": "x"})
+    ).status_code == 409
+
+    # The password set here is what KOReader signs in with.
+    headers = _ko_auth("kindle", "pw")
+    assert (await client.get("/api/kosync/users/auth", headers=headers)).status_code == 200
+    await client.put("/api/kosync/syncs/progress", json=_progress(document="d1"), headers=headers)
+    accounts = (await client.get("/api/sync-accounts")).json()
+    assert accounts[0]["username"] == "kindle"
+    assert accounts[0]["last_device"] == "Kindle"
+    assert accounts[0]["last_book_title"] == "The Book"
+    assert accounts[0]["last_synced_at"] > 0
+    assert book_id
+
+    assert (await client.delete("/api/sync-accounts/kindle")).status_code == 204
+    assert (await client.delete("/api/sync-accounts/kindle")).status_code == 404
+    assert (await client.get("/api/kosync/users/auth", headers=headers)).status_code == 401

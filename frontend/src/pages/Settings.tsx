@@ -18,6 +18,7 @@ import {
 import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
 import ShelfModal from '../components/settings/ShelfModal'
+import KoreaderSync from '../components/settings/KoreaderSync'
 import type {
   Shelf,
   OrganizerResult,
@@ -774,10 +775,22 @@ export default function Settings() {
         </div>
       </section>
 
-      {/* ── 04 Data Management ── */}
+      {/* ── 04 KOReader sync ── */}
       <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
         <SectionHeader
           num="04"
+          title="KOReader Sync"
+          description="Keep your place in sync between KOReader and Shelfloom's web reader, using KOReader's built-in Progress sync."
+        />
+        <div className="min-w-0 lg:col-span-8">
+          <KoreaderSync />
+        </div>
+      </section>
+
+      {/* ── 05 Data Management ── */}
+      <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
+        <SectionHeader
+          num="05"
           title="Data Management"
           description="Review duplicate sessions, link unmatched KOReader data, and merge duplicate books."
         />

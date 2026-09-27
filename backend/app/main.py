@@ -184,6 +184,7 @@ def create_app() -> FastAPI:
     application.include_router(tags.router, prefix="/api")
     application.include_router(import_.router, prefix="/api")
     application.include_router(kosync.router, prefix="/api")
+    application.include_router(kosync.accounts_router, prefix="/api")
     application.include_router(reading.router, prefix="/api")
     application.include_router(fs.router, prefix="/api")
     application.include_router(stats.router, prefix="/api")
