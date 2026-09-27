@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,6 +11,9 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 
 log = logging.getLogger(__name__)
+
+# Serve the PWA manifest with its registered media type.
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 # Frontend build output — check common locations
 _FRONTEND_DIST = Path(
