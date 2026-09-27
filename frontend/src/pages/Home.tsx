@@ -360,7 +360,7 @@ function StatCard({
         )}
       </div>
       <h5
-        className={`text-3xl font-extrabold leading-none tracking-tighter tabular-nums sm:text-5xl ${empty ? 'text-white/20' : 'text-white'}`}
+        className={`text-2xl font-extrabold leading-none tracking-tighter tabular-nums min-[420px]:text-3xl sm:text-5xl ${empty ? 'text-white/20' : 'text-white'}`}
       >
         {animated == null ? '—' : format(animated)}
       </h5>

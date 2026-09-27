@@ -542,7 +542,7 @@ export default function BookDetailPage() {
   const menuItem =
     'flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-white/80 hover:bg-white hover:text-black transition-colors'
   const secondaryBtn =
-    'flex items-center gap-2 border border-white/25 px-4 py-2.5 text-xs font-semibold text-white/80 hover:text-black hover:bg-white hover:border-white transition-colors'
+    'flex items-center gap-2 border border-white/25 px-3 py-2.5 text-xs font-semibold text-white/80 hover:text-black hover:bg-white hover:border-white transition-colors sm:px-4'
 
   return (
     <div className="relative">
@@ -626,7 +626,7 @@ export default function BookDetailPage() {
           </div>
 
           {/* ── Main info: title and actions ── */}
-          <div className="order-2 lg:col-span-8 lg:col-start-5 lg:row-start-1 flex flex-col min-w-0 animate-fade-up [animation-delay:80ms]">
+          <div className="relative z-20 order-2 lg:col-span-8 lg:col-start-5 lg:row-start-1 flex flex-col min-w-0 animate-fade-up [animation-delay:80ms]">
             {/* Series label */}
             {primarySeries && (
               <Link
@@ -708,7 +708,7 @@ export default function BookDetailPage() {
               {!book.file_path?.startsWith('manual://') && (
                 <a
                   href={`/api/books/${book.id}/download`}
-                  className="flex items-center gap-2 bg-primary px-5 py-2.5 text-xs font-semibold text-white hover:bg-primary-600 transition-colors"
+                  className="flex items-center gap-2 bg-primary px-4 py-2.5 text-xs font-semibold text-white hover:bg-primary-600 transition-colors sm:px-5"
                   data-testid="download-btn"
                 >
                   <Download size={14} />
@@ -783,7 +783,7 @@ export default function BookDetailPage() {
                       aria-hidden="true"
                     />
                     <div
-                      className="absolute right-0 top-full z-30 mt-1 w-56 border border-white bg-black animate-scale-in sm:left-0 sm:right-auto"
+                      className="absolute right-0 top-full z-30 mt-1 w-56 border border-white bg-black shadow-[0_0_0_9999px_rgba(0,0,0,0.4)] animate-scale-in sm:left-0 sm:right-auto sm:shadow-none"
                       data-testid="more-actions-menu"
                     >
                       <button
@@ -1018,7 +1018,7 @@ export default function BookDetailPage() {
           </div>
 
           {/* ── Side cards ── */}
-          <div className="order-3 lg:col-span-4 lg:row-start-3 space-y-6 self-start animate-fade-up [animation-delay:160ms]">
+          <div className="order-3 lg:col-span-4 lg:row-start-3 space-y-6 lg:self-start animate-fade-up [animation-delay:160ms]">
             {/* Progress card */}
             <div
               className="border-t-2 border-white pt-4 space-y-6"
