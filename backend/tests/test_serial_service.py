@@ -2253,6 +2253,71 @@ async def test_dashboard_new_count_after_acknowledge(db_session, serial):
     assert entries[0].new_chapter_count == 0
 
 
+@pytest.mark.asyncio
+async def test_dashboard_counts_are_per_serial(db_session):
+    """Batched dashboard queries must keep each serial's numbers separate."""
+    viewed = datetime(2026, 1, 10)
+    first = WebSerial(
+        url="https://example.com/a",
+        source="royalroad",
+        title="First",
+        status="ongoing",
+        total_chapters=4,
+        live_chapter_count=3,
+        last_viewed_at=viewed,
+    )
+    second = WebSerial(
+        url="https://example.com/b",
+        source="royalroad",
+        title="Second",
+        status="ongoing",
+        total_chapters=2,
+        live_chapter_count=2,
+    )
+    db_session.add_all([first, second])
+    await db_session.flush()
+    for n, day, has_content, stubbed in [
+        (1, 5, True, False),
+        (2, 12, True, False),
+        (3, 15, False, False),
+        (4, 20, False, True),
+    ]:
+        db_session.add(
+            SerialChapter(
+                serial_id=first.id,
+                chapter_number=n,
+                source_key=f"a{n}",
+                title=f"A{n}",
+                source_url=f"https://example.com/a/{n}",
+                publish_date=datetime(2026, 1, day),
+                content="<p>x</p>" if has_content else None,
+                is_stubbed=stubbed,
+            )
+        )
+    for n in (1, 2):
+        db_session.add(
+            SerialChapter(
+                serial_id=second.id,
+                chapter_number=n,
+                source_key=f"b{n}",
+                title=f"B{n}",
+                source_url=f"https://example.com/b/{n}",
+            )
+        )
+    await db_session.commit()
+
+    entries = {e.title: e for e in await list_serials_for_dashboard(db_session)}
+    # First: chapters 2 and 3 are newer than last view; stubbed ch4 ignored.
+    assert entries["First"].new_chapter_count == 2
+    assert entries["First"].fetched_count == 2
+    assert entries["First"].latest_chapter_title == "A3"
+    assert entries["First"].stubbed_chapter_count == 1
+    # Second: never viewed, so every live chapter is new; nothing fetched.
+    assert entries["Second"].new_chapter_count == 2
+    assert entries["Second"].fetched_count == 0
+    assert entries["Second"].latest_chapter_title == "B2"
+
+
 # ---------------------------------------------------------------------------
 # API: dashboard, acknowledge, check-updates
 # ---------------------------------------------------------------------------

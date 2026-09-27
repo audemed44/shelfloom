@@ -1624,46 +1624,69 @@ async def list_serials_for_dashboard(
         .order_by(WebSerial.last_checked_at.desc().nullslast())
     )
     serials = list(result.scalars().all())
+    if not serials:
+        return []
+    serial_ids = [serial.id for serial in serials]
+
+    # New chapters: published after the serial was last viewed (or all live
+    # chapters if it was never viewed). One grouped query for every serial.
+    new_counts = dict(
+        (
+            await session.execute(
+                select(SerialChapter.serial_id, sa_func.count())
+                .join(WebSerial, WebSerial.id == SerialChapter.serial_id)
+                .where(
+                    SerialChapter.serial_id.in_(serial_ids),
+                    SerialChapter.is_stubbed.is_(False),
+                    WebSerial.last_viewed_at.is_(None)
+                    | (SerialChapter.publish_date > WebSerial.last_viewed_at),
+                )
+                .group_by(SerialChapter.serial_id)
+            )
+        ).all()
+    )
+
+    # Fetched chapters (content downloaded).
+    fetched_counts = dict(
+        (
+            await session.execute(
+                select(SerialChapter.serial_id, sa_func.count())
+                .where(
+                    SerialChapter.serial_id.in_(serial_ids),
+                    SerialChapter.content.isnot(None),
+                )
+                .group_by(SerialChapter.serial_id)
+            )
+        ).all()
+    )
+
+    # Latest live chapter per serial.
+    latest_numbers = (
+        select(
+            SerialChapter.serial_id.label("serial_id"),
+            sa_func.max(SerialChapter.chapter_number).label("chapter_number"),
+        )
+        .where(
+            SerialChapter.serial_id.in_(serial_ids),
+            SerialChapter.is_stubbed.is_(False),
+        )
+        .group_by(SerialChapter.serial_id)
+        .subquery()
+    )
+    latest_rows = (
+        await session.execute(
+            select(SerialChapter.serial_id, SerialChapter.title, SerialChapter.publish_date).join(
+                latest_numbers,
+                (SerialChapter.serial_id == latest_numbers.c.serial_id)
+                & (SerialChapter.chapter_number == latest_numbers.c.chapter_number),
+            )
+        )
+    ).all()
+    latest = {row.serial_id: (row.title, row.publish_date) for row in latest_rows}
 
     entries: list[SerialDashboardEntry] = []
     for serial in serials:
-        # Count new chapters (created after last_viewed_at, or all if never viewed)
-        count_q = (
-            select(sa_func.count())
-            .select_from(SerialChapter)
-            .where(
-                SerialChapter.serial_id == serial.id,
-                SerialChapter.is_stubbed.is_(False),
-            )
-        )
-        if serial.last_viewed_at is not None:
-            count_q = count_q.where(SerialChapter.publish_date > serial.last_viewed_at)
-        new_count = await session.scalar(count_q) or 0
-
-        # Count fetched chapters (content is not null)
-        fetched = (
-            await session.scalar(
-                select(sa_func.count())
-                .select_from(SerialChapter)
-                .where(
-                    SerialChapter.serial_id == serial.id,
-                    SerialChapter.content.isnot(None),
-                )
-            )
-            or 0
-        )
-
-        # Get latest chapter
-        latest = await session.scalar(
-            select(SerialChapter)
-            .where(
-                SerialChapter.serial_id == serial.id,
-                SerialChapter.is_stubbed.is_(False),
-            )
-            .order_by(SerialChapter.chapter_number.desc())
-            .limit(1)
-        )
-
+        latest_title, latest_date = latest.get(serial.id, (None, None))
         entries.append(
             SerialDashboardEntry(
                 id=serial.id,
@@ -1674,10 +1697,10 @@ async def list_serials_for_dashboard(
                 total_chapters=serial.total_chapters,
                 live_chapter_count=serial.live_chapter_count,
                 stubbed_chapter_count=serial.stubbed_chapter_count,
-                fetched_count=fetched,
-                new_chapter_count=new_count,
-                latest_chapter_title=latest.title if latest else None,
-                latest_chapter_date=latest.publish_date if latest else None,
+                fetched_count=fetched_counts.get(serial.id, 0),
+                new_chapter_count=new_counts.get(serial.id, 0),
+                latest_chapter_title=latest_title,
+                latest_chapter_date=latest_date,
                 last_checked_at=serial.last_checked_at,
                 fetch_state=await get_serial_fetch_state(serial.id),
             )
