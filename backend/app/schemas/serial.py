@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SerialCreate(BaseModel):
@@ -190,16 +190,38 @@ class SingleVolumeCreate(BaseModel):
     name: str | None = None
 
 
+class EbookVolumeLink(BaseModel):
+    """Attach an existing library book (e.g. the published ebook) as a volume."""
+
+    book_id: str
+    # Position in the serial's reading order; later volumes shift down.
+    # Omit to append after the last volume.
+    volume_number: int | None = Field(default=None, ge=1)
+    name: str | None = None
+    # Optional: the serial chapters this book covers (e.g. stubbed ones).
+    chapter_start: int | None = Field(default=None, ge=1)
+    chapter_end: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def _check_range(self) -> EbookVolumeLink:
+        if (self.chapter_start is None) != (self.chapter_end is None):
+            raise ValueError("Give both chapter_start and chapter_end, or neither")
+        if self.chapter_start is not None and self.chapter_end < self.chapter_start:  # type: ignore[operator]
+            raise ValueError("chapter_end must be >= chapter_start")
+        return self
+
+
 class VolumeResponse(BaseModel):
     model_config = {"from_attributes": True}
     id: int
     serial_id: int
     book_id: str | None
     volume_number: int
+    kind: str = "generated"
     name: str | None
     cover_path: str | None
-    chapter_start: int
-    chapter_end: int
+    chapter_start: int | None
+    chapter_end: int | None
     generated_at: datetime | None
     is_stale: bool
     chapter_count: int = 0

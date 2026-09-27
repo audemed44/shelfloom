@@ -107,8 +107,15 @@ class SerialVolume(Base):
     cover_path: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # custom cover; falls back to serial cover
-    chapter_start: Mapped[int] = mapped_column(Integer, nullable=False)
-    chapter_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    # "generated": an EPUB Shelfloom builds from fetched chapters.
+    # "ebook": an existing library book (e.g. the author's published ebook)
+    # linked as this volume; it is never generated, rebuilt or overwritten.
+    kind: Mapped[str] = mapped_column(
+        Text, default="generated", server_default="generated", nullable=False
+    )
+    # Always set for generated volumes; optional for linked ebooks.
+    chapter_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chapter_end: Mapped[int | None] = mapped_column(Integer, nullable=True)
     generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_stale: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

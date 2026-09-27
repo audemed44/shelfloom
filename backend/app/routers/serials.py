@@ -14,6 +14,7 @@ from app.schemas.serial import (
     ChapterFetchRequest,
     ChapterFetchStatusResponse,
     ChapterResponse,
+    EbookVolumeLink,
     PendingChapterBatchStatusResponse,
     PendingChapterFetchResponse,
     SerialCreate,
@@ -30,6 +31,8 @@ from app.scrapers.registry import get_adapter, list_adapter_names
 from app.services.serial_service import (
     ChapterFetchAlreadyRunning,
     ChapterFetchBatchBusy,
+    EbookLinkError,
+    EbookNotFound,
     PendingChapterBatchAlreadyRunning,
     ScrapingError,
     SerialAlreadyExists,
@@ -50,6 +53,7 @@ from app.services.serial_service import (
     get_pending_chapter_batch_status,
     get_serial,
     get_volume_metrics,
+    link_ebook_volume,
     list_chapter_responses,
     list_serials,
     list_serials_for_dashboard,
@@ -436,6 +440,23 @@ async def add_single_volume_endpoint(
         vol = await add_single_volume(session, serial_id, body)
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    metrics = await get_volume_metrics(session, serial_id)
+    return _enrich_volumes([vol], metrics)[0]
+
+
+@router.post(
+    "/serials/{serial_id}/volumes/link-ebook", response_model=VolumeResponse, status_code=201
+)
+async def link_ebook_volume_endpoint(
+    serial_id: int, body: EbookVolumeLink, session: AsyncSession = Depends(get_session)
+):
+    """Attach an existing library book (e.g. the published ebook) as a volume."""
+    try:
+        vol = await link_ebook_volume(session, serial_id, body)
+    except (SerialNotFound, EbookNotFound) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except EbookLinkError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     metrics = await get_volume_metrics(session, serial_id)
     return _enrich_volumes([vol], metrics)[0]
 
