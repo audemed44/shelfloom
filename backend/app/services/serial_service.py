@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -1114,17 +1115,65 @@ async def generate_all_volumes(
 
 
 async def rebuild_volume(session: AsyncSession, serial_id: int, volume_id: int) -> SerialVolume:
+    from app.models.book import Book
+    from app.models.shelf import Shelf
+
     vol = await _get_volume(session, serial_id, volume_id)
     shelf_id: int | None = None
     existing_book_id: str | None = None
+    old_file: Path | None = None
+    old_title: str | None = None
     if vol.book_id is not None:
-        from app.models.book import Book
-
         existing_book_id = vol.book_id
         book = await session.scalar(select(Book).where(Book.id == vol.book_id))
         if book is not None:
             shelf_id = book.shelf_id
-    return await generate_volume(session, serial_id, volume_id, shelf_id, existing_book_id)
+            old_title = book.title
+            shelf = await session.scalar(select(Shelf).where(Shelf.id == book.shelf_id))
+            if shelf is not None and book.file_path:
+                old_file = Path(shelf.path) / book.file_path
+
+    vol = await generate_volume(session, serial_id, volume_id, shelf_id, existing_book_id)
+    await _tidy_rebuilt_volume_book(session, serial_id, vol, old_file, old_title)
+    return vol
+
+
+async def _tidy_rebuilt_volume_book(
+    session: AsyncSession,
+    serial_id: int,
+    vol: SerialVolume,
+    old_file: Path | None,
+    old_title: str | None,
+) -> None:
+    """After a rebuild, drop the replaced EPUB and refresh an auto-generated title.
+
+    The rebuilt EPUB can get a new file name (e.g. after the volume was
+    renumbered), and import never overwrites a book's title so UI edits survive.
+    Only a title Shelfloom generated itself ("<serial> - Volume N") is updated.
+    """
+    from app.models.book import Book
+    from app.models.shelf import Shelf
+
+    if vol.book_id is None:
+        return
+    book = await session.scalar(select(Book).where(Book.id == vol.book_id))
+    if book is None:
+        return
+    shelf = await session.scalar(select(Shelf).where(Shelf.id == book.shelf_id))
+    new_file = Path(shelf.path) / book.file_path if shelf and book.file_path else None
+    if old_file is not None and new_file is not None and old_file != new_file:
+        try:
+            old_file.unlink(missing_ok=True)
+        except OSError:
+            log.warning("Could not remove replaced volume file %s", old_file)
+
+    serial = await session.scalar(select(WebSerial).where(WebSerial.id == serial_id))
+    serial_title = (serial.title if serial else None) or "Untitled"
+    auto_title = re.compile(rf"^{re.escape(serial_title)} - Volume \d+$")
+    if vol.name is None and old_title is not None and auto_title.match(old_title):
+        book.title = f"{serial_title} - Volume {vol.volume_number}"
+    await session.commit()
+    await session.refresh(vol)
 
 
 # ---------------------------------------------------------------------------
@@ -1220,6 +1269,12 @@ async def link_ebook_volume(
     position = data.volume_number or max_number + 1
     position = min(position, max_number + 1)
 
+    # Only make room if the position is taken, and only move the consecutive
+    # run of volumes starting there (so an existing gap absorbs the shift).
+    taken = {v.volume_number for v in volumes}
+    run_end = position
+    while run_end in taken:
+        run_end += 1
     # Snapshot what we need from the volumes that move before touching the DB.
     shifted = [
         (
@@ -1229,14 +1284,18 @@ async def link_ebook_volume(
             v.kind == "generated" and v.generated_at is not None and v.name is None,
         )
         for v in volumes
-        if v.volume_number >= position
+        if position <= v.volume_number < run_end
     ]
     if shifted:
         # Shift in two steps (to negative, then back) so the unique
         # (serial_id, volume_number) index is never violated mid-update.
         await session.execute(
             update(SerialVolume)
-            .where(SerialVolume.serial_id == serial_id, SerialVolume.volume_number >= position)
+            .where(
+                SerialVolume.serial_id == serial_id,
+                SerialVolume.volume_number >= position,
+                SerialVolume.volume_number < run_end,
+            )
             .values(volume_number=-(SerialVolume.volume_number + 1))
             .execution_options(synchronize_session=False)
         )

@@ -400,6 +400,8 @@ export default function SerialDetail() {
           serialId={displaySerial.id}
           volumes={volumes ?? []}
           totalChapters={displaySerial.total_chapters}
+          serialTitle={displaySerial.title}
+          stubbedChapterCount={displaySerial.stubbed_chapter_count ?? 0}
           shelves={shelves ?? []}
           onRefresh={refresh}
         />

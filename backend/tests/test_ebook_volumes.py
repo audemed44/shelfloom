@@ -254,3 +254,63 @@ async def test_chapter_changes_never_mark_ebooks_stale(db_session, tmp_path):
     await db_session.commit()
     refreshed = await db_session.scalar(select(SerialVolume).where(SerialVolume.id == vol_id))
     assert refreshed.is_stale is False
+
+
+@pytest.mark.asyncio
+async def test_link_ebook_only_shifts_the_run_that_collides(client, db_session, tmp_path):
+    serial, _, (book1, book2) = await _seed(db_session, tmp_path, generated=2)
+    # Leave a gap: volumes are #1 and #2; move #2 to #4.
+    await db_session.execute(
+        SerialVolume.__table__.update()
+        .where(SerialVolume.serial_id == serial.id, SerialVolume.volume_number == 2)
+        .values(volume_number=4)
+    )
+    await db_session.commit()
+    url = f"/api/serials/{serial.id}/volumes/link-ebook"
+
+    # #3 is free: nothing moves.
+    assert (
+        await client.post(url, json={"book_id": book1.id, "volume_number": 3})
+    ).status_code == 201
+    assert [v["volume_number"] for v in await _volumes(client, serial.id)] == [1, 3, 4]
+
+    # #1 is taken: only #1 moves (to #2, the gap); #3 and #4 stay put.
+    assert (
+        await client.post(url, json={"book_id": book2.id, "volume_number": 1})
+    ).status_code == 201
+    vols = await _volumes(client, serial.id)
+    assert [(v["volume_number"], v["kind"]) for v in vols] == [
+        (1, "ebook"),
+        (2, "generated"),
+        (3, "ebook"),
+        (4, "generated"),
+    ]
+    assert [v["is_stale"] for v in vols if v["kind"] == "generated"] == [True, False]
+
+
+@pytest.mark.asyncio
+async def test_rebuild_tidies_file_and_auto_title(db_session, tmp_path):
+    from app.services.serial_service import _tidy_rebuilt_volume_book
+
+    serial, _, _ = await _seed(db_session, tmp_path, generated=1)
+    vol = await db_session.scalar(select(SerialVolume).where(SerialVolume.serial_id == serial.id))
+    book = await db_session.scalar(select(Book).where(Book.id == vol.book_id))
+    old_file = tmp_path / "serial-volume-1.epub"
+    old_file.write_bytes(b"old")
+    (tmp_path / "serial-volume-3.epub").write_bytes(b"new")
+    vol.volume_number = 3
+    book.file_path = "serial-volume-3.epub"
+    await db_session.commit()
+
+    await _tidy_rebuilt_volume_book(db_session, serial.id, vol, old_file, "Serial - Volume 1")
+    await db_session.refresh(book)
+    assert not old_file.exists()
+    assert (tmp_path / "serial-volume-3.epub").exists()
+    assert book.title == "Serial - Volume 3"
+
+    # A title the user edited is left alone.
+    book.title = "My Favourite Arc"
+    await db_session.commit()
+    await _tidy_rebuilt_volume_book(db_session, serial.id, vol, None, "My Favourite Arc")
+    await db_session.refresh(book)
+    assert book.title == "My Favourite Arc"
