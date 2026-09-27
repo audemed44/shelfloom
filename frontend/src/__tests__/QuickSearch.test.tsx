@@ -33,7 +33,7 @@ function renderSearch() {
 }
 
 describe('QuickSearch', () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>
+  let fetchSpy: { mockRestore: () => void; mock: { calls: unknown[][] } }
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {

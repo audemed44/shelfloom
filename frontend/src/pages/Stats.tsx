@@ -79,25 +79,26 @@ type DatePreset = '30d' | '1y' | 'all'
 // Constants
 // ===========================================================================
 
+// Swiss palette: blues, neutrals and a single red, each with a readable label
 const BOOK_COLOR_CLASSES = [
-  'bg-blue-600',
-  'bg-pink-600',
-  'bg-emerald-600',
-  'bg-yellow-500',
-  'bg-purple-600',
-  'bg-orange-500',
-  'bg-red-600',
-  'bg-teal-600',
+  'bg-primary',
+  'bg-white',
+  'bg-primary-300',
+  'bg-neutral-500',
+  'bg-primary-800',
+  'bg-accent',
+  'bg-neutral-300',
+  'bg-primary-500/50',
 ]
 
 const BOOK_TEXT_CLASSES = [
   'text-white',
+  'text-black',
+  'text-black',
+  'text-white',
   'text-white',
   'text-white',
   'text-black',
-  'text-white',
-  'text-black',
-  'text-white',
   'text-white',
 ]
 
@@ -141,6 +142,10 @@ function fmtSec(s: number): string {
   const h = Math.floor(m / 60)
   const rem = m % 60
   return rem > 0 ? `${h}h ${rem}m` : `${h}h`
+}
+
+function fmtDays(n: number): string {
+  return `${n} ${n === 1 ? 'Day' : 'Days'}`
 }
 
 function bookColorIdx(bookId: string): number {
@@ -291,7 +296,7 @@ function BarChart({
                 onMouseLeave={() => setHovered(null)}
               >
                 <div
-                  className={`absolute bottom-0 w-full transition-colors ${isHov ? 'bg-primary' : 'bg-primary/30 hover:bg-primary/60'}`}
+                  className={`absolute bottom-0 w-full transition-colors ${isHov ? 'bg-white' : 'bg-primary'}`}
                   style={{ height: `${Math.max(pct, 1)}%` }}
                 />
               </div>
@@ -417,8 +422,8 @@ function LineChart({
           >
             <defs>
               <linearGradient id="line-fill-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#8b7cff" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#8b7cff" stopOpacity="0" />
+                <stop offset="0%" stopColor="#2563ff" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#2563ff" stopOpacity="0" />
               </linearGradient>
             </defs>
             {processed.length > 1 && (
@@ -427,7 +432,7 @@ function LineChart({
                 <polyline
                   points={ptStr}
                   fill="none"
-                  stroke="#8b7cff"
+                  stroke="#2563ff"
                   strokeWidth="2.5"
                   strokeLinejoin="round"
                   strokeLinecap="round"
@@ -435,7 +440,7 @@ function LineChart({
               </>
             )}
             {processed.length === 1 && (
-              <circle cx={W / 2} cy={H / 2} r="4" fill="#8b7cff" />
+              <circle cx={W / 2} cy={H / 2} r="4" fill="#2563ff" />
             )}
             {hovPt && (
               <>
@@ -452,7 +457,7 @@ function LineChart({
                   cx={hovPt.x.toFixed(1)}
                   cy={hovPt.y.toFixed(1)}
                   r="4"
-                  fill="#8b7cff"
+                  fill="#2563ff"
                   stroke="#000"
                   strokeWidth="2"
                 />
@@ -519,16 +524,17 @@ function GranularityToggle({
   onChange: (g: Granularity) => void
 }) {
   return (
-    <div className="flex bg-white/5 p-0.5">
+    <div className="flex border border-white/25">
       {(['day', 'week', 'month'] as Granularity[]).map((g) => (
         <button
           key={g}
           onClick={() => onChange(g)}
           data-testid={`gran-${g}`}
-          className={`px-3 py-1 text-[10px] font-black uppercase tracking-widest transition-colors ${
+          aria-pressed={value === g}
+          className={`px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
             value === g
-              ? 'bg-white/10 text-white'
-              : 'text-white/40 hover:text-white/70'
+              ? 'bg-white text-black'
+              : 'text-white/55 hover:bg-white/[0.06] hover:text-white'
           }`}
         >
           {g}
@@ -748,7 +754,7 @@ function RadialClock({ data }: { data: { hour: number; seconds: number }[] }) {
           <path
             key={i}
             d={s.path}
-            fill="#8b7cff"
+            fill="#2563ff"
             fillOpacity={s.opacity}
             style={{ cursor: 'default' }}
             onMouseMove={(e) =>
@@ -867,7 +873,7 @@ function RadarChart({
           {tip.text}
         </div>
       )}
-      <svg viewBox="0 0 220 220" className="w-full max-w-xs mx-auto">
+      <svg viewBox="-30 0 280 220" className="w-full max-w-sm mx-auto">
         {gridLevels.map((l) => {
           const pts = axes
             .map((_, i) => {
@@ -901,9 +907,9 @@ function RadarChart({
         })}
         <polygon
           points={dataPoly}
-          fill="#8b7cff"
+          fill="#2563ff"
           fillOpacity="0.15"
-          stroke="#8b7cff"
+          stroke="#2563ff"
           strokeWidth="1.5"
           strokeLinejoin="round"
         />
@@ -913,7 +919,7 @@ function RadarChart({
             cx={p.x.toFixed(1)}
             cy={p.y.toFixed(1)}
             r="5"
-            fill="#8b7cff"
+            fill="#2563ff"
             style={{ cursor: 'default' }}
             onMouseMove={(e) =>
               setTip({
@@ -975,7 +981,7 @@ function SunburstChart({ monthlyData }: { monthlyData: TimeSeriesEntry[] }) {
   const innerR = 28,
     midR = 52,
     outerR = 76
-  const QCOLORS = ['#8b7cff', '#7563f5', '#5f4de0', '#4a3cc0']
+  const QCOLORS = ['#2563ff', '#5783ff', '#0a47f0', '#0638c4']
 
   const arcPath = (
     r1: number,
@@ -1155,7 +1161,7 @@ function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
           y={srcY.toFixed(1)}
           width={nodeW}
           height={srcH.toFixed(1)}
-          fill="#8b7cff"
+          fill="#2563ff"
           fillOpacity="0.7"
           rx="2"
           style={{ cursor: 'default' }}
@@ -1187,7 +1193,7 @@ function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
             <path
               key={i}
               d={d}
-              fill="#8b7cff"
+              fill="#2563ff"
               fillOpacity={0.06 + (rn.h / srcH) * 0.22}
               style={{ cursor: 'default' }}
               onMouseMove={(e) =>
@@ -1208,7 +1214,7 @@ function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
               y={n.y.toFixed(1)}
               width={nodeW}
               height={n.h.toFixed(1)}
-              fill="#8b7cff"
+              fill="#2563ff"
               fillOpacity={0.4 + (n.total_seconds / total) * 0.5}
               rx="2"
               style={{ cursor: 'default' }}
@@ -1352,9 +1358,9 @@ function ScatterChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
                 cx={bx.toFixed(1)}
                 cy={by.toFixed(1)}
                 r={br.toFixed(1)}
-                fill="#8b7cff"
+                fill="#2563ff"
                 fillOpacity={0.12 + (p.r / maxR) * 0.45}
-                stroke="#8b7cff"
+                stroke="#2563ff"
                 strokeWidth="1"
                 strokeOpacity="0.35"
                 style={{ cursor: 'default' }}
@@ -1476,9 +1482,7 @@ function MonthCalendar({
       )}
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-black uppercase tracking-widest">
-          Monthly Reading
-        </h3>
+        <h3 className="text-lg font-bold tracking-tight">Monthly Reading</h3>
         <div className="flex items-center gap-1 text-xs font-bold uppercase">
           <button
             onClick={onPrev}
@@ -1513,7 +1517,7 @@ function MonthCalendar({
       {/* Calendar grid */}
       <div
         style={gridStyle}
-        className="border border-white/5"
+        className="border border-white/[0.14]"
         data-testid="calendar-grid"
       >
         {cells.map((cell, i) => {
@@ -1697,7 +1701,7 @@ function OverviewTab({
     display: 'grid',
     gridTemplateColumns: 'repeat(12, 1fr)',
     gap: '1px',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
   }
 
   const metrics = [
@@ -1729,18 +1733,18 @@ function OverviewTab({
   ]
 
   return (
-    <div style={gridStyle} className="border border-white/5">
+    <div style={gridStyle} className="border border-white/[0.14]">
       {/* Key metrics */}
       {metrics.map(({ label, value, sub }, i) => (
         <div
           key={i}
-          className="bg-black p-6 col-span-6 lg:col-span-3"
+          className="bg-black p-4 sm:p-6 col-span-6 lg:col-span-3"
           data-testid="metric-card"
         >
           <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
             {label}
           </p>
-          <h2 className="text-4xl font-extrabold tracking-tighter">
+          <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tighter tabular-nums">
             {value ?? '—'}
           </h2>
           {sub && (
@@ -1755,7 +1759,7 @@ function OverviewTab({
       <div className="bg-black p-6 col-span-12">
         <div className="flex justify-between items-end mb-6">
           <div>
-            <h3 className="text-sm font-black uppercase tracking-widest mb-1">
+            <h3 className="text-lg font-bold tracking-tight mb-1">
               Reading Time
             </h3>
             <p className="text-xs text-white/30 normal-case">
@@ -1791,16 +1795,16 @@ function OverviewTab({
               <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
                 Current Streak
               </p>
-              <p className="text-4xl font-extrabold tracking-tighter">
-                {streaks !== null ? `${streaks.current} Days` : '—'}
+              <p className="text-3xl sm:text-5xl font-extrabold tracking-tighter tabular-nums">
+                {streaks !== null ? fmtDays(streaks.current) : '—'}
               </p>
             </div>
             <div>
               <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
                 Longest Streak
               </p>
-              <p className="text-4xl font-extrabold tracking-tighter">
-                {streaks !== null ? `${streaks.longest} Days` : '—'}
+              <p className="text-3xl sm:text-5xl font-extrabold tracking-tighter tabular-nums">
+                {streaks !== null ? fmtDays(streaks.longest) : '—'}
               </p>
             </div>
           </div>
@@ -1816,7 +1820,7 @@ function OverviewTab({
       {/* Books completed */}
       {completed.length > 0 && (
         <div className="bg-black p-6 col-span-12">
-          <h3 className="text-sm font-black uppercase tracking-widest mb-6">
+          <h3 className="text-lg font-bold tracking-tight mb-6">
             Books Completed
           </h3>
           <CompletedBooksCarousel books={completed} />
@@ -1825,7 +1829,7 @@ function OverviewTab({
 
       {/* By author */}
       <div className="bg-black p-6 col-span-12 md:col-span-6 lg:col-span-4">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-6">
+        <h3 className="text-lg font-bold tracking-tight mb-6">
           Reading by Author
         </h3>
         {byAuthor.length === 0 ? (
@@ -1848,7 +1852,7 @@ function OverviewTab({
 
       {/* Reading profile radar */}
       <div className="bg-black p-6 col-span-12 md:col-span-6 lg:col-span-4">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-4">
+        <h3 className="text-lg font-bold tracking-tight mb-4">
           Reading Profile
         </h3>
         <RadarChart
@@ -1875,9 +1879,7 @@ function OverviewTab({
 
       {/* Time of day */}
       <div className="bg-black p-6 col-span-12 md:col-span-6 lg:col-span-4">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-6">
-          Time of Day
-        </h3>
+        <h3 className="text-lg font-bold tracking-tight mb-6">Time of Day</h3>
         {distribution ? (
           <TimeOfDayHistogram data={distribution.by_hour} />
         ) : (
@@ -1909,15 +1911,15 @@ function ReadingTimeTab({
     display: 'grid',
     gridTemplateColumns: 'repeat(12, 1fr)',
     gap: '1px',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
   }
 
   return (
-    <div style={gridStyle} className="border border-white/5">
+    <div style={gridStyle} className="border border-white/[0.14]">
       <div className="bg-black p-6 col-span-12">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-black uppercase tracking-widest mb-1">
+            <h3 className="text-lg font-bold tracking-tight mb-1">
               Reading Time
             </h3>
             <p className="text-xs text-white/30 normal-case">
@@ -1938,7 +1940,7 @@ function ReadingTimeTab({
       </div>
 
       <div className="bg-black p-6 col-span-12 md:col-span-6">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-6">
+        <h3 className="text-lg font-bold tracking-tight mb-6">
           Pages Read Progress
         </h3>
         <LineChart
@@ -1950,7 +1952,7 @@ function ReadingTimeTab({
       </div>
 
       <div className="bg-black p-6 col-span-12 md:col-span-6">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-6">
+        <h3 className="text-lg font-bold tracking-tight mb-6">
           Reading Time Trend
         </h3>
         <LineChart
@@ -1962,7 +1964,7 @@ function ReadingTimeTab({
 
       {/* Sunburst: quarter → month breakdown */}
       <div className="bg-black p-6 col-span-12 md:col-span-6">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-4">
+        <h3 className="text-lg font-bold tracking-tight mb-4">
           Quarterly Breakdown
         </h3>
         <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
@@ -1972,9 +1974,7 @@ function ReadingTimeTab({
       </div>
 
       <div className="bg-black p-6 col-span-12 md:col-span-6">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-4">
-          By Quarter
-        </h3>
+        <h3 className="text-lg font-bold tracking-tight mb-4">By Quarter</h3>
         {(() => {
           const monthTotals = Array.from({ length: 12 }, () => 0)
           for (const d of monthlyData) {
@@ -2024,9 +2024,9 @@ function CalendarTab({
   onNext: () => void
 }) {
   return (
-    <div className="border border-white/5">
+    <div className="border border-white/[0.14]">
       <div className="p-6 bg-black border-b border-white/10">
-        <h2 className="text-sm font-black uppercase tracking-widest mb-1">
+        <h2 className="text-lg font-bold tracking-tight mb-1">
           Activity Calendar
         </h2>
         <p className="text-xs text-white/30 normal-case">
@@ -2067,14 +2067,14 @@ function BooksAuthorsTab({
     display: 'grid',
     gridTemplateColumns: 'repeat(12, 1fr)',
     gap: '1px',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
   }
 
   return (
-    <div style={gridStyle} className="border border-white/5">
+    <div style={gridStyle} className="border border-white/[0.14]">
       {/* Row 1: Author bars + Tag bars (same height, top 8) */}
       <div className="bg-black p-6 col-span-12 md:col-span-6">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-6">
+        <h3 className="text-lg font-bold tracking-tight mb-6">
           Reading by Author
         </h3>
         {byAuthor.length === 0 ? (
@@ -2096,7 +2096,7 @@ function BooksAuthorsTab({
       </div>
 
       <div className="bg-black p-6 col-span-12 md:col-span-6">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-6">
+        <h3 className="text-lg font-bold tracking-tight mb-6">
           Reading by Tag
         </h3>
         {byTag.length === 0 ? (
@@ -2119,7 +2119,7 @@ function BooksAuthorsTab({
 
       {/* Row 2: Time flow + Author engagement map */}
       <div className="bg-black p-6 col-span-12 md:col-span-6">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-2">
+        <h3 className="text-lg font-bold tracking-tight mb-2">
           Time Flow by Author
         </h3>
         <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
@@ -2129,7 +2129,7 @@ function BooksAuthorsTab({
       </div>
 
       <div className="bg-black p-6 col-span-12 md:col-span-6">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-2">
+        <h3 className="text-lg font-bold tracking-tight mb-2">
           Author Engagement Map
         </h3>
         <p className="text-[10px] text-white/30 font-bold normal-case mb-4">
@@ -2140,7 +2140,7 @@ function BooksAuthorsTab({
 
       {completed.length > 0 && (
         <div className="bg-black p-6 col-span-12">
-          <h3 className="text-sm font-black uppercase tracking-widest mb-6">
+          <h3 className="text-lg font-bold tracking-tight mb-6">
             Completed Books — Timeline
           </h3>
           <CompletedBooksCarousel books={completed} />
@@ -2179,9 +2179,7 @@ function StreakHistoryBadges({
   return (
     <div className="bg-black p-6 col-span-12">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-black uppercase tracking-widest">
-          Streak History
-        </h3>
+        <h3 className="text-lg font-bold tracking-tight">Streak History</h3>
         {totalPages > 1 && (
           <div className="flex items-center gap-1 text-[10px] font-bold text-white/40">
             <button
@@ -2243,11 +2241,11 @@ function StreaksTab({
     display: 'grid',
     gridTemplateColumns: 'repeat(12, 1fr)',
     gap: '1px',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
   }
 
   return (
-    <div style={gridStyle} className="border border-white/5">
+    <div style={gridStyle} className="border border-white/[0.14]">
       {/* Streak summary cards */}
       <div className="bg-black p-6 col-span-12 sm:col-span-4">
         <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
@@ -2309,9 +2307,7 @@ function StreaksTab({
 
       {/* Radial clock */}
       <div className="bg-black p-6 col-span-12 sm:col-span-4">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-4">
-          Reading Clock
-        </h3>
+        <h3 className="text-lg font-bold tracking-tight mb-4">Reading Clock</h3>
         {distribution ? (
           <RadialClock data={distribution.by_hour} />
         ) : (
@@ -2321,9 +2317,7 @@ function StreaksTab({
 
       {/* Time of day histogram */}
       <div className="bg-black p-6 col-span-12 sm:col-span-4">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-4">
-          Time of Day
-        </h3>
+        <h3 className="text-lg font-bold tracking-tight mb-4">Time of Day</h3>
         {distribution ? (
           <TimeOfDayHistogram data={distribution.by_hour} />
         ) : (
@@ -2333,9 +2327,7 @@ function StreaksTab({
 
       {/* Day of week */}
       <div className="bg-black p-6 col-span-12 sm:col-span-4">
-        <h3 className="text-sm font-black uppercase tracking-widest mb-4">
-          Day of Week
-        </h3>
+        <h3 className="text-lg font-bold tracking-tight mb-4">Day of Week</h3>
         {distribution ? (
           <DayOfWeekChart data={distribution.by_weekday} />
         ) : (
@@ -2437,56 +2429,76 @@ export default function Stats() {
   )
 
   return (
-    <div className="min-h-screen">
+    <div className="mx-auto min-h-screen max-w-[1600px]">
       {/* Page header */}
-      <header className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-6 py-4 md:py-5 border-b border-white/10 sticky top-0 bg-black/90 z-40">
-        <h1
-          className="text-3xl font-extrabold tracking-tighter"
-          data-testid="stats-heading"
-        >
-          Reading Stats
-        </h1>
-        <div className="flex items-center gap-0.5 bg-white/5 p-0.5">
-          {DATE_PRESETS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setPreset(p.id)}
-              data-testid={`preset-${p.id}`}
-              className={`px-4 py-1.5 text-[10px] font-black tracking-widest uppercase transition-colors ${
-                preset === p.id
-                  ? 'bg-primary text-black'
-                  : 'text-white/50 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+      <header className="grid grid-cols-12 gap-4 px-4 pb-6 pt-6 sm:px-6 lg:px-10 lg:pt-10">
+        <div className="col-span-12 lg:col-span-8">
+          <h1
+            className="text-5xl font-extrabold leading-[0.9] tracking-tighter sm:text-7xl"
+            data-testid="stats-heading"
+          >
+            Reading Stats
+          </h1>
+          <p className="mt-3 text-base text-white/50 sm:text-lg">
+            {overview
+              ? `${overview.books_owned} books · ${overview.books_read} completed · ${fmtSec(overview.total_reading_time_seconds)} read`
+              : 'Loading…'}
+          </p>
+        </div>
+        <div className="col-span-12 flex items-end lg:col-span-4 lg:justify-end">
+          <div
+            className="flex w-full border border-white/25 sm:w-auto"
+            role="group"
+            aria-label="Date range"
+          >
+            {DATE_PRESETS.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setPreset(p.id)}
+                data-testid={`preset-${p.id}`}
+                aria-pressed={preset === p.id}
+                className={`flex-1 whitespace-nowrap px-4 py-2 text-xs font-semibold transition-colors sm:flex-none ${
+                  preset === p.id
+                    ? 'bg-primary text-white'
+                    : 'text-white/60 hover:bg-white/[0.06] hover:text-white'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
-      {/* Tab navigation */}
+      {/* Tab navigation — numbered, sticky while scrolling */}
       <nav
-        className="flex border-b border-white/10 overflow-x-auto"
-        style={{ scrollbarWidth: 'none' }}
+        className="sticky top-0 z-30 flex overflow-x-auto border-y-2 border-white bg-black px-4 no-scrollbar sm:px-6 lg:px-10"
+        aria-label="Stats sections"
       >
-        {TABS.map((t) => (
+        {TABS.map((t, i) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             data-testid={`tab-${t.id}`}
-            className={`px-8 py-4 text-[10px] font-black tracking-widest uppercase border-b-2 whitespace-nowrap transition-colors ${
+            aria-current={tab === t.id ? 'page' : undefined}
+            className={`flex items-baseline gap-2 whitespace-nowrap border-t-[3px] px-4 pb-3 pt-2.5 text-sm font-semibold transition-colors first:pl-0 -mt-[2px] ${
               tab === t.id
-                ? 'border-primary text-primary'
-                : 'border-transparent text-white/40 hover:text-white/70'
+                ? 'border-primary text-white'
+                : 'border-transparent text-white/45 hover:text-white'
             }`}
           >
+            <span
+              className={`text-[11px] tabular-nums ${tab === t.id ? 'text-primary-400' : 'text-white/30'}`}
+            >
+              {String(i + 1).padStart(2, '0')}
+            </span>
             {t.label}
           </button>
         ))}
       </nav>
 
       {/* Tab content */}
-      <div className="p-4 md:p-6 lg:p-10 min-w-0">
+      <div className="min-w-0 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
         {tab === 'overview' && (
           <OverviewTab
             overview={overview}
@@ -2543,9 +2555,9 @@ export default function Stats() {
       </div>
 
       {/* Status footer */}
-      <div className="mx-6 lg:mx-10 pb-8">
-        <div className="border-t-2 border-primary pt-4 flex justify-between items-center">
-          <span className="text-[10px] font-black tracking-widest text-white/30">
+      <div className="px-4 pb-8 sm:px-6 lg:px-10">
+        <div className="flex items-center justify-between border-t-2 border-white pt-3">
+          <span className="text-[10px] font-semibold tracking-widest text-white/40">
             {overview
               ? `Calculated from ${overview.books_owned} books · ${overview.books_read} completed`
               : 'Loading stats…'}
