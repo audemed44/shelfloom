@@ -2,6 +2,25 @@
 
 Self-hosted book library manager with deep KOReader integration and rich reading statistics. Only meant for my own personal use and it is perpetually in development.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td colspan="3"><img src="docs/screenshots/home-desktop.png" alt="Home dashboard on desktop" /></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="docs/screenshots/book-desktop.png" alt="Book detail page with the series shelf" /></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="docs/screenshots/library-desktop.png" alt="Library grid on desktop" /></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/home-mobile.png" alt="Home dashboard on mobile" /></td>
+    <td><img src="docs/screenshots/book-mobile.png" alt="Book detail page on mobile" /></td>
+    <td><img src="docs/screenshots/library-mobile.png" alt="Library on mobile" /></td>
+  </tr>
+</table>
+
 ## Quick Start (Docker)
 
 ### Using the pre-built image (recommended)
