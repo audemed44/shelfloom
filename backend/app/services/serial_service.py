@@ -1136,8 +1136,32 @@ async def rebuild_volume(session: AsyncSession, serial_id: int, volume_id: int) 
             if shelf is not None and book.file_path:
                 old_file = Path(shelf.path) / book.file_path
 
+    # The old file's layout, so reading positions can follow chapters that move.
+    from app.services.kosync_service import carry_position_across_rebuild, epub_spine
+
+    old_spine: list[tuple[str, int]] = []
+    if old_file is not None and old_file.exists():
+        try:
+            old_spine = epub_spine(old_file)
+        except Exception:  # noqa: BLE001 - a broken old file just means no remap
+            log.warning("Could not read the spine of %s", old_file)
+
     vol = await generate_volume(session, serial_id, volume_id, shelf_id, existing_book_id)
     await _tidy_rebuilt_volume_book(session, serial_id, vol, old_file, old_title)
+
+    if old_spine and vol.book_id is not None:
+        book = await session.scalar(select(Book).where(Book.id == vol.book_id))
+        shelf = (
+            await session.scalar(select(Shelf).where(Shelf.id == book.shelf_id)) if book else None
+        )
+        if book is not None and shelf is not None:
+            try:
+                new_spine = epub_spine(Path(shelf.path) / book.file_path)
+            except Exception:  # noqa: BLE001
+                new_spine = []
+            if new_spine:
+                await carry_position_across_rebuild(session, book, old_spine, new_spine)
+                await session.refresh(vol)
     return vol
 
 

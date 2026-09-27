@@ -309,3 +309,140 @@ async def save_web_progress(
         book_id=book.id,
         locator=locator,
     )
+
+
+# ── carrying a position across a rebuilt file ─────────────────────────────────
+
+REBUILD_DEVICE = "Shelfloom"
+REBUILD_DEVICE_ID = "shelfloom-rebuild"
+
+_DOC_FRAGMENT = re.compile(r"^/body(?:\[1\])?/DocFragment\[(\d+)\]")
+
+
+def epub_spine(path: str | PurePath) -> list[tuple[str, int]]:
+    """Spine of an EPUB as (href, uncompressed size) pairs, in reading order.
+
+    KOReader numbers these DocFragment[1], DocFragment[2], … (every spine item
+    gets one), so this is what an XPointer's first step refers to.
+    """
+    import posixpath
+    import zipfile
+    from xml.etree import ElementTree
+
+    with zipfile.ZipFile(path) as z:
+        container = ElementTree.fromstring(z.read("META-INF/container.xml"))
+        rootfile = next(el for el in container.iter() if el.tag.endswith("rootfile"))
+        opf_path = rootfile.attrib["full-path"]
+        opf = ElementTree.fromstring(z.read(opf_path))
+        base = posixpath.dirname(opf_path)
+        hrefs = {
+            el.attrib["id"]: el.attrib["href"]
+            for el in opf.iter()
+            if el.tag.endswith("item") and "id" in el.attrib and "href" in el.attrib
+        }
+        sizes = {info.filename: info.file_size for info in z.infolist()}
+        spine = []
+        for el in opf.iter():
+            if el.tag.endswith("itemref"):
+                href = hrefs.get(el.attrib.get("idref", ""), "")
+                full = posixpath.normpath(posixpath.join(base, href)) if base else href
+                spine.append((href, sizes.get(full, 0)))
+        return spine
+
+
+def _chapter_number(href: str) -> int | None:
+    m = re.search(r"chapter_(\d+)\.xhtml$", href)
+    return int(m.group(1)) if m else None
+
+
+def remap_position(
+    progress: str,
+    percentage: float,
+    old_spine: list[tuple[str, int]],
+    new_spine: list[tuple[str, int]],
+) -> tuple[str, float] | None:
+    """Move a KOReader position from an old build of a book to a new one.
+
+    The spine item it was in is found in the new spine by href (for serial
+    volumes, one file per chapter), so the rest of the XPointer (the path
+    inside that chapter) still applies. If the chapter is no longer in the
+    book, the position moves to the start of the next chapter that is.
+    The percentage is re-estimated from spine item sizes. Returns None if the
+    position doesn't need to change or can't be mapped.
+    """
+    m = _DOC_FRAGMENT.match(progress)
+    if not m or not old_spine or not new_spine:
+        return None
+    old_index = int(m.group(1)) - 1
+    if not 0 <= old_index < len(old_spine):
+        return None
+    href = old_spine[old_index][0]
+    new_hrefs = [h for h, _ in new_spine]
+    rest = progress[m.end() :]
+    if href in new_hrefs:
+        new_index = new_hrefs.index(href)
+    else:
+        number = _chapter_number(href)
+        later = [
+            i
+            for i, h in enumerate(new_hrefs)
+            if number is not None and (_chapter_number(h) or -1) > number
+        ]
+        new_index = later[0] if later else len(new_hrefs) - 1
+        rest = "/body"  # start of that chapter
+    new_progress = f"/body/DocFragment[{new_index + 1}]{rest}"
+
+    # How far into its spine item the position was, from the old percentage.
+    old_total = sum(s for _, s in old_spine) or 1
+    old_before = sum(s for _, s in old_spine[:old_index])
+    old_size = old_spine[old_index][1] or 1
+    within = (percentage * old_total - old_before) / old_size
+    within = max(0.0, min(1.0, within)) if href in new_hrefs else 0.0
+    new_total = sum(s for _, s in new_spine) or 1
+    new_before = sum(s for _, s in new_spine[:new_index])
+    new_pct = (new_before + within * new_spine[new_index][1]) / new_total
+
+    if new_progress == progress and abs(new_pct - percentage) < 0.001:
+        return None
+    return new_progress, max(0.0, min(1.0, new_pct))
+
+
+async def carry_position_across_rebuild(
+    session: AsyncSession,
+    book: Book,
+    old_spine: list[tuple[str, int]],
+    new_spine: list[tuple[str, int]],
+) -> KoSyncProgress | None:
+    """After a book's file is rebuilt, re-save its latest position for the new layout.
+
+    It is saved as a new record from "Shelfloom", newer than the device's own:
+    KOReader ignores a record from its own device (and would otherwise keep its
+    now-shifted local position), but follows a newer one from elsewhere.
+    """
+    if old_spine == new_spine:
+        return None
+    latest = await latest_progress_for_book(session, book.id)
+    if latest is None:
+        return None
+    mapped = remap_position(latest.progress, latest.percentage, old_spine, new_spine)
+    if mapped is None:
+        return None
+    progress, percentage = mapped
+    log.info(
+        "Moved %s position %s -> %s after rebuild of book %s",
+        latest.device,
+        latest.progress,
+        progress,
+        book.id,
+    )
+    return await save_progress(
+        session,
+        username=WEB_READER_USERNAME,
+        document=book.file_hash_md5_ko or f"book:{book.id}",
+        progress=progress,
+        percentage=percentage,
+        device=REBUILD_DEVICE,
+        device_id=REBUILD_DEVICE_ID,
+        book_id=book.id,
+        locator=None,
+    )
