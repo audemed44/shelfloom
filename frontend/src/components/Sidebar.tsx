@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom'
-import { type LucideIcon } from 'lucide-react'
+import { Search, type LucideIcon } from 'lucide-react'
 import { NAV_ITEMS, MORE_ITEMS } from './nav/navItems'
 import Logo from './nav/Logo'
+import { useQuickSearch } from './search/QuickSearch'
 
 interface NavItemProps {
   to: string
@@ -47,6 +48,7 @@ function NavItem({ to, icon: Icon, label, end, index }: NavItemProps) {
 }
 
 export default function Sidebar() {
+  const { open: openSearch } = useQuickSearch()
   return (
     <aside
       className="hidden sm:flex w-20 lg:w-64 fixed top-0 left-0 h-full flex-col border-r border-white/[0.14] bg-black z-40"
@@ -58,6 +60,22 @@ export default function Sidebar() {
         <span className="hidden lg:block text-xl font-extrabold tracking-tighter text-white">
           Shelfloom
         </span>
+      </div>
+
+      <div className="px-3 pb-4 lg:px-4">
+        <button
+          onClick={openSearch}
+          title="Search (⌘K)"
+          aria-label="Search"
+          data-testid="sidebar-search"
+          className="flex w-full items-center justify-center gap-3 border border-white/25 px-3 py-2.5 text-sm text-white/60 transition-colors hover:border-white hover:text-white lg:justify-start"
+        >
+          <Search size={16} className="shrink-0" />
+          <span className="hidden lg:block">Search</span>
+          <kbd className="ml-auto hidden border border-white/20 px-1.5 text-[10px] text-white/40 lg:block">
+            ⌘K
+          </kbd>
+        </button>
       </div>
 
       <nav className="flex-1 px-3 lg:px-4">

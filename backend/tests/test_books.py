@@ -166,6 +166,25 @@ async def test_list_books_search_series_name(client, db_session, tmp_path):
     assert [item["title"] for item in items] == ["Gardens of the Moon"]
 
 
+async def test_list_books_search_genre_and_tag_names(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    cozy = await _create_book(db_session, shelf.id, "Legends & Lattes", "Travis Baldree")
+    grim = await _create_book(db_session, shelf.id, "Prince of Thorns", "Mark Lawrence")
+    await _create_book(db_session, shelf.id, "Dune", "Frank Herbert")
+    genre = Genre(name="Cozy Fantasy")
+    tag = Tag(name="grimdark")
+    db_session.add_all([genre, tag])
+    await db_session.flush()
+    db_session.add(BookGenre(book_id=cozy.id, genre_id=genre.id))
+    db_session.add(BookTag(book_id=grim.id, tag_id=tag.id))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?search=cozy")
+    assert [b["title"] for b in resp.json()["items"]] == ["Legends & Lattes"]
+    resp = await client.get("/api/books?search=GRIMDARK")
+    assert [b["title"] for b in resp.json()["items"]] == ["Prince of Thorns"]
+
+
 async def test_list_books_filter_shelf(client, db_session, tmp_path):
     shelf1 = await _create_shelf(db_session, tmp_path, "Shelf1")
     shelf2 = await _create_shelf(db_session, tmp_path, "Shelf2")

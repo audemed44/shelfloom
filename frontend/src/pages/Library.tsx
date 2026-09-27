@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { usePersistedState } from '../hooks/usePersistedState'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Search,
   LayoutGrid,
@@ -350,8 +350,14 @@ function LoadMore({
 
 export default function Library() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [view, setView] = usePersistedState('shelfloom:view', 'grid')
-  const [search, setSearch] = useState('')
+  // `?search=` (e.g. from quick search) pre-fills the library search box.
+  const urlSearch = new URLSearchParams(location.search).get('search') ?? ''
+  const [search, setSearch] = useState(urlSearch)
+  useEffect(() => {
+    if (urlSearch) setSearch(urlSearch)
+  }, [urlSearch])
   const [selectedShelfId, setSelectedShelfId] = useState<number | null>(null)
   const [sort, setSort] = usePersistedState('shelfloom:sort', 'last_read')
   const [status, setStatus] = usePersistedState<string | null>(

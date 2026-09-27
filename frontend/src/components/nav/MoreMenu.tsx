@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
+import { Search } from 'lucide-react'
+import { useQuickSearch } from '../search/QuickSearch'
 import { MORE_ITEMS } from './navItems'
 
 interface MoreMenuProps {
@@ -8,6 +10,7 @@ interface MoreMenuProps {
 }
 
 export default function MoreMenu({ open, onClose }: MoreMenuProps) {
+  const { open: openSearch } = useQuickSearch()
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
@@ -38,7 +41,18 @@ export default function MoreMenu({ open, onClose }: MoreMenuProps) {
           <p className="pb-3 text-[10px] font-semibold tracking-widest text-white/40">
             More
           </p>
-          <nav className="grid grid-cols-3 gap-px bg-white/[0.14] border border-white/[0.14]">
+          <nav className="grid grid-cols-2 gap-px bg-white/[0.14] border border-white/[0.14]">
+            <button
+              onClick={() => {
+                onClose()
+                openSearch()
+              }}
+              className="flex flex-col items-start gap-6 bg-black px-3 py-4 text-sm font-semibold text-white/75 transition-colors hover:bg-white/[0.06] hover:text-white"
+              data-testid="more-menu-item-search"
+            >
+              <Search size={22} strokeWidth={1.75} />
+              <span>Search</span>
+            </button>
             {MORE_ITEMS.map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}

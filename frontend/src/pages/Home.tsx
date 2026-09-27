@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Loader2,
   ArrowRight,
+  Search,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
@@ -23,6 +24,7 @@ import type {
   PendingChapterFetchResponse,
 } from '../types/api'
 import { getBookCoverUrl } from '../utils/bookCover'
+import { useQuickSearch } from '../components/search/QuickSearch'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -689,6 +691,7 @@ export default function Home() {
   )
   const batchRunning = pendingBatchStatus?.state === 'running'
 
+  const { open: openSearch } = useQuickSearch()
   const iconButton =
     'grid size-8 place-items-center border border-white/20 text-white/70 transition-colors hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50'
   const heroBook = currentlyReading[0]
@@ -718,6 +721,15 @@ export default function Home() {
             Welcome back, reader. Your library awaits.
           </p>
         </div>
+        {/* Phones have no sidebar, so give search a prominent entry point */}
+        <button
+          onClick={openSearch}
+          className="col-span-12 flex items-center gap-3 border border-white/25 px-4 py-3 text-left text-sm text-white/50 sm:hidden"
+          data-testid="home-search"
+        >
+          <Search size={16} className="text-primary-400" />
+          Search books, series, genres…
+        </button>
       </header>
 
       <div className="stagger grid grid-cols-12 gap-x-6 gap-y-12 lg:gap-x-8 lg:gap-y-16">
