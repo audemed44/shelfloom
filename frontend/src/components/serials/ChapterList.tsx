@@ -113,6 +113,30 @@ function getMatchingVolumes(
 }
 
 const LIMIT = 50
+// Backend caps a single chapter request at 500 rows.
+const MAX_REQUEST = 500
+
+async function fetchChapterRange(
+  serialId: number,
+  offset: number,
+  count: number
+): Promise<SerialChapter[]> {
+  const results: SerialChapter[] = []
+  let cursor = offset
+  let remaining = count
+  while (remaining > 0) {
+    const limit = Math.min(remaining, MAX_REQUEST)
+    const data =
+      (await api.get<SerialChapter[]>(
+        `/api/serials/${serialId}/chapters?offset=${cursor}&limit=${limit}`
+      )) ?? []
+    results.push(...data)
+    if (data.length < limit) break
+    cursor += limit
+    remaining -= limit
+  }
+  return results
+}
 
 export default function ChapterList({
   serialId,
@@ -122,9 +146,13 @@ export default function ChapterList({
 }: ChapterListProps) {
   const isMountedRef = useRef(true)
   const lastFetchStateRef = useRef<string>('idle')
-  const [offset, setOffset] = useState(0)
   const [chapters, setChapters] = useState<SerialChapter[] | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const loadedCountRef = useRef(0)
+  const loadingMoreRef = useRef(false)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
   const [fetchStart, setFetchStart] = useState('')
   const [fetchEnd, setFetchEnd] = useState('')
   const [fetching, setFetching] = useState(false)
@@ -141,25 +169,64 @@ export default function ChapterList({
     }
   }, [])
 
+  // Loads (or silently refreshes) every chapter currently on screen so that
+  // background fetch jobs keep the already-scrolled list up to date.
   const loadChapters = useCallback(
     async (silent: boolean = false) => {
       if (!silent) {
         setLoading(true)
       }
       try {
-        const data = await api.get<SerialChapter[]>(
-          `/api/serials/${serialId}/chapters?offset=${offset}&limit=${LIMIT}`
-        )
+        const count = Math.max(loadedCountRef.current, LIMIT)
+        const data = await fetchChapterRange(serialId, 0, count)
         if (!isMountedRef.current) return
-        setChapters(data ?? [])
+        loadedCountRef.current = data.length
+        setChapters(data)
+        setHasMore(data.length >= count)
       } finally {
         if (isMountedRef.current && !silent) {
           setLoading(false)
         }
       }
     },
-    [offset, serialId]
+    [serialId]
   )
+
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current) return
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+    try {
+      const offset = loadedCountRef.current
+      const data = await fetchChapterRange(serialId, offset, LIMIT)
+      if (!isMountedRef.current) return
+      loadedCountRef.current = offset + data.length
+      setChapters((prev) => [...(prev ?? []).slice(0, offset), ...data])
+      setHasMore(data.length >= LIMIT)
+    } finally {
+      loadingMoreRef.current = false
+      if (isMountedRef.current) {
+        setLoadingMore(false)
+      }
+    }
+  }, [serialId])
+
+  useEffect(() => {
+    const node = sentinelRef.current
+    if (!node || !hasMore || typeof IntersectionObserver === 'undefined') {
+      return
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadMore()
+        }
+      },
+      { rootMargin: '600px 0px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasMore, loadMore, chapters])
 
   const loadFetchStatus = useCallback(async () => {
     const data = await api.get<ChapterFetchStatusResponse>(
@@ -176,6 +243,7 @@ export default function ChapterList({
 
   useEffect(() => {
     setChapters(null)
+    loadedCountRef.current = 0
     void loadChapters()
   }, [loadChapters])
 
@@ -613,27 +681,31 @@ export default function ChapterList({
         </div>
       )}
 
-      {totalChapters > LIMIT && (
-        <div className="flex items-center justify-between pt-1">
-          <button
-            onClick={() => setOffset(Math.max(0, offset - LIMIT))}
-            disabled={offset === 0}
-            className="text-[10px] font-black tracking-widest uppercase text-white/40 hover:text-white disabled:opacity-30 transition-colors"
-          >
-            Previous
-          </button>
-          <span className="text-[10px] text-white/30 tracking-widest uppercase">
-            {offset + 1}–{Math.min(offset + LIMIT, totalChapters)} of{' '}
-            {totalChapters}
-          </span>
-          <button
-            onClick={() => setOffset(offset + LIMIT)}
-            disabled={offset + LIMIT >= totalChapters}
-            className="text-[10px] font-black tracking-widest uppercase text-white/40 hover:text-white disabled:opacity-30 transition-colors"
-          >
-            Next
-          </button>
+      {!loading && hasMore && (
+        <div
+          ref={sentinelRef}
+          className="flex items-center justify-center gap-3 py-3"
+          data-testid="chapter-list-sentinel"
+        >
+          {loadingMore ? (
+            <span className="flex items-center gap-2 text-[10px] tracking-widest uppercase text-white/40">
+              <Loader2 size={12} className="animate-spin" />
+              Loading more chapters
+            </span>
+          ) : (
+            <button
+              onClick={() => void loadMore()}
+              className="rounded-full border border-white/10 px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase text-white/50 hover:text-white hover:border-white/30 transition-colors"
+            >
+              Load more
+            </button>
+          )}
         </div>
+      )}
+      {!loading && shown > 0 && (
+        <p className="text-center text-[10px] text-white/30 tracking-widest uppercase">
+          Showing {shown} of {Math.max(totalChapters, shown)} chapters
+        </p>
       )}
       <p className="text-[10px] text-white/20 normal-case">
         * Running page totals are based on fetched chapters only and are marked

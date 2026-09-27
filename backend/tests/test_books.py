@@ -150,6 +150,22 @@ async def test_list_books_search_author(client, db_session, tmp_path):
     assert resp.json()["total"] == 1
 
 
+async def test_list_books_search_series_name(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    book1 = await _create_book(db_session, shelf.id, "Gardens of the Moon", "Steven Erikson")
+    await _create_book(db_session, shelf.id, "Foundation", "Isaac Asimov")
+    series = Series(name="Malazan Book of the Fallen")
+    db_session.add(series)
+    await db_session.flush()
+    db_session.add(BookSeries(book_id=book1.id, series_id=series.id, sequence=1))
+    await db_session.commit()
+
+    resp = await client.get("/api/books?search=malazan")
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert [item["title"] for item in items] == ["Gardens of the Moon"]
+
+
 async def test_list_books_filter_shelf(client, db_session, tmp_path):
     shelf1 = await _create_shelf(db_session, tmp_path, "Shelf1")
     shelf2 = await _create_shelf(db_session, tmp_path, "Shelf2")
