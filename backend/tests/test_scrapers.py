@@ -275,6 +275,89 @@ class TestRoyalRoadAdapter:
             )
         assert "Text" in content.html_content
 
+    @pytest.mark.asyncio
+    async def test_fetch_chapter_content_drops_hidden_antipiracy_notice(self):
+        # Mirrors a real RoyalRoad chapter: paragraphs carry random "cn..." classes,
+        # the notice is a bare <span> with a random class hidden by a <style> rule
+        # in the page body. Story text that mentions Amazon must survive.
+        html = (
+            "<html><body><h1>Chapter 5</h1>"
+            "<style>.cjAxM2JmNmQ5Mzk1YTRmZmZiM2Q2MWQ5YTNlMmQxNTU2{"
+            "display: none; speak: never;}</style>"
+            "<div class='portlet-body'><div class='chapter-inner chapter-content'>"
+            "<p class='cnM4YmQ2ZGI1OWJlZTRjYzNiMTlkZWU5M2UyNmIzNjEw'>"
+            "She ordered a book from Amazon.</p>"
+            "<span class='cjAxM2JmNmQ5Mzk1YTRmZmZiM2Q2MWQ5YTNlMmQxNTU2'>"
+            "Stolen from its original source, this story is not meant to be on "
+            "Amazon; report any sightings.</span>"
+            "<p style='display:none'>Invisible filler</p>"
+            "<p class='cnM0MmM1OTQ1MWMzNzQwOTNhZGEwMDY3OTUyYTZjNzgw'>The end.</p>"
+            "</div></div></body></html>"
+        )
+        resp = _make_response(html)
+        with (
+            patch("app.scrapers.royalroad.build_client", return_value=_mock_client([resp])),
+            patch("app.scrapers.royalroad.rate_limited_sleep", new_callable=AsyncMock),
+        ):
+            content = await self.adapter.fetch_chapter_content(
+                "https://royalroad.com/fiction/1/story/chapter/100/ch5"
+            )
+        assert "report any sightings" not in content.html_content
+        assert "Invisible filler" not in content.html_content
+        assert "She ordered a book from Amazon." in content.html_content
+        assert "The end." in content.html_content
+
+    def test_hidden_classes_from_css(self):
+        from bs4 import BeautifulSoup
+
+        from app.scrapers.royalroad import hidden_classes_from_css
+
+        soup = BeautifulSoup(
+            "<style>.a{display:none}.b{color:red}.c, .d{ visibility : hidden }"
+            ".e{speak:never}</style>",
+            "html.parser",
+        )
+        assert hidden_classes_from_css(soup) == {"a", "c", "d", "e"}
+
+    @pytest.mark.parametrize(
+        "notice",
+        [
+            "Stolen from its original source, this story is not meant to be on Amazon; "
+            "report any sightings.",
+            "This story originates from a different website. Ensure the author gets the "
+            "support they deserve by reading it there.",
+            "You could be reading stolen content. Head to the original site for the genuine story.",
+            "Unauthorized usage: this narrative is on Amazon without the author's consent. "
+            "Report any sightings.",
+        ],
+    )
+    def test_strip_antipiracy_notices_from_stored_chapter(self, notice):
+        # Chapters already in the database have lost the page CSS; the notice is
+        # still recognisable as a bare span with a random class.
+        from app.scrapers.royalroad import strip_antipiracy_notices
+
+        html = (
+            "<div><div class='chapter-inner chapter-content'>"
+            "<p>First paragraph.</p>"
+            f"<span class='cmMyMjliZTY1NTNmZjQ4YjFiYWZlNzA3OWY1N2FkNzdj'>{notice}</span>"
+            "<p>A paragraph about Amazon warehouses and stolen goods.</p>"
+            "</div></div>"
+        )
+        cleaned, removed = strip_antipiracy_notices(html)
+        assert removed == 1
+        assert notice[:20] not in cleaned
+        assert "First paragraph." in cleaned
+        assert "A paragraph about Amazon warehouses and stolen goods." in cleaned
+
+    def test_strip_antipiracy_notices_leaves_clean_chapters_untouched(self):
+        from app.scrapers.royalroad import strip_antipiracy_notices
+
+        html = (
+            "<div><div class='chapter-inner'><p>Report to the captain.</p>"
+            "<span>An inline aside.</span></div></div>"
+        )
+        assert strip_antipiracy_notices(html) == (html, 0)
+
     def test_remove_advertisement_blocks(self):
         from bs4 import BeautifulSoup
 
