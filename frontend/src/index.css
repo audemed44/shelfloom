@@ -4,8 +4,6 @@
 @import '@fontsource/inter/700.css';
 @import '@fontsource/inter/800.css';
 @import '@fontsource/inter/900.css';
-@import '@fontsource-variable/fraunces/index.css';
-@import '@fontsource-variable/fraunces/wght-italic.css';
 
 @tailwind base;
 @tailwind components;
@@ -19,7 +17,7 @@
     --mobile-bottom-nav-offset: calc(
       var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom)
     );
-    --primary-rgb: 139 124 255;
+    --primary-rgb: 37 99 255;
     --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
@@ -57,9 +55,8 @@
   }
 
   h1 {
-    @apply font-display;
-    font-optical-sizing: auto;
-    letter-spacing: -0.02em;
+    font-weight: 800;
+    letter-spacing: -0.045em;
   }
 
   /* Preserve natural case for user-entered content and external data */
@@ -70,7 +67,7 @@
   }
 
   ::selection {
-    background: rgb(var(--primary-rgb) / 0.35);
+    background: rgb(var(--primary-rgb));
     color: #fff;
   }
 
@@ -83,12 +80,6 @@
   textarea:focus-visible,
   select:focus-visible {
     outline: none;
-  }
-
-  input,
-  textarea,
-  select {
-    border-radius: 0.5rem;
   }
 
   * {
@@ -104,8 +95,7 @@
     background: transparent;
   }
   *::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.18);
   }
   *::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
@@ -113,71 +103,46 @@
 }
 
 @layer components {
-  /* Frosted surface used by cards, panels and navigation chrome */
+  /* Flat panel: a hairline frame on pure black */
   .glass {
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.055),
-      rgba(255, 255, 255, 0.025)
-    );
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(18px) saturate(140%);
-    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    background: #000;
+    border: 1px solid rgba(255, 255, 255, 0.14);
   }
 
   .surface {
-    @apply rounded-2xl border border-white/[0.07] bg-ink-850/70;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    @apply border border-white/[0.14] bg-black;
+  }
+
+  /* Swiss section rule: heavy top line that anchors a heading */
+  .rule {
+    @apply border-t-2 border-white pt-3;
   }
 
   .text-gradient {
-    background-image: linear-gradient(
-      100deg,
-      #f7f6f3 0%,
-      #cfc7ff 35%,
-      #8b7cff 60%,
-      #f47fb0 85%,
-      #f5b56b 100%
-    );
-    background-size: 200% auto;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: #fff;
   }
 
   .skeleton {
     background: linear-gradient(
       90deg,
       rgba(255, 255, 255, 0.04) 0%,
-      rgba(255, 255, 255, 0.09) 50%,
+      rgba(255, 255, 255, 0.1) 50%,
       rgba(255, 255, 255, 0.04) 100%
     );
     background-size: 200% 100%;
     animation: shimmer 1.8s linear infinite;
   }
 
-  /* Book cover with a subtle spine highlight and depth */
+  /* Book cover: flat, with a hairline edge */
   .book-cover {
     position: relative;
-    box-shadow:
-      0 18px 40px -18px rgba(0, 0, 0, 0.95),
-      0 2px 6px rgba(0, 0, 0, 0.5);
   }
   .book-cover::after {
     content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
-    border-radius: inherit;
-    background: linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.14) 0%,
-      rgba(255, 255, 255, 0) 4%,
-      rgba(0, 0, 0, 0.18) 5.5%,
-      rgba(255, 255, 255, 0) 8%,
-      rgba(255, 255, 255, 0) 100%
-    );
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -211,7 +176,7 @@
   }
 
   .stagger > * {
-    animation: fade-up 0.6s var(--ease-out-expo) both;
+    animation: fade-up 0.5s var(--ease-out-expo) both;
   }
   .stagger > *:nth-child(1) { animation-delay: 0ms; }
   .stagger > *:nth-child(2) { animation-delay: 60ms; }
@@ -241,38 +206,6 @@
   }
 }
 
-/* Animated backdrop glows behind the whole app */
-.app-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-.app-backdrop::before,
-.app-backdrop::after {
-  content: '';
-  position: absolute;
-  width: 60vmax;
-  height: 60vmax;
-  border-radius: 9999px;
-  filter: blur(90px);
-  opacity: 0.16;
-  animation: aurora 26s ease-in-out infinite;
-}
-.app-backdrop::before {
-  top: -30vmax;
-  left: -10vmax;
-  background: radial-gradient(circle, #8b7cff 0%, transparent 65%);
-}
-.app-backdrop::after {
-  bottom: -35vmax;
-  right: -15vmax;
-  background: radial-gradient(circle, #f47fb0 0%, transparent 65%);
-  opacity: 0.08;
-  animation-delay: -12s;
-}
-
 /* Heatmap scrollbar — thin, primary-coloured */
 .heatmap-container::-webkit-scrollbar {
   height: 4px;
@@ -281,7 +214,7 @@
   background: rgba(255, 255, 255, 0.05);
 }
 .heatmap-container::-webkit-scrollbar-thumb {
-  background: #8b7cff;
+  background: #2563ff;
 }
 
 @media (prefers-reduced-motion: reduce) {

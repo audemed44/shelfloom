@@ -74,7 +74,7 @@ export default function BookCard({
   const coverContent = (
     <div
       className={`book-cover aspect-[2/3] rounded-xl bg-white/5 overflow-hidden transition-all duration-500 ease-out group-hover:-translate-y-1.5 group-hover:shadow-lift ${
-        isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-black' : ''
+        isSelected ? 'outline outline-2 outline-offset-2 outline-primary' : ''
       }`}
     >
       <img
@@ -88,18 +88,18 @@ export default function BookCard({
       />
       {/* Format badge */}
       <div className="absolute top-2 right-2">
-        <span className="rounded-full bg-black/60 backdrop-blur text-[9px] font-semibold tracking-widest px-2 py-0.5 text-white/70">
+        <span className="bg-black text-[9px] font-semibold tracking-widest px-1.5 py-0.5 text-white/80">
           {fmtFormat(book.format)}
         </span>
       </div>
 
       {/* Genre + tag badges */}
       {(genres.length > 0 || book.tags?.length > 0) && (
-        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 pb-2 pt-6 bg-gradient-to-t from-black/85 to-transparent">
+        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 p-1.5">
           {genres.slice(0, 2).map((genre) => (
             <span
               key={genre.id}
-              className="rounded-full bg-primary/85 text-[9px] font-medium px-2 py-0.5 text-white leading-tight"
+              className="bg-primary text-[9px] font-semibold px-1.5 py-0.5 text-white leading-tight"
             >
               {genre.name}
             </span>
@@ -107,7 +107,7 @@ export default function BookCard({
           {book.tags?.slice(0, 2).map((t) => (
             <span
               key={t.id}
-              className="rounded-full bg-accent/85 text-[9px] font-medium px-2 py-0.5 text-ink-900 leading-tight"
+              className="bg-white text-[9px] font-semibold px-1.5 py-0.5 text-black leading-tight"
             >
               {t.name}
             </span>
@@ -118,7 +118,7 @@ export default function BookCard({
       {/* Selection checkbox — visible on hover or when selecting */}
       {onToggle && (
         <div
-          className={`absolute top-2 left-2 size-6 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-opacity ${
+          className={`absolute top-2 left-2 size-6 flex items-center justify-center cursor-pointer transition-opacity ${
             isSelected
               ? 'bg-primary opacity-100'
               : isSelecting
@@ -136,7 +136,7 @@ export default function BookCard({
 
       {isDnf && (
         <div
-          className="absolute bottom-2 right-2 size-5 rounded-full bg-red-500 flex items-center justify-center shadow-lg"
+          className="absolute bottom-2 right-2 size-5 bg-red-500 flex items-center justify-center"
           data-testid="book-card-dnf-badge"
         >
           <X size={10} strokeWidth={3} className="text-white" />
@@ -145,12 +145,12 @@ export default function BookCard({
 
       {/* Complete checkmark — moves to bottom-right when checkbox occupies top-left */}
       {!onToggle && isComplete && (
-        <div className="absolute top-2 left-2 size-6 rounded-full bg-primary flex items-center justify-center shadow-lg">
+        <div className="absolute top-2 left-2 size-6 bg-primary flex items-center justify-center">
           <Check size={12} strokeWidth={3} className="text-white" />
         </div>
       )}
       {onToggle && isComplete && (
-        <div className="absolute bottom-2 right-2 size-5 rounded-full bg-primary flex items-center justify-center shadow-lg">
+        <div className="absolute bottom-2 right-2 size-5 bg-primary flex items-center justify-center">
           <Check size={10} strokeWidth={3} className="text-white" />
         </div>
       )}
@@ -159,7 +159,7 @@ export default function BookCard({
       {isInProgress && (
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/60">
           <div
-            className="h-full bg-gradient-to-r from-primary-400 to-accent-rose transition-all"
+            className="h-full bg-primary transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>

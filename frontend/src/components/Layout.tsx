@@ -7,9 +7,6 @@ export default function Layout() {
 
   return (
     <div className="relative flex min-h-screen min-h-dvh flex-col bg-black text-white">
-      {/* Ambient animated glow behind all pages */}
-      <div className="app-backdrop" aria-hidden="true" />
-
       {/* Sidebar: hidden on mobile, icon-only on sm/md, full on lg+ */}
       <Sidebar />
 

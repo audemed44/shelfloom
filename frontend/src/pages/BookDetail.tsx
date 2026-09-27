@@ -65,7 +65,7 @@ interface SessionDisplay extends ReadingSession {
 
 function SessionRow({ session }: { session: SessionDisplay }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-white/[0.06] last:border-0">
+    <div className="flex items-center justify-between py-3 border-b border-white/[0.12]">
       <div className="flex items-center gap-3">
         <Clock size={13} className="text-white/30 shrink-0" />
         <span className="text-xs text-white/60 normal-case">
@@ -133,18 +133,15 @@ function SeriesShelf({
   }
 
   return (
-    <section
-      className="surface overflow-hidden p-4 sm:p-6 mb-10"
-      data-testid="series-shelf"
-    >
-      <div className="flex items-end justify-between gap-4 mb-4">
+    <section className="mb-12" data-testid="series-shelf">
+      <div className="rule flex items-end justify-between gap-4 mb-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold tracking-widest text-primary-300">
+          <p className="text-[10px] font-semibold tracking-widest text-primary-400">
             {sequence != null
               ? `Book ${fmtSequence(sequence)} of ${books.length}`
               : `${books.length} books`}
           </p>
-          <h2 className="font-display text-xl sm:text-2xl font-semibold text-white truncate">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white truncate">
             In this series
           </h2>
         </div>
@@ -152,20 +149,20 @@ function SeriesShelf({
           <button
             onClick={() => scrollBy(-1)}
             aria-label="Scroll series left"
-            className="hidden sm:grid size-8 place-items-center rounded-full border border-white/10 text-white/60 hover:text-white hover:border-white/30 transition-colors"
+            className="hidden sm:grid size-8 place-items-center border border-white/25 text-white/70 hover:bg-white hover:text-black transition-colors"
           >
             <ChevronLeft size={15} />
           </button>
           <button
             onClick={() => scrollBy(1)}
             aria-label="Scroll series right"
-            className="hidden sm:grid size-8 place-items-center rounded-full border border-white/10 text-white/60 hover:text-white hover:border-white/30 transition-colors"
+            className="hidden sm:grid size-8 place-items-center border border-white/25 text-white/70 hover:bg-white hover:text-black transition-colors"
           >
             <ChevronRight size={15} />
           </button>
           <Link
             to={`/series/${seriesId}`}
-            className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white/75 hover:bg-primary hover:text-white transition-colors"
+            className="inline-flex items-center gap-1 bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-primary hover:text-white transition-colors"
           >
             <span className="hidden sm:inline">{seriesName}</span>
             <span className="sm:hidden">View series</span>
@@ -179,11 +176,11 @@ function SeriesShelf({
         {books.map((sb, i) => (
           <div
             key={sb.book_id}
-            className={`flex-1 rounded-full transition-colors ${
+            className={`flex-1 transition-colors ${
               i === currentIndex
-                ? 'bg-primary shadow-[0_0_10px_rgba(139,124,255,0.8)]'
+                ? 'bg-primary'
                 : i < currentIndex
-                  ? 'bg-primary/35'
+                  ? 'bg-white/60'
                   : 'bg-white/10'
             }`}
           />
@@ -192,7 +189,7 @@ function SeriesShelf({
 
       <div
         ref={scrollerRef}
-        className="relative -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 pt-2 sm:-mx-6 sm:gap-4 sm:px-6 no-scrollbar"
+        className="relative -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 pt-2 sm:mx-0 sm:gap-4 sm:px-1 no-scrollbar"
         data-testid="series-shelf-list"
       >
         {books.map((sb) => {
@@ -209,7 +206,7 @@ function SeriesShelf({
               <div
                 className={`book-cover relative aspect-[2/3] overflow-hidden rounded-lg bg-ink-700 transition-all duration-300 ${
                   isCurrent
-                    ? 'ring-2 ring-primary ring-offset-2 ring-offset-ink-850'
+                    ? 'outline outline-2 outline-offset-2 outline-primary'
                     : 'opacity-80 group-hover:opacity-100 group-hover:-translate-y-1'
                 }`}
               >
@@ -226,10 +223,10 @@ function SeriesShelf({
                   }}
                 />
                 <span
-                  className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold backdrop-blur ${
+                  className={`absolute left-0 top-0 px-1.5 py-0.5 text-[9px] font-bold tabular-nums ${
                     isCurrent
                       ? 'bg-primary text-white'
-                      : 'bg-black/70 text-white/80'
+                      : 'bg-black text-white/80'
                   }`}
                 >
                   #{fmtSequence(sb.sequence)}
@@ -245,7 +242,7 @@ function SeriesShelf({
                 {sb.title}
               </p>
               {isCurrent && (
-                <p className="mt-0.5 text-[9px] font-semibold tracking-widest text-primary-300">
+                <p className="mt-0.5 text-[9px] font-semibold tracking-widest text-primary-400">
                   Reading now
                 </p>
               )}
@@ -540,26 +537,14 @@ export default function BookDetailPage() {
   const pct = percent ?? 0
 
   const secondaryBtn =
-    'flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-white/70 hover:text-white hover:border-white/25 hover:bg-white/[0.07] transition-all'
+    'flex items-center gap-2 border border-white/25 px-4 py-2.5 text-xs font-semibold text-white/80 hover:text-black hover:bg-white hover:border-white transition-colors'
 
   return (
     <div className="relative">
-      {/* Blurred cover wash behind the hero */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[520px] overflow-hidden"
-        aria-hidden="true"
-      >
-        <div
-          className="absolute inset-0 scale-125 bg-cover bg-center opacity-30 blur-3xl saturate-150"
-          style={{ backgroundImage: `url("${coverUrl}")` }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/70 to-black" />
-      </div>
-
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Breadcrumb */}
         <nav
-          className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap text-xs text-white/45 mb-6 sm:mb-10"
+          className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap text-xs text-white/45 mb-6 border-b border-white/[0.14] pb-3 sm:mb-10"
           aria-label="breadcrumb"
         >
           {crumbs.map((c, i) => (
@@ -568,7 +553,7 @@ export default function BookDetailPage() {
               {c.to ? (
                 <Link
                   to={c.to}
-                  className="hover:text-primary-300 transition-colors"
+                  className="hover:text-primary-400 transition-colors"
                 >
                   {c.label}
                 </Link>
@@ -590,7 +575,7 @@ export default function BookDetailPage() {
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:grid-rows-[auto_1fr] lg:gap-x-14 lg:gap-y-6">
           {/* ── Cover ── */}
           <div className="lg:col-span-4 lg:row-start-1 animate-fade-up">
-            <div className="book-cover relative mx-auto aspect-[2/3] w-48 overflow-hidden rounded-2xl bg-white/5 sm:w-60 lg:w-full">
+            <div className="book-cover relative aspect-[2/3] w-40 overflow-hidden bg-white/5 sm:w-56 lg:w-full">
               <img
                 key={coverKey}
                 src={coverUrl}
@@ -604,7 +589,7 @@ export default function BookDetailPage() {
               <div className="absolute bottom-2 right-2 flex gap-1.5">
                 <label
                   title="Upload cover image"
-                  className={`grid size-8 place-items-center rounded-full bg-black/60 backdrop-blur border border-white/15 text-white/70 hover:text-white hover:border-white/40 transition-all cursor-pointer ${coverUploading ? 'opacity-40 pointer-events-none' : ''}`}
+                  className={`grid size-8 place-items-center bg-black text-white/80 hover:bg-white hover:text-black transition-all cursor-pointer ${coverUploading ? 'opacity-40 pointer-events-none' : ''}`}
                 >
                   {coverUploading ? (
                     <Loader2 size={13} className="animate-spin" />
@@ -623,7 +608,7 @@ export default function BookDetailPage() {
                   disabled={coverRefreshing}
                   data-testid="refresh-cover-btn"
                   title="Refresh cover from file"
-                  className="grid size-8 place-items-center rounded-full bg-black/60 backdrop-blur border border-white/15 text-white/70 hover:text-white hover:border-white/40 transition-all disabled:opacity-40"
+                  className="grid size-8 place-items-center bg-black text-white/80 hover:bg-white hover:text-black transition-all disabled:opacity-40"
                 >
                   {coverRefreshing ? (
                     <Loader2 size={13} className="animate-spin" />
@@ -641,9 +626,9 @@ export default function BookDetailPage() {
             {primarySeries && (
               <Link
                 to={`/series/${primarySeries.series_id}`}
-                className="group mb-4 inline-flex max-w-full items-center gap-2 self-center lg:self-start"
+                className="group mb-4 inline-flex max-w-full items-center gap-3 self-start"
               >
-                <span className="shrink-0 rounded-full bg-primary/20 px-3 py-1 text-[10px] font-semibold tracking-widest text-primary-300 ring-1 ring-primary/30">
+                <span className="shrink-0 bg-primary px-2 py-1 text-[10px] font-semibold tracking-widest text-white">
                   {primarySeries.sequence != null
                     ? `Book ${primarySeries.sequence}`
                     : 'Series'}
@@ -655,17 +640,17 @@ export default function BookDetailPage() {
             )}
 
             {/* Title + Author */}
-            <div className="mb-6 text-center lg:text-left">
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.02] mb-3 break-words">
+            <div className="mb-6">
+              <h1 className="text-[2.75rem] sm:text-6xl lg:text-7xl font-extrabold tracking-tighter text-white leading-[0.92] mb-4 break-words">
                 {book.title}
               </h1>
               {book.author && (
-                <p className="text-lg sm:text-xl text-white/55">
+                <p className="text-lg sm:text-2xl font-medium tracking-tight text-white/60">
                   {book.author}
                 </p>
               )}
               {book.rating != null && (
-                <div className="mt-3 flex justify-center lg:justify-start">
+                <div className="mt-3 flex">
                   <StarRating value={book.rating} readOnly size={16} />
                 </div>
               )}
@@ -673,21 +658,21 @@ export default function BookDetailPage() {
 
             {/* Format / shelf / genre badges */}
             <div
-              className="flex flex-wrap justify-center lg:justify-start gap-2 mb-8"
+              className="flex flex-wrap gap-2 mb-8"
               data-testid="book-badges"
             >
               {book.format && (
-                <span className="rounded-full px-3 py-1 text-[11px] font-semibold border border-primary/40 text-primary-300">
+                <span className="px-2 py-1 text-[11px] font-semibold bg-primary text-white">
                   {fmtFormat(book.format)}
                 </span>
               )}
               {currentShelf && (
-                <span className="rounded-full px-3 py-1 text-[11px] font-medium border border-white/15 text-white/60">
+                <span className="px-2 py-1 text-[11px] font-medium border border-white/25 text-white/60">
                   {currentShelf.name}
                 </span>
               )}
               {primarySeries && (
-                <span className="rounded-full px-3 py-1 text-[11px] font-medium border border-white/15 text-white/50">
+                <span className="px-2 py-1 text-[11px] font-medium border border-white/25 text-white/50">
                   {primarySeries.series_name}
                   {primarySeries.sequence != null
                     ? ` #${primarySeries.sequence}`
@@ -697,7 +682,7 @@ export default function BookDetailPage() {
               {genres.map((genre) => (
                 <span
                   key={genre.id}
-                  className="rounded-full px-3 py-1 text-[11px] font-medium bg-primary/15 text-primary-200"
+                  className="px-2 py-1 text-[11px] font-medium border border-primary text-primary-300"
                 >
                   {genre.name}
                 </span>
@@ -705,7 +690,7 @@ export default function BookDetailPage() {
               {book.tags?.map((t) => (
                 <span
                   key={t.id}
-                  className="rounded-full px-3 py-1 text-[11px] font-medium bg-accent/15 text-accent"
+                  className="px-2 py-1 text-[11px] font-medium border border-accent/70 text-accent"
                 >
                   {t.name}
                 </span>
@@ -713,11 +698,11 @@ export default function BookDetailPage() {
             </div>
 
             {/* Action buttons */}
-            <div className="flex flex-wrap justify-center lg:justify-start gap-2.5 mb-10">
+            <div className="flex flex-wrap gap-2 mb-12">
               {!book.file_path?.startsWith('manual://') && (
                 <a
                   href={`/api/books/${book.id}/download`}
-                  className="flex items-center gap-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 px-5 py-2.5 text-xs font-semibold text-white shadow-glow hover:brightness-110 transition-all"
+                  className="flex items-center gap-2 bg-primary px-5 py-2.5 text-xs font-semibold text-white hover:bg-primary-600 transition-colors"
                   data-testid="download-btn"
                 >
                   <Download size={14} />
@@ -742,7 +727,7 @@ export default function BookDetailPage() {
                   </button>
                   {moveOpen && (
                     <div
-                      className="absolute left-0 top-full mt-2 z-30 min-w-[180px] overflow-hidden rounded-xl bg-ink-800/95 backdrop-blur border border-white/15 shadow-lift animate-scale-in"
+                      className="absolute left-0 top-full mt-1 z-30 min-w-[180px] bg-black border border-white animate-scale-in"
                       data-testid="move-shelf-dropdown"
                     >
                       {otherShelves.map((s) => (
@@ -806,7 +791,7 @@ export default function BookDetailPage() {
                 onClick={() => setShowDelete(true)}
                 data-testid="delete-btn"
                 aria-label="Delete book"
-                className="grid size-10 place-items-center rounded-full border border-red-500/25 text-red-400/60 hover:text-red-300 hover:border-red-400/60 hover:bg-red-500/10 transition-all"
+                className="grid size-10 place-items-center border border-red-500/40 text-red-400/70 hover:text-red-300 hover:border-red-400/60 hover:bg-red-500/10 transition-all"
               >
                 <Trash2 size={14} />
               </button>
@@ -836,14 +821,14 @@ export default function BookDetailPage() {
             )}
 
             {/* Verdict */}
-            <div className="surface mb-10 p-5 sm:p-6">
-              <div className="flex items-center justify-between mb-5">
-                <p className="font-display text-lg font-semibold text-white">
+            <div className="mb-12">
+              <div className="rule flex items-center justify-between mb-5">
+                <p className="text-xl font-bold tracking-tight text-white">
                   Your Verdict
                 </p>
                 <button
                   onClick={() => setShowVerdict(true)}
-                  className="text-xs font-medium text-primary-300 hover:text-white transition-colors"
+                  className="text-xs font-semibold text-primary-400 hover:text-white transition-colors"
                 >
                   Edit
                 </button>
@@ -870,7 +855,7 @@ export default function BookDetailPage() {
                       Outcome
                     </p>
                     {isDnf ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-widest bg-red-500/10 border border-red-400/30 text-red-400">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold tracking-widest bg-red-500/10 border border-red-400/30 text-red-400">
                         <AlertTriangle size={12} />
                         DNF
                       </span>
@@ -899,7 +884,7 @@ export default function BookDetailPage() {
                     Review
                   </p>
                   {book.review ? (
-                    <p className="font-display text-base text-white/80 leading-relaxed whitespace-pre-wrap">
+                    <p className="text-base text-white/80 leading-relaxed whitespace-pre-wrap">
                       {book.review}
                     </p>
                   ) : (
@@ -920,21 +905,20 @@ export default function BookDetailPage() {
                 className="space-y-4 mb-10"
                 data-testid="highlights-section"
               >
-                <h2 className="font-display text-xl font-semibold text-white">
+                <h2 className="rule text-xl font-bold tracking-tight text-white">
                   Recent Highlights
                 </h2>
                 <div className="space-y-4">
                   {highlights.map((h) => (
                     <figure
                       key={h.id}
-                      className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-br from-white/[0.05] to-transparent p-5 pl-6"
+                      className="relative border-l-4 border-primary py-1 pl-5"
                     >
-                      <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary to-accent-rose" />
-                      <p className="font-display text-base sm:text-lg leading-relaxed text-white/85 italic">
+                      <p className="text-lg sm:text-xl font-medium tracking-tight leading-snug text-white">
                         &ldquo;{h.text}&rdquo;
                       </p>
                       {h.note && (
-                        <p className="text-sm text-primary-300/90 mt-2">
+                        <p className="text-sm text-primary-300 mt-2">
                           {h.note}
                         </p>
                       )}
@@ -952,11 +936,11 @@ export default function BookDetailPage() {
             {/* Reading sessions */}
             {sessions.length > 0 && (
               <section className="space-y-3" data-testid="sessions-section">
-                <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-white">
-                  <BookOpen size={16} className="text-primary-300" />
+                <h2 className="rule flex items-center gap-2 text-xl font-bold tracking-tight text-white">
+                  <BookOpen size={16} className="text-primary-400" />
                   Reading Sessions
                 </h2>
-                <div className="surface px-4">
+                <div>
                   {sessions.slice(0, 5).map((s) => (
                     <SessionRow key={s.id} session={s} />
                   ))}
@@ -969,7 +953,7 @@ export default function BookDetailPage() {
           <div className="lg:col-span-4 lg:row-start-2 space-y-6 self-start animate-fade-up [animation-delay:160ms]">
             {/* Progress card */}
             <div
-              className="surface p-6 space-y-6"
+              className="border-t-2 border-white pt-4 space-y-6"
               data-testid={percent != null ? 'reading-progress' : undefined}
             >
               <div className="flex items-start justify-between">
@@ -978,14 +962,14 @@ export default function BookDetailPage() {
                     Book Progress
                   </p>
                   {percent != null ? (
-                    <p className="font-display text-4xl font-semibold tabular-nums">
+                    <p className="text-5xl font-extrabold tracking-tighter tabular-nums">
                       {percent}%{' '}
-                      <span className="font-sans text-sm font-normal text-white/40">
+                      <span className="text-sm font-medium tracking-normal text-white/40">
                         Complete
                       </span>
                     </p>
                   ) : (
-                    <p className="font-display text-xl font-semibold text-white/35">
+                    <p className="text-2xl font-bold tracking-tight text-white/35">
                       Not started
                     </p>
                   )}
@@ -1006,8 +990,8 @@ export default function BookDetailPage() {
                   >
                     <defs>
                       <linearGradient id="progress-ring" x1="0" x2="1">
-                        <stop offset="0%" stopColor="#b3a8ff" />
-                        <stop offset="100%" stopColor="#f47fb0" />
+                        <stop offset="0%" stopColor="#2563ff" />
+                        <stop offset="100%" stopColor="#2563ff" />
                       </linearGradient>
                     </defs>
                     <circle
@@ -1040,7 +1024,7 @@ export default function BookDetailPage() {
                   {weeklyBars.map((bar) => (
                     <div
                       key={bar.label}
-                      className={`flex-1 rounded-md transition-all ${bar.active ? 'bg-gradient-to-t from-primary-600 to-primary-300' : 'bg-white/[0.07]'}`}
+                      className={`flex-1 transition-all ${bar.active ? 'bg-primary' : 'bg-white/[0.1]'}`}
                       style={{ height: `${bar.heightPct}%` }}
                     />
                   ))}
@@ -1060,7 +1044,10 @@ export default function BookDetailPage() {
 
             {/* Series navigation */}
             {primarySeries && (
-              <div className="surface p-6 space-y-6" data-testid="series-nav">
+              <div
+                className="border-t-2 border-white pt-4 space-y-6"
+                data-testid="series-nav"
+              >
                 {/* Prev / Next navigation */}
                 {(primarySeries.prev_book || primarySeries.next_book) && (
                   <div className="flex gap-2">
@@ -1068,7 +1055,7 @@ export default function BookDetailPage() {
                       <Link
                         to={`/books/${primarySeries.prev_book.id}`}
                         data-testid="prev-book-link"
-                        className="group flex-1 min-w-0 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:border-primary/40 transition-colors"
+                        className="group flex-1 min-w-0 flex items-center gap-2 px-3 py-2.5 border border-white/20 hover:border-white transition-colors"
                       >
                         <ChevronLeft
                           size={14}
@@ -1090,7 +1077,7 @@ export default function BookDetailPage() {
                       <Link
                         to={`/books/${primarySeries.next_book.id}`}
                         data-testid="next-book-link"
-                        className="group flex-1 min-w-0 flex items-center justify-end gap-2 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:border-primary/40 transition-colors"
+                        className="group flex-1 min-w-0 flex items-center justify-end gap-2 px-3 py-2.5 border border-white/20 hover:border-white transition-colors"
                       >
                         <div className="min-w-0 text-right">
                           <p className="text-[9px] font-semibold tracking-widest text-white/35">
@@ -1133,8 +1120,8 @@ export default function BookDetailPage() {
                             to={`/series/${s.id}`}
                             className={
                               isLast
-                                ? 'text-primary-300 hover:underline'
-                                : 'text-white/65 hover:text-primary-300 hover:underline transition-colors'
+                                ? 'text-primary-400 hover:underline'
+                                : 'text-white/65 hover:text-primary-400 hover:underline transition-colors'
                             }
                           >
                             {s.name}
@@ -1171,7 +1158,7 @@ export default function BookDetailPage() {
           book.language ||
           book.isbn ||
           book.format) && (
-          <footer className="mt-16 pt-8 border-t border-white/[0.07]">
+          <footer className="mt-16 pt-4 border-t-2 border-white">
             <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-8 gap-y-5 text-sm">
               {book.date_published && (
                 <div className="flex flex-col gap-1">

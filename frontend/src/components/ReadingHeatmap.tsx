@@ -79,7 +79,7 @@ function cellClass(level: 0 | 1 | 2 | 3 | 4, inYear: boolean): string {
   if (level === 1) return 'bg-primary/25'
   if (level === 2) return 'bg-primary/45'
   if (level === 3) return 'bg-primary/70'
-  return 'bg-primary-300 shadow-[0_0_8px_rgba(139,124,255,0.6)]'
+  return 'bg-primary-300'
 }
 
 // ---------------------------------------------------------------------------
@@ -176,17 +176,17 @@ function computeYearStats(data: HeatmapEntry[]): YearStats {
 function Tooltip({ state }: { state: TooltipState }) {
   return createPortal(
     <div
-      className="fixed z-[200] rounded-lg bg-ink-800/95 backdrop-blur border border-white/15 shadow-lift px-3 py-2 pointer-events-none whitespace-nowrap"
+      className="fixed z-[200] bg-white text-black px-3 py-2 pointer-events-none whitespace-nowrap"
       style={{
         left: state.x,
         top: state.y - 8,
         transform: 'translate(-50%, -100%)',
       }}
     >
-      <p className="text-white/50 text-[10px] font-bold">
+      <p className="text-black/55 text-[10px] font-bold">
         {fmtDate(state.cell.date)}
       </p>
-      <p className="text-white text-xs font-black mt-0.5">
+      <p className="text-black text-xs font-black mt-0.5">
         {state.cell.seconds > 0
           ? `${fmtSec(state.cell.seconds)} reading`
           : 'No reading'}
@@ -204,9 +204,16 @@ interface ReadingHeatmapProps {
   data: HeatmapEntry[]
   year: number
   streak: number
+  /** Omit the frame and title when the page already provides a heading. */
+  bare?: boolean
 }
 
-export function ReadingHeatmap({ data, year, streak }: ReadingHeatmapProps) {
+export function ReadingHeatmap({
+  data,
+  year,
+  streak,
+  bare = false,
+}: ReadingHeatmapProps) {
   const weeks = useMemo(() => buildCells(data, year), [data, year])
   const monthLabels = useMemo(() => getMonthLabels(weeks), [weeks])
   const yearStats = useMemo(() => computeYearStats(data), [data])
@@ -240,18 +247,20 @@ export function ReadingHeatmap({ data, year, streak }: ReadingHeatmapProps) {
   }, [weeks])
 
   return (
-    <div className="surface px-5 pt-5 pb-5 sm:px-7 sm:pt-6 h-full flex flex-col">
+    <div className={`h-full flex flex-col ${bare ? '' : 'surface p-5 sm:p-6'}`}>
       {/* Header */}
-      <div className="flex justify-between items-center mb-6 shrink-0">
+      <div className="flex justify-between items-center mb-5 shrink-0">
         <div>
-          <h4 className="font-display text-xl sm:text-2xl font-semibold text-white">
-            Reading Activity
-          </h4>
+          {!bare && (
+            <h4 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+              Reading Activity
+            </h4>
+          )}
           <p className="text-white/40 text-[10px] font-semibold tracking-wider mt-1">
             {year} Activity Heatmap
           </p>
         </div>
-        <div className="rounded-full bg-gradient-to-r from-accent to-accent-rose text-ink-900 text-[10px] font-bold px-3 py-1 tracking-widest flex items-center gap-1.5 shadow-[0_6px_20px_-6px_rgba(245,181,107,0.6)]">
+        <div className="bg-accent text-white text-[10px] font-bold px-2.5 py-1 tracking-widest flex items-center gap-1.5">
           <Flame size={11} />
           {streak > 0 ? `${streak} Day Streak` : 'No Streak Yet'}
         </div>
@@ -308,7 +317,7 @@ export function ReadingHeatmap({ data, year, streak }: ReadingHeatmapProps) {
                 week.map((cell, di) => (
                   <div
                     key={`${wi}-${di}`}
-                    className={`cursor-default rounded-[3px] transition-transform duration-150 hover:scale-125 hover:ring-1 hover:ring-white/40 ${cellClass(cell.level, cell.inYear)}`}
+                    className={`cursor-default transition-transform duration-150 hover:scale-125 hover:ring-1 hover:ring-white/40 ${cellClass(cell.level, cell.inYear)}`}
                     style={{ width: CELL_PX, height: CELL_PX }}
                     onMouseEnter={(e) => handleMouseEnter(e, cell)}
                     onMouseLeave={handleMouseLeave}
@@ -321,7 +330,7 @@ export function ReadingHeatmap({ data, year, streak }: ReadingHeatmapProps) {
       </div>
 
       {/* Year at a Glance — fills remaining height */}
-      <div className="flex-1 flex flex-col justify-center border-t border-white/[0.07] pt-5 mt-1">
+      <div className="flex-1 flex flex-col justify-center border-t border-white/[0.14] pt-5 mt-1">
         {hasData ? (
           <>
             <p className="text-[10px] font-black tracking-widest text-white/30 mb-4">
@@ -332,7 +341,7 @@ export function ReadingHeatmap({ data, year, streak }: ReadingHeatmapProps) {
                 <p className="text-[10px] font-black tracking-widest text-white/30">
                   Days Read
                 </p>
-                <p className="font-display text-2xl font-semibold text-white leading-tight mt-0.5 tabular-nums">
+                <p className="text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums">
                   {yearStats.daysRead}
                 </p>
               </div>
@@ -340,7 +349,7 @@ export function ReadingHeatmap({ data, year, streak }: ReadingHeatmapProps) {
                 <p className="text-[10px] font-black tracking-widest text-white/30">
                   Total Time
                 </p>
-                <p className="font-display text-2xl font-semibold text-white leading-tight mt-0.5 tabular-nums">
+                <p className="text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums">
                   {fmtSec(yearStats.totalSeconds)}
                 </p>
               </div>
@@ -348,7 +357,7 @@ export function ReadingHeatmap({ data, year, streak }: ReadingHeatmapProps) {
                 <p className="text-[10px] font-black tracking-widest text-white/30">
                   Best Day
                 </p>
-                <p className="font-display text-2xl font-semibold text-white leading-tight mt-0.5 tabular-nums">
+                <p className="text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums">
                   {fmtSec(yearStats.bestSeconds)}
                 </p>
                 <p className="text-[10px] text-white/30 normal-case mt-0.5">
@@ -359,7 +368,7 @@ export function ReadingHeatmap({ data, year, streak }: ReadingHeatmapProps) {
                 <p className="text-[10px] font-black tracking-widest text-white/30">
                   Avg / Active Day
                 </p>
-                <p className="font-display text-2xl font-semibold text-white leading-tight mt-0.5 tabular-nums">
+                <p className="text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums">
                   {fmtSec(yearStats.avgSeconds)}
                 </p>
               </div>

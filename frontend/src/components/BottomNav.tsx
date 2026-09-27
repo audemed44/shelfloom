@@ -4,16 +4,17 @@ import { NAV_ITEMS, MORE_ITEMS, MoreHorizontal } from './nav/navItems'
 import MoreMenu from './nav/MoreMenu'
 
 function itemClass(active: boolean) {
-  return `relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold transition-colors duration-300 ${
+  return `relative flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-semibold transition-colors duration-150 ${
     active ? 'text-white' : 'text-white/45'
   }`
 }
 
-function ActivePill({ active }: { active: boolean }) {
+/** Blue bar across the top edge of the active tab. */
+function ActiveBar({ active }: { active: boolean }) {
   return (
     <span
-      className={`absolute top-1 h-8 w-12 rounded-full bg-primary/20 shadow-[inset_0_0_0_1px_rgba(139,124,255,0.3)] transition-all duration-300 ${
-        active ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
+      className={`absolute inset-x-2 top-0 h-[3px] bg-primary transition-transform duration-200 origin-center ${
+        active ? 'scale-x-100' : 'scale-x-0'
       }`}
       aria-hidden="true"
     />
@@ -30,10 +31,10 @@ export default function BottomNav() {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.07] bg-ink-900/85 backdrop-blur-xl sm:hidden h-mobile-bottom-nav"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.14] bg-black sm:hidden h-mobile-bottom-nav"
         data-testid="bottom-nav"
       >
-        <div className="mx-auto flex h-full min-h-[var(--mobile-bottom-nav-height)] max-w-md items-stretch justify-around px-2 pb-mobile-safe">
+        <div className="mx-auto flex h-full min-h-[var(--mobile-bottom-nav-height)] max-w-md items-stretch justify-around pb-mobile-safe">
           {NAV_ITEMS.map(({ to, icon: Icon, label, end }) => (
             <NavLink
               key={to}
@@ -43,15 +44,13 @@ export default function BottomNav() {
             >
               {({ isActive }) => (
                 <>
-                  <ActivePill active={isActive} />
+                  <ActiveBar active={isActive} />
                   <Icon
                     size={21}
                     strokeWidth={isActive ? 2.25 : 1.75}
-                    className={`relative mt-1 transition-transform duration-300 ${
-                      isActive ? 'text-primary-300 -translate-y-px' : ''
-                    }`}
+                    className={isActive ? 'text-primary-400' : ''}
                   />
-                  <span className="relative">{label}</span>
+                  <span>{label}</span>
                 </>
               )}
             </NavLink>
@@ -62,12 +61,12 @@ export default function BottomNav() {
             aria-label="More"
             data-testid="more-button"
           >
-            <ActivePill active={moreActive || moreOpen} />
+            <ActiveBar active={moreActive || moreOpen} />
             <MoreHorizontal
               size={21}
-              className={`relative mt-1 ${moreActive || moreOpen ? 'text-primary-300' : ''}`}
+              className={moreActive || moreOpen ? 'text-primary-400' : ''}
             />
-            <span className="relative">More</span>
+            <span>More</span>
           </button>
         </div>
       </nav>

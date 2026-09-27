@@ -1740,7 +1740,7 @@ function OverviewTab({
           <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
             {label}
           </p>
-          <h2 className="font-display text-4xl font-semibold tracking-tight">
+          <h2 className="text-4xl font-extrabold tracking-tighter">
             {value ?? '—'}
           </h2>
           {sub && (
@@ -1791,7 +1791,7 @@ function OverviewTab({
               <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
                 Current Streak
               </p>
-              <p className="font-display text-4xl font-semibold">
+              <p className="text-4xl font-extrabold tracking-tighter">
                 {streaks !== null ? `${streaks.current} Days` : '—'}
               </p>
             </div>
@@ -1799,7 +1799,7 @@ function OverviewTab({
               <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
                 Longest Streak
               </p>
-              <p className="font-display text-4xl font-semibold">
+              <p className="text-4xl font-extrabold tracking-tighter">
                 {streaks !== null ? `${streaks.longest} Days` : '—'}
               </p>
             </div>
@@ -2253,7 +2253,7 @@ function StreaksTab({
         <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
           Current Streak
         </p>
-        <p className="font-display text-5xl font-semibold tracking-tight">
+        <p className="text-5xl font-extrabold tracking-tighter">
           {streaks?.current ?? 0}
         </p>
         <p className="text-[10px] text-white/30 font-bold mt-1">days</p>
@@ -2269,7 +2269,7 @@ function StreaksTab({
         <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
           Longest Streak
         </p>
-        <p className="font-display text-5xl font-semibold tracking-tight">
+        <p className="text-5xl font-extrabold tracking-tighter">
           {streaks?.longest ?? 0}
         </p>
         <p className="text-[10px] text-white/30 font-bold mt-1">days</p>
@@ -2439,9 +2439,9 @@ export default function Stats() {
   return (
     <div className="min-h-screen">
       {/* Page header */}
-      <header className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-6 py-4 md:py-5 border-b border-white/10 sticky top-0 bg-black/90 backdrop-blur-md z-40">
+      <header className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-6 py-4 md:py-5 border-b border-white/10 sticky top-0 bg-black/90 z-40">
         <h1
-          className="font-display text-3xl font-semibold tracking-tight"
+          className="text-3xl font-extrabold tracking-tighter"
           data-testid="stats-heading"
         >
           Reading Stats

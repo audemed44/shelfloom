@@ -179,7 +179,7 @@ function ScrollRow({ children }: { children: React.ReactNode }) {
   }
 
   const arrowClass =
-    'absolute top-[38%] z-10 hidden sm:grid size-10 -translate-y-1/2 place-items-center rounded-full border border-white/10 bg-ink-850/90 text-white shadow-lift backdrop-blur transition-all duration-300 opacity-0 group-hover/scroll:opacity-100 hover:bg-primary hover:border-primary'
+    'absolute top-[38%] z-10 hidden sm:grid size-10 -translate-y-1/2 place-items-center bg-white text-black transition-opacity duration-200 opacity-0 group-hover/scroll:opacity-100 hover:bg-primary hover:text-white'
 
   return (
     <div className="relative group/scroll -mx-4 sm:mx-0">
@@ -194,7 +194,7 @@ function ScrollRow({ children }: { children: React.ReactNode }) {
       )}
       <div
         ref={ref}
-        className="stagger flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-4 pt-1 sm:snap-none sm:px-0 no-scrollbar"
+        className="stagger flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 pt-1 sm:snap-none sm:px-0 no-scrollbar"
       >
         {children}
       </div>
@@ -215,28 +215,33 @@ const ROW_ITEM_CLASS =
   'w-[42%] snap-start sm:w-[calc(33.333%-11px)] md:w-[calc(25%-12px)] lg:w-[calc(20%-13px)] xl:w-[calc(16.667%-14px)] flex-shrink-0'
 
 // ---------------------------------------------------------------------------
-// Section heading
+// Section heading — Swiss rule with an index number
 // ---------------------------------------------------------------------------
 
 function SectionTitle({
+  index,
   children,
   action,
 }: {
+  index: number
   children: React.ReactNode
   action?: React.ReactNode
 }) {
   return (
-    <div className="mb-4 flex items-center gap-3">
-      <h4 className="font-display text-xl sm:text-2xl font-semibold tracking-tight text-white">
+    <div className="rule mb-5 flex items-baseline gap-4">
+      <span className="w-6 shrink-0 text-xs font-semibold tabular-nums text-primary-400">
+        {String(index).padStart(2, '0')}
+      </span>
+      <h4 className="text-xl font-bold tracking-tight text-white sm:text-2xl">
         {children}
       </h4>
-      {action}
+      {action && <div className="ml-auto flex items-center">{action}</div>}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Hero
+// Hero — solid blue panel
 // ---------------------------------------------------------------------------
 
 function HeroBook({ book }: { book: Book & { reading_progress?: number } }) {
@@ -245,58 +250,51 @@ function HeroBook({ book }: { book: Book & { reading_progress?: number } }) {
   return (
     <Link
       to={`/books/${book.id}`}
-      className="group relative block overflow-hidden rounded-3xl border border-white/[0.08] bg-ink-850"
+      className="group grid grid-cols-[auto_1fr] bg-primary text-white transition-colors hover:bg-primary-600"
       data-testid="hero-book"
     >
-      {/* Blurred cover wash */}
-      <div
-        className="absolute inset-0 scale-125 bg-cover bg-center opacity-40 blur-3xl saturate-150 transition-transform duration-[2s] group-hover:scale-150"
-        style={{ backgroundImage: `url("${cover}")` }}
-        aria-hidden="true"
-      />
-      <div className="absolute inset-0 bg-gradient-to-r from-ink-900 via-ink-900/85 to-ink-900/30" />
-
-      <div className="relative flex items-center gap-5 p-5 sm:gap-8 sm:p-8">
-        <div className="w-24 shrink-0 sm:w-36 animate-float [--tilt:-3deg]">
-          <div className="book-cover aspect-[2/3] overflow-hidden rounded-lg bg-white/5 transition-transform duration-500 group-hover:scale-[1.04]">
-            <img
-              src={cover}
-              alt=""
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
-            />
-          </div>
+      <div className="w-28 p-4 sm:w-44 sm:p-6">
+        <div className="book-cover aspect-[2/3] overflow-hidden bg-black/20">
+          <img
+            src={cover}
+            alt=""
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold tracking-widest text-primary-300">
-            Pick up where you left off
+      </div>
+      <div className="flex min-w-0 flex-col justify-between gap-4 py-4 pr-4 sm:py-6 sm:pr-8">
+        <div>
+          <p className="text-[10px] font-semibold tracking-widest text-white/75">
+            Continue reading
           </p>
-          <p className="mt-2 font-display text-2xl font-semibold leading-tight text-white line-clamp-2 sm:text-4xl">
+          <p className="mt-2 text-2xl font-extrabold leading-[0.95] tracking-tighter line-clamp-3 sm:text-5xl">
             {book.title}
           </p>
           {book.author && (
-            <p className="mt-1 text-sm text-white/55 truncate sm:text-base">
+            <p className="mt-2 truncate text-sm font-medium text-white/80 sm:text-base">
               {book.author}
             </p>
           )}
-          <div className="mt-5 max-w-sm">
-            <div className="mb-1.5 flex justify-between text-xs text-white/50">
-              <span>{progress}% complete</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-primary-400 via-primary to-accent-rose transition-[width] duration-1000"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+        </div>
+        <div>
+          <div className="flex items-end justify-between gap-4">
+            <p className="text-4xl font-extrabold leading-none tracking-tighter tabular-nums sm:text-7xl">
+              <span>{progress}</span>
+              <span className="text-2xl sm:text-4xl">%</span>
+            </p>
+            <span className="inline-flex items-center gap-2 text-xs font-semibold transition-transform duration-200 group-hover:translate-x-1">
+              Open <ArrowRight size={14} />
+            </span>
           </div>
-          <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-ink-900 transition-transform duration-300 group-hover:translate-x-1">
-            <BookOpen size={14} />
-            Continue reading
-            <ArrowRight size={14} />
-          </span>
+          <div className="mt-3 h-1 bg-white/25">
+            <div
+              className="h-full bg-white transition-[width] duration-1000"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
       </div>
     </Link>
@@ -305,41 +303,28 @@ function HeroBook({ book }: { book: Book & { reading_progress?: number } }) {
 
 function EmptyHero() {
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-br from-primary/15 via-ink-850 to-accent-rose/10 p-8 sm:p-10">
-      <div className="flex flex-col items-center gap-6 sm:flex-row">
-        <div className="relative h-28 w-32 shrink-0" aria-hidden="true">
-          {[
-            'left-0 bg-primary/70 [--tilt:-8deg]',
-            'left-8 bg-accent-rose/70 [--tilt:4deg] [animation-delay:-2s]',
-            'left-16 bg-accent/70 [--tilt:-2deg] [animation-delay:-4s]',
-          ].map((c) => (
-            <div
-              key={c}
-              className={`absolute top-0 h-28 w-16 rounded-md shadow-card animate-float ${c}`}
-            />
-          ))}
-        </div>
-        <div className="text-center sm:text-left">
-          <p className="text-sm font-semibold tracking-widest text-white/70">
-            Nothing In Progress
-          </p>
-          <p className="mt-1 text-sm text-white/45">
-            Open the library to start reading
-          </p>
-          <Link
-            to="/library"
-            className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-glow transition-transform hover:-translate-y-0.5"
-          >
-            Browse library <ArrowRight size={14} />
-          </Link>
-        </div>
+    <div className="flex h-full flex-col justify-between gap-8 border border-white/[0.14] p-6 sm:p-8">
+      <BookOpen size={28} className="text-primary-400" />
+      <div>
+        <p className="text-sm font-semibold tracking-widest text-white">
+          Nothing In Progress
+        </p>
+        <p className="mt-1 text-sm text-white/50">
+          Open the library to start reading
+        </p>
+        <Link
+          to="/library"
+          className="mt-5 inline-flex items-center gap-2 bg-primary px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-primary-600"
+        >
+          Browse library <ArrowRight size={14} />
+        </Link>
       </div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Stat card
+// Stat — typographic column
 // ---------------------------------------------------------------------------
 
 interface StatCardProps {
@@ -348,7 +333,6 @@ interface StatCardProps {
   value: number | null
   format?: (n: number) => string
   sub?: string
-  tint: string
 }
 
 function StatCard({
@@ -357,38 +341,27 @@ function StatCard({
   value,
   format = String,
   sub,
-  tint,
 }: StatCardProps) {
   const animated = useCountUp(value)
   const empty = value == null
   return (
-    <div className="group surface relative overflow-hidden p-3.5 sm:p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/15">
-      <div
-        className={`absolute -right-8 -top-8 size-28 rounded-full opacity-25 blur-2xl transition-opacity duration-500 group-hover:opacity-50 ${tint}`}
-        aria-hidden="true"
-      />
-      <div className="relative flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:gap-4">
-        <div
-          className={`grid size-9 sm:size-11 shrink-0 place-items-center rounded-xl bg-white/[0.06] text-white ring-1 ring-white/10`}
-        >
-          <Icon size={19} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold tracking-widest text-white/40">
-            {label}
+    <div className="flex min-w-0 flex-col justify-between gap-4 border-t border-white/[0.14] pt-3 xl:flex-row xl:items-end">
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-widest text-white/45">
+          <Icon size={12} className="shrink-0" />
+          <span className="truncate">{label}</span>
+        </p>
+        {sub && (
+          <p className="mt-0.5 text-[11px] leading-tight text-white/40 sm:text-xs">
+            {sub}
           </p>
-          <h5
-            className={`font-display text-xl sm:text-3xl font-semibold leading-tight tabular-nums ${empty ? 'text-white/20' : 'text-white'}`}
-          >
-            {animated == null ? '—' : format(animated)}
-          </h5>
-          {sub && (
-            <p className="text-[11px] sm:text-xs text-white/40 leading-tight">
-              {sub}
-            </p>
-          )}
-        </div>
+        )}
       </div>
+      <h5
+        className={`text-3xl font-extrabold leading-none tracking-tighter tabular-nums sm:text-5xl ${empty ? 'text-white/20' : 'text-white'}`}
+      >
+        {animated == null ? '—' : format(animated)}
+      </h5>
     </div>
   )
 }
@@ -396,39 +369,6 @@ function StatCard({
 // ---------------------------------------------------------------------------
 // Currently reading card
 // ---------------------------------------------------------------------------
-
-function ProgressRing({ value }: { value: number }) {
-  const r = 14
-  const c = 2 * Math.PI * r
-  return (
-    <div className="relative grid size-10 place-items-center rounded-full bg-black/70 backdrop-blur">
-      <svg viewBox="0 0 36 36" className="absolute inset-0 -rotate-90">
-        <circle
-          cx="18"
-          cy="18"
-          r={r}
-          fill="none"
-          stroke="rgba(255,255,255,0.12)"
-          strokeWidth="3"
-        />
-        <circle
-          cx="18"
-          cy="18"
-          r={r}
-          fill="none"
-          stroke="#8b7cff"
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={c * (1 - Math.min(100, value) / 100)}
-        />
-      </svg>
-      <span className="relative text-[9px] font-bold text-white">
-        {Math.round(value)}%
-      </span>
-    </div>
-  )
-}
 
 function CurrentlyReadingCard({
   book,
@@ -442,86 +382,80 @@ function CurrentlyReadingCard({
       className="group block"
       data-testid="currently-reading-card"
     >
-      <div className="book-cover aspect-[2/3] overflow-hidden rounded-xl bg-white/5 transition-all duration-500 ease-out group-hover:-translate-y-1.5 group-hover:shadow-lift">
+      <div className="book-cover aspect-[2/3] overflow-hidden bg-white/5 transition-transform duration-300 group-hover:-translate-y-1">
         <img
           src={getBookCoverUrl(book.id, book.cover_path)}
           alt={book.title}
           loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          className="h-full w-full object-cover"
           onError={(e) => {
             e.currentTarget.style.display = 'none'
           }}
         />
-        <div className="absolute right-2 top-2">
-          <ProgressRing value={progress} />
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-black/60">
+          <div
+            className="h-full bg-primary"
+            style={{ width: `${Math.min(100, progress)}%` }}
+          />
         </div>
       </div>
-      <div className="mt-3 px-0.5">
-        <p className="text-sm font-semibold leading-snug text-white/90 line-clamp-2 group-hover:text-white">
-          {book.title}
-        </p>
-        {book.author && (
-          <p className="mt-0.5 truncate text-xs text-white/45">{book.author}</p>
-        )}
+      <div className="mt-2.5 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold leading-snug text-white line-clamp-2 group-hover:text-primary-300">
+            {book.title}
+          </p>
+          {book.author && (
+            <p className="mt-0.5 truncate text-xs text-white/45">
+              {book.author}
+            </p>
+          )}
+        </div>
+        <span className="shrink-0 text-xs font-semibold tabular-nums text-primary-400">
+          {Math.round(progress)}%
+        </span>
       </div>
     </Link>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Activity feed
+// Activity feed — ruled table
 // ---------------------------------------------------------------------------
 
 function ActivityFeed({ sessions }: { sessions: RecentSession[] }) {
   return (
-    <div className="surface p-5 sm:p-6">
-      <h4 className="mb-4 font-display text-xl font-semibold text-white">
-        Recent Activity
-      </h4>
-      <div className="relative">
-        <div className="absolute bottom-3 left-[19px] top-3 w-px bg-gradient-to-b from-primary/50 via-white/10 to-transparent" />
-        {sessions.map((s, i) => (
-          <Link
-            key={i}
-            to={`/books/${s.book_id}`}
-            className="group relative flex items-center gap-4 rounded-xl py-2.5 pl-1 pr-2 transition-colors hover:bg-white/[0.04]"
-            data-testid="activity-item"
-          >
-            <div className="relative z-10 size-9 shrink-0 overflow-hidden rounded-lg bg-ink-700 ring-2 ring-ink-850">
-              <img
-                src={getBookCoverUrl(s.book_id)}
-                alt=""
-                loading="lazy"
-                className="h-full w-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none'
-                }}
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-white/85 transition-colors group-hover:text-primary-300">
-                {s.title}
-              </p>
-              {s.author && (
-                <p className="truncate text-xs text-white/35">{s.author}</p>
-              )}
-            </div>
-            <div className="ml-2 flex shrink-0 items-center gap-3 sm:gap-4">
-              {s.pages_read != null && s.pages_read > 0 && (
-                <span className="hidden text-xs text-white/35 sm:inline">
-                  {s.pages_read}p
-                </span>
-              )}
-              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs font-semibold text-white/75">
-                {fmtDuration(s.duration)}
-              </span>
-              <span className="w-14 text-right text-xs text-white/35">
-                {timeAgo(s.start_time)}
-              </span>
-            </div>
-          </Link>
-        ))}
-      </div>
+    <div>
+      {sessions.map((s, i) => (
+        <Link
+          key={i}
+          to={`/books/${s.book_id}`}
+          className="group grid grid-cols-[1fr_auto] items-center gap-4 border-b border-white/[0.1] py-3 transition-colors hover:bg-white/[0.04] sm:grid-cols-[2rem_1fr_auto_auto_auto]"
+          data-testid="activity-item"
+        >
+          <span className="hidden text-xs tabular-nums text-white/30 sm:block">
+            {String(i + 1).padStart(2, '0')}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white transition-colors group-hover:text-primary-300">
+              {s.title}
+            </p>
+            {s.author && (
+              <p className="truncate text-xs text-white/40">{s.author}</p>
+            )}
+          </div>
+          <span className="hidden w-12 text-right text-xs tabular-nums text-white/40 sm:block">
+            {s.pages_read != null && s.pages_read > 0 ? `${s.pages_read}p` : ''}
+          </span>
+          <div className="flex items-center gap-4 sm:contents">
+            <span className="w-14 text-right text-sm font-semibold tabular-nums text-white">
+              {fmtDuration(s.duration)}
+            </span>
+            <span className="w-14 text-right text-xs text-white/40">
+              {timeAgo(s.start_time)}
+            </span>
+          </div>
+        </Link>
+      ))}
     </div>
   )
 }
@@ -553,19 +487,19 @@ function NewChaptersCard({
     <div className="group block" data-testid="new-chapters-card">
       <div className="relative">
         <Link to={`/serials/${serial.id}`} className="block">
-          <div className="book-cover aspect-[2/3] overflow-hidden rounded-xl bg-white/5 transition-all duration-500 ease-out group-hover:-translate-y-1.5 group-hover:shadow-lift">
+          <div className="book-cover aspect-[2/3] overflow-hidden bg-white/5 transition-transform duration-300 group-hover:-translate-y-1">
             <img
               src={`/api/serials/${serial.id}/cover`}
               alt={serial.title ?? 'Serial'}
               loading="lazy"
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+              className="h-full w-full object-cover"
               onError={(e) => {
                 e.currentTarget.style.display = 'none'
               }}
             />
             {hasNew && (
               <div className="absolute left-2 top-2">
-                <span className="relative inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-glow">
+                <span className="relative inline-flex items-center gap-1.5 bg-primary px-2 py-1 text-[10px] font-bold text-white">
                   <span className="relative flex size-1.5">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
                     <span className="relative inline-flex size-1.5 rounded-full bg-white" />
@@ -576,12 +510,12 @@ function NewChaptersCard({
             )}
             {serial.status === 'error' && (
               <div className="absolute right-2 top-2">
-                <span className="rounded-full bg-red-500/90 px-2 py-0.5 text-[10px] font-bold text-white">
+                <span className="bg-accent px-2 py-1 text-[10px] font-bold text-white">
                   ERROR
                 </span>
               </div>
             )}
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent px-2.5 pb-2.5 pt-8">
+            <div className="absolute inset-x-0 bottom-0 bg-black/85 px-2.5 pb-2.5 pt-2">
               <div className="flex flex-wrap gap-1 pr-10 text-[10px] leading-tight text-white/80">
                 <span>{serial.total_chapters} ch</span>
                 <span className="text-white/30">·</span>
@@ -589,14 +523,14 @@ function NewChaptersCard({
                   {serial.fetched_count}/{serial.total_chapters} fetched
                 </span>
                 {serial.stubbed_chapter_count > 0 && (
-                  <span className="text-amber-300">
+                  <span className="text-accent">
                     {serial.stubbed_chapter_count} stubbed
                   </span>
                 )}
               </div>
-              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15 mr-10">
+              <div className="mt-1.5 h-1 bg-white/15 mr-10">
                 <div
-                  className="h-full rounded-full bg-primary"
+                  className="h-full bg-primary"
                   style={{ width: `${fetchedPct}%` }}
                 />
               </div>
@@ -613,7 +547,7 @@ function NewChaptersCard({
           aria-label={`Fetch pending chapters for ${serial.title ?? 'serial'}`}
           title="Fetch pending chapters"
           disabled={fetchPendingDisabled}
-          className="absolute bottom-2 right-2 z-10 grid size-8 place-items-center rounded-full border border-white/15 bg-black/70 text-white/70 backdrop-blur transition-all hover:border-primary hover:bg-primary hover:text-white disabled:opacity-40"
+          className="absolute bottom-1.5 right-1.5 z-10 grid size-8 place-items-center bg-white text-black transition-colors hover:bg-primary hover:text-white disabled:opacity-40"
         >
           {isFetchingPending ? (
             <Loader2 size={13} className="animate-spin" />
@@ -622,8 +556,8 @@ function NewChaptersCard({
           )}
         </button>
       </div>
-      <div className="mt-3 px-0.5">
-        <p className="text-sm font-semibold leading-snug text-white/90 line-clamp-2">
+      <div className="mt-2.5">
+        <p className="text-sm font-semibold leading-snug text-white line-clamp-2">
           {serial.title}
         </p>
         {serial.author && (
@@ -761,60 +695,62 @@ export default function Home() {
   const batchRunning = pendingBatchStatus?.state === 'running'
 
   const iconButton =
-    'grid size-8 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-white/60 transition-all hover:border-primary/50 hover:text-white disabled:opacity-50'
+    'grid size-8 place-items-center border border-white/20 text-white/70 transition-colors hover:border-primary hover:bg-primary hover:text-white disabled:opacity-50'
   const heroBook = currentlyReading[0]
+  let section = 0
+  const next = () => ++section
 
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-12 lg:py-10">
       {/* Header */}
-      <header className="mb-8 animate-fade-up sm:mb-10">
-        <p className="text-[11px] font-semibold tracking-widest text-white/40">
-          {new Date().toLocaleDateString(undefined, {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-          })}
-        </p>
-        <h1 className="mt-2 text-4xl font-semibold leading-[1.05] sm:text-6xl">
-          <span className="text-gradient animate-gradient-pan">
+      <header className="mb-10 grid grid-cols-12 gap-4 animate-fade-up sm:mb-14">
+        <div className="col-span-12 lg:col-span-9">
+          <h1 className="text-[3.25rem] font-extrabold leading-[0.9] tracking-tighter sm:text-8xl">
             {greeting()}
-          </span>
-          <span className="sr-only"> — Dashboard</span>
-        </h1>
-        <p className="mt-3 text-base text-white/50 sm:text-lg">
-          Welcome back, reader. Your library awaits.
-        </p>
+            <span className="text-primary">.</span>
+            <span className="sr-only"> — Dashboard</span>
+          </h1>
+        </div>
+        <div className="col-span-12 flex flex-col justify-end gap-1 lg:col-span-3 lg:border-l lg:border-white/[0.14] lg:pl-4">
+          <p className="text-[10px] font-semibold tracking-widest text-white/45">
+            {new Date().toLocaleDateString(undefined, {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </p>
+          <p className="text-sm text-white/60">
+            Welcome back, reader. Your library awaits.
+          </p>
+        </div>
       </header>
 
-      <div className="stagger grid grid-cols-12 gap-6 lg:gap-8">
+      <div className="stagger grid grid-cols-12 gap-x-6 gap-y-12 lg:gap-x-8 lg:gap-y-16">
         {/* Hero */}
         <section className="col-span-12 xl:col-span-8">
           {heroBook ? <HeroBook book={heroBook} /> : <EmptyHero />}
         </section>
 
-        {/* Stat cards */}
-        <section className="col-span-12 grid grid-cols-3 gap-2.5 sm:gap-4 xl:col-span-4 xl:grid-cols-1">
+        {/* Stats */}
+        <section className="col-span-12 grid grid-cols-3 gap-4 xl:col-span-4 xl:grid-cols-1 xl:gap-6">
           <StatCard
             icon={Clock}
             label="This Week"
             value={thisWeekSeconds > 0 ? thisWeekSeconds : null}
             format={fmtDuration}
             sub="reading time"
-            tint="bg-primary"
           />
           <StatCard
             icon={BookOpen}
             label="This Week"
             value={thisWeekPages > 0 ? thisWeekPages : null}
             sub="pages read"
-            tint="bg-accent-teal"
           />
           <StatCard
             icon={Flame}
             label="This Year"
             value={completedBooks !== undefined ? booksCompletedThisYear : null}
             sub="books completed"
-            tint="bg-accent"
           />
         </section>
 
@@ -822,8 +758,9 @@ export default function Home() {
         {currentlyReading.length > 0 && (
           <section className="col-span-12">
             <SectionTitle
+              index={next()}
               action={
-                <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-xs text-white/50">
+                <span className="text-sm font-semibold tabular-nums text-white/40">
                   {currentlyReading.length}
                 </span>
               }
@@ -844,8 +781,16 @@ export default function Home() {
         {serialsDashboard && serialsDashboard.length > 0 && (
           <section className="col-span-12">
             <SectionTitle
+              index={next()}
               action={
                 <div className="flex items-center gap-2">
+                  {pendingBatchStatus &&
+                    pendingBatchStatus.state !== 'idle' && (
+                      <span className="mr-2 text-[10px] tracking-widest uppercase text-white/40">
+                        {pendingBatchStatus.processed_serials}/
+                        {pendingBatchStatus.total_serials} processed
+                      </span>
+                    )}
                   <button
                     onClick={handleFetchAllPending}
                     disabled={batchRunning || fetchingPendingAll}
@@ -870,13 +815,6 @@ export default function Home() {
                       className={checkingUpdates ? 'animate-spin' : ''}
                     />
                   </button>
-                  {pendingBatchStatus &&
-                    pendingBatchStatus.state !== 'idle' && (
-                      <span className="text-[10px] tracking-widest uppercase text-white/35">
-                        {pendingBatchStatus.processed_serials}/
-                        {pendingBatchStatus.total_serials} processed
-                      </span>
-                    )}
                 </div>
               }
             >
@@ -905,35 +843,36 @@ export default function Home() {
         <section
           className={`col-span-12 ${activitySessions.length > 0 ? '2xl:col-span-7' : ''}`}
         >
+          <SectionTitle index={next()}>Reading Activity</SectionTitle>
           <ReadingHeatmap
             data={heatmapData ?? []}
             year={CURRENT_YEAR}
             streak={streak}
+            bare
           />
         </section>
 
         {/* Recent activity */}
         {activitySessions.length > 0 && (
           <section className="col-span-12 2xl:col-span-5">
+            <SectionTitle index={next()}>Recent Activity</SectionTitle>
             <ActivityFeed sessions={activitySessions} />
           </section>
         )}
 
         {/* Status row */}
         <section className="col-span-12">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/[0.07] pt-5">
-            <div className="flex gap-3">
-              <span className="rounded-full bg-white/[0.05] px-3 py-1 text-xs text-white/50">
-                {overview
-                  ? `${overview.books_owned} books in library`
-                  : 'Loading…'}
+          <div className="grid grid-cols-2 gap-4 border-t-2 border-white pt-3 sm:grid-cols-4">
+            <span className="text-xs font-semibold text-white/60">
+              {overview
+                ? `${overview.books_owned} books in library`
+                : 'Loading…'}
+            </span>
+            {overview && (
+              <span className="text-xs font-semibold text-white/60">
+                {`${overview.books_read} completed`}
               </span>
-              {overview && (
-                <span className="rounded-full bg-white/[0.05] px-3 py-1 text-xs text-white/50">
-                  {`${overview.books_read} completed`}
-                </span>
-              )}
-            </div>
+            )}
           </div>
         </section>
       </div>

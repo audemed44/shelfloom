@@ -34,7 +34,7 @@ export default function Serials() {
       <header className="mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
+            <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tighter leading-[0.9] text-white">
               Serials
             </h1>
             <p className="text-white/40 text-base sm:text-lg font-medium mt-2 normal-case">

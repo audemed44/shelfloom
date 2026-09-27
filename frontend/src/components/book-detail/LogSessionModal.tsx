@@ -52,7 +52,7 @@ export default function LogSessionModal({ bookId, onClose, onSaved }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80"
       onClick={onClose}
     >
       <div

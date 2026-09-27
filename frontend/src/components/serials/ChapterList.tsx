@@ -695,7 +695,7 @@ export default function ChapterList({
           ) : (
             <button
               onClick={() => void loadMore()}
-              className="rounded-full border border-white/10 px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase text-white/50 hover:text-white hover:border-white/30 transition-colors"
+              className="border border-white/25 px-4 py-1.5 text-[10px] font-bold tracking-widest uppercase text-white/50 hover:text-white hover:border-white/30 transition-colors"
             >
               Load more
             </button>
