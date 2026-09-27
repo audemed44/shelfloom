@@ -367,17 +367,24 @@ async def get_book_series_memberships(session: AsyncSession, book_id: str) -> li
         .where(BookSeries.book_id == book_id)
     )
     memberships = rows.all()
+    if not memberships:
+        return []
+
+    # Siblings for every series the book belongs to, fetched in one query and
+    # grouped per series, ordered by sequence (nulls last) then title.
+    sibling_rows = await session.execute(
+        select(BookSeries, Book)
+        .join(Book, BookSeries.book_id == Book.id)
+        .where(BookSeries.series_id.in_([series.id for _, series in memberships]))
+        .order_by(BookSeries.series_id, BookSeries.sequence.nulls_last(), Book.title)
+    )
+    siblings_by_series: dict[int, list[tuple[BookSeries, Book]]] = {}
+    for sib, sib_book in sibling_rows.all():
+        siblings_by_series.setdefault(sib.series_id, []).append((sib, sib_book))
 
     result = []
     for bs, series in memberships:
-        # All books in this series ordered by sequence (nulls last), then title
-        sibs = await session.execute(
-            select(BookSeries, Book)
-            .join(Book, BookSeries.book_id == Book.id)
-            .where(BookSeries.series_id == series.id)
-            .order_by(BookSeries.sequence.nulls_last(), Book.title)
-        )
-        all_books = [(b, bk) for b, bk in sibs.all()]
+        all_books = siblings_by_series.get(series.id, [])
         idx = next((i for i, (b, _) in enumerate(all_books) if b.book_id == book_id), None)
         prev_entry = all_books[idx - 1] if idx is not None and idx > 0 else None
         next_entry = all_books[idx + 1] if idx is not None and idx < len(all_books) - 1 else None

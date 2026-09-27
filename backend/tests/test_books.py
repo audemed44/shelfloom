@@ -1034,3 +1034,39 @@ async def test_list_books_cross_category_and(client, db_session, tmp_path):
     assert resp.status_code == 200
     assert resp.json()["total"] == 1
     assert resp.json()["items"][0]["title"] == "Has Both"
+
+
+async def test_book_series_memberships_prev_next_across_series(client, db_session, tmp_path):
+    shelf = await _create_shelf(db_session, tmp_path)
+    a = await _create_book(db_session, shelf.id, "A")
+    b = await _create_book(db_session, shelf.id, "B")
+    c = await _create_book(db_session, shelf.id, "C")
+    d = await _create_book(db_session, shelf.id, "D")
+    main = Series(name="Main")
+    omnibus = Series(name="Omnibus")
+    db_session.add_all([main, omnibus])
+    await db_session.flush()
+    db_session.add_all(
+        [
+            BookSeries(book_id=a.id, series_id=main.id, sequence=1),
+            BookSeries(book_id=b.id, series_id=main.id, sequence=2),
+            BookSeries(book_id=c.id, series_id=main.id, sequence=3),
+            BookSeries(book_id=d.id, series_id=omnibus.id, sequence=1),
+            BookSeries(book_id=b.id, series_id=omnibus.id, sequence=2),
+        ]
+    )
+    await db_session.commit()
+
+    resp = await client.get(f"/api/books/{b.id}/series")
+    assert resp.status_code == 200
+    by_name = {m["series_name"]: m for m in resp.json()}
+    assert by_name["Main"]["prev_book"]["id"] == a.id
+    assert by_name["Main"]["next_book"]["id"] == c.id
+    assert by_name["Omnibus"]["prev_book"]["id"] == d.id
+    assert by_name["Omnibus"]["next_book"] is None
+
+    resp = await client.get(f"/api/books/{a.id}/series")
+    only = resp.json()
+    assert len(only) == 1
+    assert only[0]["prev_book"] is None
+    assert only[0]["next_book"]["id"] == b.id
