@@ -15,6 +15,12 @@ Self-hosted book library manager with deep KOReader integration and rich reading
     <td colspan="3"><img src="docs/screenshots/library-desktop.png" alt="Library grid on desktop" /></td>
   </tr>
   <tr>
+    <td colspan="3"><img src="docs/screenshots/search-desktop.png" alt="Quick search matching books by genre" /></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="docs/screenshots/stats-desktop.png" alt="Reading stats" /></td>
+  </tr>
+  <tr>
     <td colspan="3"><img src="docs/screenshots/home-serials-desktop.png" alt="Web serials row on the home dashboard with new-chapter badges and fetch buttons" /></td>
   </tr>
   <tr>
@@ -24,16 +30,21 @@ Self-hosted book library manager with deep KOReader integration and rich reading
     <td colspan="3"><img src="docs/screenshots/serial-chapters-desktop.png" alt="Serial chapter list loading more chapters as you scroll" /></td>
   </tr>
   <tr>
+    <td colspan="3"><img src="docs/screenshots/settings-desktop.png" alt="Settings" /></td>
+  </tr>
+  <tr>
     <td><img src="docs/screenshots/home-mobile.png" alt="Home dashboard on mobile" /></td>
     <td><img src="docs/screenshots/book-mobile.png" alt="Book detail page on mobile" /></td>
     <td><img src="docs/screenshots/library-mobile.png" alt="Library on mobile" /></td>
   </tr>
   <tr>
+    <td><img src="docs/screenshots/search-mobile.png" alt="Quick search on mobile" /></td>
+    <td><img src="docs/screenshots/stats-mobile.png" alt="Reading stats on mobile" /></td>
     <td><img src="docs/screenshots/serial-mobile.png" alt="Web serial detail on mobile" /></td>
-    <td></td>
-    <td></td>
   </tr>
 </table>
+
+Shelfloom can also be installed to your phone's home screen (Add to Home Screen) and opened full screen like an app. Press <kbd>⌘K</kbd> / <kbd>Ctrl+K</kbd> or <kbd>/</kbd> anywhere to search.
 
 ## Quick Start (Docker)
 
