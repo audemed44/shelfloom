@@ -17,6 +17,7 @@ const DataManagement = lazy(() => import('./pages/DataManagement'))
 const Lenses = lazy(() => import('./pages/Lenses'))
 const LensDetail = lazy(() => import('./pages/LensDetail'))
 const NotFound = lazy(() => import('./pages/NotFound'))
+const Reader = lazy(() => import('./pages/Reader'))
 const SetupWizard = lazy(() => import('./components/SetupWizard'))
 
 export default function App() {
@@ -47,6 +48,7 @@ export default function App() {
         </Suspense>
       )}
       <Routes>
+        <Route path="books/:id/read" element={<Reader />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="library" element={<Library />} />

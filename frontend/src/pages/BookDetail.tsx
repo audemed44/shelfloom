@@ -525,6 +525,8 @@ export default function BookDetailPage() {
   const highlights = highlightsData?.items ?? []
   const isDnf = book.status === 'dnf'
   const genres = book.genres ?? []
+  const hasFile = !book.file_path?.startsWith('manual://')
+  const canRead = hasFile && book.format === 'epub'
 
   // Breadcrumb — Library → ancestor0 → … → ancestorN (direct series) → Book
   const crumbs: Array<{ to: string | null; label: string }> = [
@@ -705,14 +707,34 @@ export default function BookDetailPage() {
             {/* Action buttons — primary actions stay visible, the rest live
                 in the More menu so the row never wraps on a phone. */}
             <div className="flex flex-wrap gap-2">
-              {!book.file_path?.startsWith('manual://') && (
+              {canRead && (
+                <Link
+                  to={`/books/${book.id}/read`}
+                  className="flex items-center gap-2 bg-primary px-4 py-2.5 text-xs font-semibold text-white hover:bg-primary-600 transition-colors sm:px-5"
+                  data-testid="read-btn"
+                >
+                  <BookOpen size={14} />
+                  {percent != null && percent > 0 && percent < 100
+                    ? `Continue · ${Math.round(percent)}%`
+                    : 'Read'}
+                </Link>
+              )}
+              {hasFile && (
                 <a
                   href={`/api/books/${book.id}/download`}
-                  className="flex items-center gap-2 bg-primary px-4 py-2.5 text-xs font-semibold text-white hover:bg-primary-600 transition-colors sm:px-5"
+                  className={
+                    canRead
+                      ? `${secondaryBtn} px-3`
+                      : 'flex items-center gap-2 bg-primary px-4 py-2.5 text-xs font-semibold text-white hover:bg-primary-600 transition-colors sm:px-5'
+                  }
                   data-testid="download-btn"
+                  aria-label="Download"
+                  title="Download"
                 >
                   <Download size={14} />
-                  Download
+                  <span className={canRead ? 'hidden sm:inline' : ''}>
+                    Download
+                  </span>
                 </a>
               )}
 

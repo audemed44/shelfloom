@@ -222,6 +222,27 @@ describe('BookDetail', () => {
     expect(badges).toHaveTextContent('Main Library')
   })
 
+  it('offers to continue reading an EPUB in the browser', async () => {
+    renderDetail()
+    const read = await screen.findByTestId('read-btn')
+    expect(read).toHaveAttribute('href', '/books/1/read')
+    expect(read).toHaveTextContent('Continue · 42%')
+    expect(screen.getByTestId('download-btn')).toHaveAttribute(
+      'href',
+      '/api/books/1/download'
+    )
+  })
+
+  it('has no web reader for PDFs', async () => {
+    fetchSpy.mockRestore()
+    fetchSpy = mockFetch({
+      book: { ...BOOK, format: 'pdf', file_path: 'way-of-kings.pdf' },
+    })
+    renderDetail()
+    await screen.findByTestId('download-btn')
+    expect(screen.queryByTestId('read-btn')).not.toBeInTheDocument()
+  })
+
   it('shows reading progress bar', async () => {
     renderDetail()
     await waitFor(() =>
