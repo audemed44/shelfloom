@@ -23,41 +23,38 @@ export default function MoreMenu({ open, onClose }: MoreMenuProps) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/60 z-40 sm:hidden"
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-fade-in sm:hidden"
         onClick={onClose}
         data-testid="more-menu-backdrop"
       />
 
       {/* Bottom sheet */}
       <div
-        className="fixed left-0 right-0 z-[60] border-t border-white/10 bg-black rounded-t-xl sm:hidden"
-        style={{ bottom: 'var(--mobile-bottom-nav-offset)' }}
+        className="fixed left-2 right-2 z-[60] rounded-3xl border border-white/10 bg-ink-850/95 shadow-lift backdrop-blur-xl animate-scale-in sm:hidden"
+        style={{ bottom: 'calc(var(--mobile-bottom-nav-offset) + 0.5rem)' }}
         data-testid="more-menu"
       >
-        <div className="px-4 pt-4 pb-safe-bottom pb-2">
-          <div className="w-8 h-1 bg-white/10 rounded-full mx-auto mb-4" />
-          <p className="text-[9px] font-black tracking-widest text-white/30 mb-3 px-2">
-            MORE
+        <div className="p-3">
+          <p className="px-2 pb-2 pt-1 text-[10px] font-semibold tracking-widest text-white/35">
+            More
           </p>
-          <nav className="space-y-1 pb-4">
+          <nav className="grid grid-cols-3 gap-2">
             {MORE_ITEMS.map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}
                 to={to}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-4 px-4 py-3 transition-colors ${
+                  `flex flex-col items-center gap-2 rounded-2xl px-2 py-4 text-xs font-medium transition-colors ${
                     isActive
-                      ? 'text-primary'
-                      : 'text-white/60 hover:text-white hover:bg-white/5'
+                      ? 'bg-primary/20 text-white shadow-[inset_0_0_0_1px_rgba(139,124,255,0.3)]'
+                      : 'bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white'
                   }`
                 }
                 data-testid={`more-menu-item-${label.toLowerCase()}`}
               >
-                <Icon size={20} />
-                <span className="text-sm font-bold tracking-widest">
-                  {label}
-                </span>
+                <Icon size={22} strokeWidth={1.75} />
+                <span>{label}</span>
               </NavLink>
             ))}
           </nav>

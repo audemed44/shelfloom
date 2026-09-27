@@ -246,6 +246,40 @@ describe('BookDetail', () => {
     expect(screen.queryByTestId('prev-book-link')).not.toBeInTheDocument()
   })
 
+  it('shows every book in the series on the page', async () => {
+    const seriesBooks = Array.from({ length: 8 }, (_, i) => ({
+      book_id: String(i + 1),
+      sequence: i + 1,
+      title: i === 0 ? 'The Way of Kings' : `Stormlight ${i + 1}`,
+      author: 'Brandon Sanderson',
+      format: 'epub',
+      cover_path: null,
+    }))
+    const baseFetch = fetchSpy.getMockImplementation()
+    fetchSpy.mockImplementation(
+      (url: RequestInfo | URL, options?: RequestInit) => {
+        if (url.toString().includes('/api/series/1/books')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => seriesBooks,
+          }) as Promise<Response>
+        }
+        return baseFetch(url, options)
+      }
+    )
+
+    renderDetail()
+    await waitFor(() => {
+      expect(screen.getByTestId('series-shelf')).toBeInTheDocument()
+    })
+    const books = screen.getAllByTestId('series-shelf-book')
+    expect(books).toHaveLength(8)
+    expect(books[7]).toHaveAttribute('href', '/books/8')
+    expect(books[0]).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByText('Book 1 of 8')).toBeInTheDocument()
+  })
+
   it('renders session history', async () => {
     renderDetail()
     await waitFor(() =>

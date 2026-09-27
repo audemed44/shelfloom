@@ -616,17 +616,17 @@ export default function EditBookModal({
   return (
     <>
       <div
-        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 overflow-y-auto"
+        className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose()
         }}
       >
         <div
-          className="relative my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden border border-white/10 bg-black shadow-2xl"
+          className="rounded-2xl shadow-lift ring-1 ring-white/[0.04] animate-scale-in relative my-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden border border-white/10 bg-ink-900 shadow-2xl"
           data-testid="edit-book-modal"
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-black z-10">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-ink-900 z-10">
             <div>
               <h2 className="text-sm font-black tracking-widest uppercase text-white">
                 Edit Book
@@ -903,7 +903,7 @@ export default function EditBookModal({
 
           {/* Footer */}
           <div
-            className="sticky bottom-0 flex justify-end gap-3 border-t border-white/10 bg-black px-6 py-4"
+            className="sticky bottom-0 flex justify-end gap-3 border-t border-white/10 bg-ink-900 px-6 py-4"
             data-testid="edit-book-modal-footer"
           >
             <button

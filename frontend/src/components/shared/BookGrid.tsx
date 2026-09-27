@@ -33,7 +33,7 @@ export default function BookGrid({
   if (loading) {
     return view === 'grid' ? (
       <div
-        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4"
+        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-6 sm:gap-x-5 sm:gap-y-8"
         data-testid="book-grid"
       >
         {Array.from({ length: 12 }).map((_, i) => (
@@ -67,7 +67,7 @@ export default function BookGrid({
     <div>
       {view === 'grid' ? (
         <div
-          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4"
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-6 sm:gap-x-5 sm:gap-y-8"
           data-testid="book-grid"
         >
           {books.map((book) => (

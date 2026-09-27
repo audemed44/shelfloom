@@ -429,7 +429,7 @@ export default function Settings() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-12">
       <header className="mb-4">
-        <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
+        <h2 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
           Settings
         </h2>
         <p className="text-white/40 text-base sm:text-lg font-medium mt-2 normal-case">

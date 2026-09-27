@@ -274,7 +274,7 @@ export default function SeriesList() {
       <header className="mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
+            <h1 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
               Series
             </h1>
             <p className="text-white/40 text-base sm:text-lg font-medium mt-2 normal-case">
@@ -324,13 +324,13 @@ export default function SeriesList() {
           placeholder="Search series..."
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
-          className="w-full bg-black border border-white/10 pl-9 pr-4 py-2.5 text-sm text-white placeholder-white/20 focus:border-primary focus:outline-none normal-case"
+          className="w-full rounded-xl bg-white/[0.04] border border-white/10 pl-9 pr-4 py-2.5 text-sm text-white placeholder-white/20 focus:border-primary focus:outline-none normal-case"
         />
       </div>
 
       {/* Series list */}
       <div
-        className="border border-white/10 bg-black max-w-5xl"
+        className="surface overflow-hidden max-w-5xl"
         data-testid="series-list"
       >
         {pageItems.length === 0 ? (

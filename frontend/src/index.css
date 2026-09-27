@@ -2,6 +2,10 @@
 @import '@fontsource/inter/500.css';
 @import '@fontsource/inter/600.css';
 @import '@fontsource/inter/700.css';
+@import '@fontsource/inter/800.css';
+@import '@fontsource/inter/900.css';
+@import '@fontsource-variable/fraunces/index.css';
+@import '@fontsource-variable/fraunces/wght-italic.css';
 
 @tailwind base;
 @tailwind components;
@@ -10,15 +14,20 @@
 @layer base {
   :root {
     color-scheme: dark;
-    --mobile-bottom-nav-height: 57px;
+    --mobile-bottom-nav-height: 64px;
     --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
     --mobile-bottom-nav-offset: calc(
       var(--mobile-bottom-nav-height) + var(--mobile-safe-bottom)
     );
+    --primary-rgb: 139 124 255;
+    --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   html {
-    @apply bg-black text-white font-sans uppercase;
+    @apply bg-black text-white font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+    -webkit-tap-highlight-color: transparent;
+    text-rendering: optimizeLegibility;
   }
 
   body,
@@ -27,9 +36,30 @@
     min-height: 100dvh;
   }
 
+  body {
+    @apply bg-black;
+    overflow-x: hidden;
+  }
+
   html.light {
     color-scheme: light;
     @apply bg-gray-50 text-zinc-900;
+  }
+
+  /*
+   * Small tracked labels are the app's "eyebrow" typography — they stay
+   * uppercase, while headings and body copy use natural case.
+   */
+  [class*='tracking-widest'],
+  [class*='tracking-wider'],
+  [class*='tracking-[0.'] {
+    text-transform: uppercase;
+  }
+
+  h1 {
+    @apply font-display;
+    font-optical-sizing: auto;
+    letter-spacing: -0.02em;
   }
 
   /* Preserve natural case for user-entered content and external data */
@@ -37,6 +67,117 @@
   textarea,
   [data-normal-case] {
     text-transform: none;
+  }
+
+  ::selection {
+    background: rgb(var(--primary-rgb) / 0.35);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--primary-rgb) / 0.7);
+    outline-offset: 2px;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+  }
+
+  input,
+  textarea,
+  select {
+    border-radius: 0.5rem;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+@layer components {
+  /* Frosted surface used by cards, panels and navigation chrome */
+  .glass {
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.055),
+      rgba(255, 255, 255, 0.025)
+    );
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+
+  .surface {
+    @apply rounded-2xl border border-white/[0.07] bg-ink-850/70;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .text-gradient {
+    background-image: linear-gradient(
+      100deg,
+      #f7f6f3 0%,
+      #cfc7ff 35%,
+      #8b7cff 60%,
+      #f47fb0 85%,
+      #f5b56b 100%
+    );
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 0%,
+      rgba(255, 255, 255, 0.09) 50%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+
+  /* Book cover with a subtle spine highlight and depth */
+  .book-cover {
+    position: relative;
+    box-shadow:
+      0 18px 40px -18px rgba(0, 0, 0, 0.95),
+      0 2px 6px rgba(0, 0, 0, 0.5);
+  }
+  .book-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.14) 0%,
+      rgba(255, 255, 255, 0) 4%,
+      rgba(0, 0, 0, 0.18) 5.5%,
+      rgba(255, 255, 255, 0) 8%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
   }
 }
 
@@ -50,7 +191,7 @@
   }
 
   .pb-mobile-bottom-nav {
-    padding-bottom: var(--mobile-bottom-nav-offset);
+    padding-bottom: calc(var(--mobile-bottom-nav-offset) + 0.75rem);
   }
 
   .pb-mobile-bottom-toolbar {
@@ -68,6 +209,68 @@
   .pb-safe-bottom {
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
   }
+
+  .stagger > * {
+    animation: fade-up 0.6s var(--ease-out-expo) both;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 0ms; }
+  .stagger > *:nth-child(2) { animation-delay: 60ms; }
+  .stagger > *:nth-child(3) { animation-delay: 120ms; }
+  .stagger > *:nth-child(4) { animation-delay: 180ms; }
+  .stagger > *:nth-child(5) { animation-delay: 240ms; }
+  .stagger > *:nth-child(6) { animation-delay: 300ms; }
+  .stagger > *:nth-child(7) { animation-delay: 360ms; }
+  .stagger > *:nth-child(8) { animation-delay: 420ms; }
+  .stagger > *:nth-child(n + 9) { animation-delay: 480ms; }
+
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      #000 24px,
+      #000 calc(100% - 24px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      90deg,
+      transparent 0,
+      #000 24px,
+      #000 calc(100% - 24px),
+      transparent 100%
+    );
+  }
+}
+
+/* Animated backdrop glows behind the whole app */
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.app-backdrop::before,
+.app-backdrop::after {
+  content: '';
+  position: absolute;
+  width: 60vmax;
+  height: 60vmax;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.16;
+  animation: aurora 26s ease-in-out infinite;
+}
+.app-backdrop::before {
+  top: -30vmax;
+  left: -10vmax;
+  background: radial-gradient(circle, #8b7cff 0%, transparent 65%);
+}
+.app-backdrop::after {
+  bottom: -35vmax;
+  right: -15vmax;
+  background: radial-gradient(circle, #f47fb0 0%, transparent 65%);
+  opacity: 0.08;
+  animation-delay: -12s;
 }
 
 /* Heatmap scrollbar — thin, primary-coloured */
@@ -78,5 +281,16 @@
   background: rgba(255, 255, 255, 0.05);
 }
 .heatmap-container::-webkit-scrollbar-thumb {
-  background: #258cf4;
+  background: #8b7cff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

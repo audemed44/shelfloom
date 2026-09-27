@@ -222,7 +222,7 @@ export default function BulkUploadZone({ onSuccess }: BulkUploadZoneProps) {
         setIsDragOver(true)
       }}
       onDragLeave={() => setIsDragOver(false)}
-      className={`border-2 border-dashed transition-colors ${
+      className={`rounded-2xl border-2 border-dashed transition-colors ${
         isDragOver
           ? 'border-primary bg-primary/5'
           : 'border-white/10 hover:border-white/20'

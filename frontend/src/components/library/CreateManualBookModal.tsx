@@ -64,11 +64,11 @@ export default function CreateManualBookModal({ onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl max-h-[90vh] bg-black border border-white/10 flex flex-col"
+        className="rounded-2xl shadow-lift ring-1 ring-white/[0.04] animate-scale-in relative w-full max-w-2xl max-h-[90vh] bg-ink-900 border border-white/10 flex flex-col"
         onClick={(e) => e.stopPropagation()}
         data-testid="create-manual-book-modal"
       >
