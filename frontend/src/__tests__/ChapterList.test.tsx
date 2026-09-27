@@ -218,7 +218,7 @@ describe('ChapterList', () => {
     expect(
       screen.getByText('Fetched chapter 1 "Chapter 1" (42 words)')
     ).toBeInTheDocument()
-    expect(container.querySelectorAll('svg.text-green-500')).toHaveLength(1)
+    expect(container.querySelectorAll('svg.text-primary-400')).toHaveLength(1)
 
     status = {
       ...status,

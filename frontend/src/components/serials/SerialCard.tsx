@@ -5,10 +5,10 @@ import type { WebSerial } from '../../types/api'
 import { getSerialCoverSources } from '../../utils/serialCover'
 
 const STATUS_STYLES: Record<string, string> = {
-  ongoing: 'bg-green-500/20 text-green-400',
-  completed: 'bg-primary/20 text-primary',
-  paused: 'bg-amber-500/20 text-amber-400',
-  error: 'bg-red-500/20 text-red-400',
+  ongoing: 'bg-primary text-white',
+  completed: 'bg-white text-black',
+  paused: 'bg-black text-white/70',
+  error: 'bg-accent text-white',
 }
 
 interface SerialCardProps {
@@ -33,11 +33,16 @@ export default function SerialCard({ serial }: SerialCardProps) {
     >
       {/* Cover */}
       <div className="book-cover aspect-[2/3] rounded-xl bg-white/5 overflow-hidden transition-all duration-500 ease-out group-hover:-translate-y-1.5 group-hover:shadow-lift">
+        {/* Fallback placeholder icon (sits behind the cover image) */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <Scroll size={32} className="text-white/10" />
+        </div>
+
         {coverSrc && (
           <img
             src={coverSrc}
             alt={serial.title ?? 'Serial cover'}
-            className="w-full h-full object-cover"
+            className="relative w-full h-full object-cover"
             onError={(e) => {
               if (fallbackSrc && coverSrc !== fallbackSrc) {
                 setCoverSrc(fallbackSrc)
@@ -47,11 +52,6 @@ export default function SerialCard({ serial }: SerialCardProps) {
             }}
           />
         )}
-
-        {/* Fallback placeholder icon (visible when cover fails to load) */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <Scroll size={32} className="text-white/10" />
-        </div>
 
         {/* Status badge */}
         <div className="absolute top-2 right-2">
@@ -63,12 +63,12 @@ export default function SerialCard({ serial }: SerialCardProps) {
         </div>
 
         {/* Chapter count */}
-        <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
+        <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-black/85">
           <span className="text-[9px] font-black tracking-widest text-white/60 block">
             {serial.total_chapters} ch
           </span>
           {serial.stubbed_chapter_count > 0 && (
-            <span className="text-[8px] font-black tracking-widest text-amber-300/90 block mt-0.5">
+            <span className="text-[8px] font-black tracking-widest text-accent block mt-0.5">
               {serial.live_chapter_count} live · {serial.stubbed_chapter_count}{' '}
               stubbed
             </span>

@@ -15,9 +15,23 @@ Self-hosted book library manager with deep KOReader integration and rich reading
     <td colspan="3"><img src="docs/screenshots/library-desktop.png" alt="Library grid on desktop" /></td>
   </tr>
   <tr>
+    <td colspan="3"><img src="docs/screenshots/home-serials-desktop.png" alt="Web serials row on the home dashboard with new-chapter badges and fetch buttons" /></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="docs/screenshots/serials-desktop.png" alt="Web serials list" /></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="docs/screenshots/serial-chapters-desktop.png" alt="Serial chapter list loading more chapters as you scroll" /></td>
+  </tr>
+  <tr>
     <td><img src="docs/screenshots/home-mobile.png" alt="Home dashboard on mobile" /></td>
     <td><img src="docs/screenshots/book-mobile.png" alt="Book detail page on mobile" /></td>
     <td><img src="docs/screenshots/library-mobile.png" alt="Library on mobile" /></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/serial-mobile.png" alt="Web serial detail on mobile" /></td>
+    <td></td>
+    <td></td>
   </tr>
 </table>
 

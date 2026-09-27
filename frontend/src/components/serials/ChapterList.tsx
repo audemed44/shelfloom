@@ -667,7 +667,7 @@ export default function ChapterList({
                       {chapter.has_content ? (
                         <CheckCircle2
                           size={13}
-                          className="text-green-500 inline"
+                          className="text-primary-400 inline"
                         />
                       ) : (
                         <Circle size={13} className="text-white/20 inline" />
