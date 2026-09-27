@@ -15,6 +15,7 @@ import { useApi } from '../hooks/useApi'
 import VolumeList from '../components/serials/VolumeList'
 import ChapterList from '../components/serials/ChapterList'
 import EditSerialModal from '../components/serials/EditSerialModal'
+import SeriesMergeBanner from '../components/serials/SeriesMergeBanner'
 import type { WebSerial, SerialVolume, Shelf } from '../types/api'
 import { getSerialCoverSources } from '../utils/serialCover'
 
@@ -380,6 +381,12 @@ export default function SerialDetail() {
           </p>
         </div>
       )}
+
+      <SeriesMergeBanner
+        serialId={displaySerial.id}
+        refreshKey={refreshKey}
+        onMerged={refresh}
+      />
 
       {/* 01 VOLUMES */}
       <section className="mb-12" data-testid="volumes-section">

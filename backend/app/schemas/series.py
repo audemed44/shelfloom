@@ -25,6 +25,17 @@ class SeriesResponse(BaseModel):
     cover_path: str | None = None
 
 
+class SeriesMergeRequest(BaseModel):
+    source_id: int
+
+
+class SeriesMergeResponse(BaseModel):
+    series: SeriesResponse
+    merged_from: str
+    moved_books: int
+    already_in_target: int
+
+
 class SeriesTreeNode(SeriesResponse):
     children: list["SeriesTreeNode"] = []
     book_count: int = 0

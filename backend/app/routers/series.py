@@ -11,12 +11,15 @@ from app.schemas.series import (
     ReadingOrderResponse,
     SeriesBookItem,
     SeriesCreate,
+    SeriesMergeRequest,
+    SeriesMergeResponse,
     SeriesResponse,
     SeriesUpdate,
 )
 from app.services.series_service import (
     BookNotFound,
     ReadingOrderNotFound,
+    SeriesMergeError,
     SeriesNotFound,
     add_book_to_series_by_id,
     add_reading_order_entry,
@@ -30,6 +33,7 @@ from app.services.series_service import (
     list_books_in_series,
     list_reading_orders_for_series,
     list_series,
+    merge_series,
     purge_empty_series,
     remove_book_from_series,
     reorder_entries,
@@ -104,6 +108,25 @@ async def delete_series_endpoint(series_id: int, session: AsyncSession = Depends
         await delete_series(session, series_id)
     except SeriesNotFound as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/series/{series_id}/merge", response_model=SeriesMergeResponse)
+async def merge_series_endpoint(
+    series_id: int, body: SeriesMergeRequest, session: AsyncSession = Depends(get_session)
+):
+    """Merge ``body.source_id`` into this series and delete the source series."""
+    try:
+        result = await merge_series(session, body.source_id, series_id)
+    except SeriesNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except SeriesMergeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return SeriesMergeResponse(
+        series=SeriesResponse.model_validate(result.target),
+        merged_from=result.source_name,
+        moved_books=result.moved_books,
+        already_in_target=result.already_in_target,
+    )
 
 
 @router.post("/series/{series_id}/books/{book_id}", status_code=status.HTTP_201_CREATED)

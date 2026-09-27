@@ -12,7 +12,7 @@ from pathlib import Path
 
 import httpx
 from sqlalchemy import func as sa_func
-from sqlalchemy import select
+from sqlalchemy import nullslast, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
@@ -1356,6 +1356,167 @@ async def link_ebook_volume(
     await session.commit()
     await session.refresh(vol)
     return vol
+
+
+class SeriesAdoptError(Exception):
+    """The series can't be merged into this serial's series."""
+
+
+def _series_key(name: str | None) -> str:
+    """Normalise a title for loose "is this the same story?" matching."""
+    key = re.sub(r"[^a-z0-9]+", " ", (name or "").lower()).strip()
+    key = re.sub(r"^the ", "", key)
+    key = re.sub(r" (series|saga|books?|novels?)$", "", key)
+    return key
+
+
+async def _other_serial_series_ids(session: AsyncSession, serial_id: int) -> set[int]:
+    rows = await session.execute(
+        select(WebSerial.series_id).where(
+            WebSerial.id != serial_id, WebSerial.series_id.is_not(None)
+        )
+    )
+    return {sid for (sid,) in rows}
+
+
+async def series_merge_candidates(session: AsyncSession, serial_id: int) -> list[dict]:
+    """Series that look like this serial's story but aren't its own series.
+
+    Typical case: the published ebooks were already in the library, in a series
+    of their own, before the serial was added (which created a second series).
+    A series matches when its name is the serial's title, or when it holds a
+    book that is linked to this serial as an ebook volume. Series belonging to
+    another serial are never suggested.
+    """
+    from app.models.book import Book
+
+    serial = await get_serial(session, serial_id)
+    own_id = serial.series_id
+    own_name = (
+        await session.scalar(select(Series.name).where(Series.id == own_id))
+        if own_id is not None
+        else None
+    )
+    keys = {k for k in (_series_key(serial.title), _series_key(own_name)) if k}
+    linked_ids = {v.book_id for v in serial.volumes if v.book_id and v.kind == "ebook"}
+    excluded = await _other_serial_series_ids(session, serial_id)
+    if own_id is not None:
+        excluded.add(own_id)
+
+    reasons: dict[int, list[str]] = {}
+    names: dict[int, str] = {}
+    for sid, name in await session.execute(select(Series.id, Series.name)):
+        names[sid] = name
+        if sid not in excluded and _series_key(name) in keys:
+            reasons.setdefault(sid, []).append("same_name")
+    if linked_ids:
+        rows = await session.execute(
+            select(BookSeries.series_id).where(BookSeries.book_id.in_(linked_ids)).distinct()
+        )
+        for (sid,) in rows:
+            if sid not in excluded:
+                reasons.setdefault(sid, []).append("linked_ebook")
+    if not reasons:
+        return []
+
+    books: dict[int, list[dict]] = {sid: [] for sid in reasons}
+    rows = await session.execute(
+        select(BookSeries.series_id, BookSeries.book_id, BookSeries.sequence, Book.title)
+        .join(Book, Book.id == BookSeries.book_id)
+        .where(BookSeries.series_id.in_(reasons))
+        .order_by(nullslast(BookSeries.sequence), Book.title)
+    )
+    for sid, book_id, sequence, title in rows:
+        books[sid].append(
+            {
+                "book_id": book_id,
+                "title": title,
+                "sequence": sequence,
+                "linked": book_id in linked_ids,
+            }
+        )
+    return [
+        {
+            "series_id": sid,
+            "name": names[sid],
+            "book_count": len(books[sid]),
+            "reasons": reasons[sid],
+            "books": books[sid],
+        }
+        for sid in sorted(reasons, key=lambda sid: names[sid].lower())
+        if books[sid]
+    ]
+
+
+async def merge_series_into_serial(
+    session: AsyncSession, serial_id: int, series_id: int, *, link_as_volumes: bool = True
+) -> dict:
+    """Fold another series (e.g. the ebooks' own series) into this serial's series.
+
+    With ``link_as_volumes`` the series' books become the serial's first ebook
+    volumes, in series order, ahead of any generated volumes. The other series
+    is then merged into the serial's series and deleted.
+    """
+    from app.services.series_service import get_series, merge_series
+
+    serial = await get_serial(session, serial_id)
+    own_id = serial.series_id
+    if series_id == own_id:
+        raise SeriesAdoptError("That is already this serial's series")
+    source = await get_series(session, series_id)  # raises SeriesNotFound
+    source_name = source.name
+    if series_id in await _other_serial_series_ids(session, serial_id):
+        raise SeriesAdoptError(f'"{source_name}" belongs to another serial')
+
+    ordered = [
+        book_id
+        for (book_id,) in await session.execute(
+            select(BookSeries.book_id)
+            .where(BookSeries.series_id == series_id)
+            .order_by(nullslast(BookSeries.sequence), BookSeries.book_id)
+        )
+    ]
+
+    linked = 0
+    if link_as_volumes:
+        position = 1
+        for book_id in ordered:
+            session.expire_all()  # see volumes added by the previous link
+            existing = await session.scalar(
+                select(SerialVolume.volume_number).where(
+                    SerialVolume.serial_id == serial_id, SerialVolume.book_id == book_id
+                )
+            )
+            if existing is not None:
+                position = existing + 1
+                continue
+            await link_ebook_volume(
+                session, serial_id, EbookVolumeLink(book_id=book_id, volume_number=position)
+            )
+            position += 1
+            linked += 1
+
+    session.expire_all()
+    if own_id is None:
+        # The serial lost its series at some point: adopt this one outright.
+        await session.execute(
+            WebSerial.__table__.update()
+            .where(WebSerial.id == serial_id)
+            .values(series_id=series_id)
+        )
+        await session.commit()
+        target_id, target_name, moved = series_id, source_name, 0
+    else:
+        result = await merge_series(session, series_id, own_id)
+        target_id, target_name, moved = result.target.id, result.target.name, result.moved_books
+
+    return {
+        "series_id": target_id,
+        "series_name": target_name,
+        "merged_from": source_name,
+        "moved_books": moved,
+        "linked_volumes": linked,
+    }
 
 
 # ---------------------------------------------------------------------------
