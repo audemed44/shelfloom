@@ -30,6 +30,15 @@ Self-hosted book library manager with deep KOReader integration and rich reading
     <td colspan="3"><img src="docs/screenshots/serial-chapters-desktop.png" alt="Serial chapter list loading more chapters as you scroll" /></td>
   </tr>
   <tr>
+    <td colspan="3"><img src="docs/screenshots/serial-ebook-volumes.png" alt="Published ebooks linked to a serial as its first volumes, ahead of generated volumes" /></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="docs/screenshots/volume-suggestions-desktop.png" alt="Book-length volume suggestions of 500 to 600 pages for a web serial" /></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="docs/screenshots/series-merge-banner.png" alt="Serial page offering to merge the ebooks' existing series into the serial's series" /></td>
+  </tr>
+  <tr>
     <td colspan="3"><img src="docs/screenshots/settings-desktop.png" alt="Settings" /></td>
   </tr>
   <tr>
