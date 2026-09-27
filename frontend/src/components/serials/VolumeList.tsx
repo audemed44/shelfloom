@@ -8,14 +8,19 @@ import {
   Plus,
   Trash2,
   Loader2,
+  Link2,
 } from 'lucide-react'
 import { api } from '../../api/client'
+import { getBookCoverUrl } from '../../utils/bookCover'
+import LinkEbookModal from './LinkEbookModal'
 import type { SerialVolume, SerialVolumePreview, Shelf } from '../../types/api'
 
 interface VolumeListProps {
   serialId: number
   volumes: SerialVolume[]
   totalChapters: number
+  serialTitle?: string | null
+  stubbedChapterCount?: number
   shelves: Shelf[]
   onRefresh: () => void
 }
@@ -82,9 +87,12 @@ export default function VolumeList({
   serialId,
   volumes,
   totalChapters,
+  serialTitle = null,
+  stubbedChapterCount = 0,
   shelves,
   onRefresh,
 }: VolumeListProps) {
+  const [showLinkEbook, setShowLinkEbook] = useState(false)
   const [configMode, setConfigMode] = useState<'auto' | 'custom'>('custom')
   const [chaptersPerVolume, setChaptersPerVolume] = useState('100')
   const [customSplits, setCustomSplits] = useState<
@@ -309,8 +317,10 @@ export default function VolumeList({
   // Pre-fill add form start from last volume's end + 1
   const openAddForm = () => {
     if (volumes.length > 0) {
-      const lastEnd = Math.max(...volumes.map((v) => v.chapter_end))
-      setAddStart(String(lastEnd + 1))
+      const ends = volumes
+        .map((v) => v.chapter_end)
+        .filter((n): n is number => n != null)
+      setAddStart(String(ends.length > 0 ? Math.max(...ends) + 1 : 1))
     } else {
       setAddStart('1')
     }
@@ -586,6 +596,23 @@ export default function VolumeList({
       ) : (
         <div className="space-y-2">
           {volumes.map((vol) => {
+            if (vol.kind === 'ebook') {
+              return (
+                <EbookVolumeCard
+                  key={vol.id}
+                  vol={vol}
+                  confirming={confirmDeleteId === vol.id}
+                  deleting={deletingId === vol.id}
+                  onAskUnlink={() =>
+                    setConfirmDeleteId(
+                      confirmDeleteId === vol.id ? null : vol.id
+                    )
+                  }
+                  onUnlink={() => handleDelete(vol.id, false)}
+                  onCancel={() => setConfirmDeleteId(null)}
+                />
+              )
+            }
             const isGenerating = generatingId === vol.id
             const isDeleting = deletingId === vol.id
             const isUploading = uploadingId === vol.id
@@ -822,13 +849,143 @@ export default function VolumeList({
           </div>
         </div>
       ) : (
-        <button
-          onClick={openAddForm}
-          className="flex items-center gap-1.5 text-[10px] font-black tracking-widest uppercase text-primary hover:underline"
-        >
-          <Plus size={11} />
-          Add Volume
-        </button>
+        <div className="flex flex-wrap items-center gap-5">
+          <button
+            onClick={openAddForm}
+            className="flex items-center gap-1.5 text-[10px] font-black tracking-widest uppercase text-primary hover:underline"
+          >
+            <Plus size={11} />
+            Add Volume
+          </button>
+          <button
+            onClick={() => setShowLinkEbook(true)}
+            className="flex items-center gap-1.5 text-[10px] font-black tracking-widest uppercase text-primary hover:underline"
+            data-testid="link-ebook-button"
+          >
+            <Link2 size={11} />
+            Link Ebook
+          </button>
+        </div>
+      )}
+
+      {showLinkEbook && (
+        <LinkEbookModal
+          serialId={serialId}
+          serialTitle={serialTitle}
+          volumes={volumes}
+          stubbedChapterCount={stubbedChapterCount}
+          onClose={() => setShowLinkEbook(false)}
+          onLinked={() => {
+            setShowLinkEbook(false)
+            onRefresh()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Linked ebook volume — the user's own file, so no generate/rebuild/delete
+// ---------------------------------------------------------------------------
+
+function EbookVolumeCard({
+  vol,
+  confirming,
+  deleting,
+  onAskUnlink,
+  onUnlink,
+  onCancel,
+}: {
+  vol: SerialVolume
+  confirming: boolean
+  deleting: boolean
+  onAskUnlink: () => void
+  onUnlink: () => void
+  onCancel: () => void
+}) {
+  const hasRange = vol.chapter_start != null && vol.chapter_end != null
+  return (
+    <div
+      className="border border-white/10 p-4 transition-colors hover:border-white/20"
+      data-testid="ebook-volume"
+    >
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="size-10 flex items-center justify-center bg-primary/10 text-primary text-xs font-black shrink-0">
+          {String(vol.volume_number).padStart(2, '0')}
+        </div>
+        {vol.book_id && (
+          <img
+            src={getBookCoverUrl(vol.book_id)}
+            alt=""
+            className="h-14 w-10 shrink-0 bg-white/10 object-cover"
+            onError={(e) => {
+              e.currentTarget.style.visibility = 'hidden'
+            }}
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-black tracking-tighter normal-case">
+              {vol.name ?? `Volume ${vol.volume_number}`}
+            </p>
+            <span className="bg-white px-1.5 py-0.5 text-[9px] font-black tracking-widest text-black">
+              EBOOK
+            </span>
+          </div>
+          <p className="mt-0.5 text-[10px] tracking-widest uppercase text-white/40">
+            {hasRange
+              ? `Ch ${vol.chapter_start}–${vol.chapter_end}`
+              : 'Chapters not set'}
+            <span className="ml-2 text-white/25">
+              Your copy · never rebuilt
+            </span>
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {vol.book_id && (
+            <Link
+              to={`/books/${vol.book_id}`}
+              className="flex items-center gap-1.5 text-[10px] font-black tracking-widest uppercase text-primary hover:underline"
+            >
+              <BookOpen size={11} />
+              View
+            </Link>
+          )}
+          <button
+            onClick={onAskUnlink}
+            disabled={deleting}
+            className="p-1.5 text-white/30 transition-colors hover:text-red-400 disabled:opacity-40"
+            title="Unlink from serial"
+            aria-label="Unlink ebook"
+          >
+            {deleting ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Trash2 size={13} />
+            )}
+          </button>
+        </div>
+      </div>
+      {confirming && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
+          <span className="text-[10px] font-black tracking-widest uppercase text-white/40">
+            Unlink this ebook? The book stays in your library.
+          </span>
+          <button
+            onClick={onUnlink}
+            disabled={deleting}
+            className="border border-red-500/30 px-3 py-1 text-[10px] font-black tracking-widest uppercase text-red-400 transition-colors hover:bg-red-400/10 disabled:opacity-40"
+          >
+            Unlink
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-3 py-1 text-[10px] font-black tracking-widest uppercase text-white/30 transition-colors hover:text-white/60"
+          >
+            Cancel
+          </button>
+        </div>
       )}
     </div>
   )

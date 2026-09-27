@@ -478,10 +478,13 @@ export interface SerialVolume {
   serial_id: number
   book_id: string | null
   volume_number: number
+  /** "ebook" = a linked library book (e.g. the published edition), never generated */
+  kind: 'generated' | 'ebook'
   name: string | null
   cover_path: string | null
-  chapter_start: number
-  chapter_end: number
+  /** Always set for generated volumes; optional for linked ebooks */
+  chapter_start: number | null
+  chapter_end: number | null
   generated_at: string | null
   is_stale: boolean
   chapter_count: number

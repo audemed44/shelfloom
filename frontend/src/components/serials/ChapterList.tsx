@@ -106,6 +106,8 @@ function getMatchingVolumes(
   return volumes
     .filter(
       (volume) =>
+        volume.chapter_start != null &&
+        volume.chapter_end != null &&
         volume.chapter_start <= chapterNumber &&
         volume.chapter_end >= chapterNumber
     )

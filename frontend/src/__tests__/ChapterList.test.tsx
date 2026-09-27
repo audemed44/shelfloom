@@ -260,6 +260,7 @@ describe('ChapterList', () => {
         serial_id: 1,
         book_id: null,
         volume_number: 1,
+        kind: 'generated',
         name: 'Arc One',
         cover_path: null,
         chapter_start: 1,
