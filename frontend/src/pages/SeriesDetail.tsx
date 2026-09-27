@@ -8,10 +8,12 @@ import {
   Settings,
   MoreVertical,
   BookOpen,
+  GitMerge,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
 import SeriesModal from '../components/series/SeriesModal'
+import MergeSeriesModal from '../components/series/MergeSeriesModal'
 import type {
   SeriesWithCount,
   SeriesBook,
@@ -55,6 +57,7 @@ export default function SeriesDetail() {
       : null
   )
   const [showEdit, setShowEdit] = useState(false)
+  const [showMerge, setShowMerge] = useState(false)
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null)
   const [newOrderName, setNewOrderName] = useState('')
   const [showNewOrderForm, setShowNewOrderForm] = useState(false)
@@ -267,7 +270,7 @@ export default function SeriesDetail() {
       {/* Header section */}
       <div className="px-8 pt-8 pb-6 border-b border-white/10">
         <div className="max-w-5xl mx-auto">
-          <div className="flex justify-between items-start mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start mb-6">
             <div>
               {/* Breadcrumb */}
               <nav
@@ -307,13 +310,21 @@ export default function SeriesDetail() {
                 </p>
               )}
             </div>
-            <div className="flex gap-3 shrink-0">
+            <div className="flex flex-wrap gap-3 shrink-0">
               <button
                 onClick={() => setShowEdit(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-semibold transition-all normal-case"
               >
                 <Settings size={14} />
                 Series Settings
+              </button>
+              <button
+                onClick={() => setShowMerge(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-semibold transition-all normal-case"
+                data-testid="merge-series-button"
+              >
+                <GitMerge size={14} />
+                Merge into…
               </button>
               <button
                 onClick={handleDelete}
@@ -759,6 +770,19 @@ export default function SeriesDetail() {
             Save Order
           </button>
         </footer>
+      )}
+
+      {showMerge && (
+        <MergeSeriesModal
+          source={series}
+          sourceBookCount={books?.length ?? 0}
+          allSeries={allSeries ?? []}
+          onClose={() => setShowMerge(false)}
+          onMerged={(targetId) => {
+            setShowMerge(false)
+            navigate(`/series/${targetId}`)
+          }}
+        />
       )}
 
       {/* Edit modal */}
