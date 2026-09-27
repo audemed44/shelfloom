@@ -409,7 +409,8 @@ describe('BookDetail', () => {
   it('opens delete modal when delete button is clicked', async () => {
     const user = userEvent.setup()
     renderDetail()
-    await waitFor(() => screen.getByTestId('delete-btn'))
+    await waitFor(() => screen.getByTestId('more-actions-btn'))
+    await user.click(screen.getByTestId('more-actions-btn'))
     await user.click(screen.getByTestId('delete-btn'))
     expect(
       screen.getByRole('heading', { name: /delete book/i })
@@ -472,7 +473,8 @@ describe('BookDetail', () => {
     })
 
     renderDetail()
-    await waitFor(() => screen.getByTestId('delete-btn'))
+    await waitFor(() => screen.getByTestId('more-actions-btn'))
+    await user.click(screen.getByTestId('more-actions-btn'))
     await user.click(screen.getByTestId('delete-btn'))
     await user.click(screen.getByTestId('confirm-delete-btn'))
     await waitFor(() =>
@@ -483,7 +485,8 @@ describe('BookDetail', () => {
   it('shows move shelf dropdown with other shelves', async () => {
     const user = userEvent.setup()
     renderDetail()
-    await waitFor(() => screen.getByTestId('move-shelf-btn'))
+    await waitFor(() => screen.getByTestId('more-actions-btn'))
+    await user.click(screen.getByTestId('more-actions-btn'))
     await user.click(screen.getByTestId('move-shelf-btn'))
     await waitFor(() =>
       expect(screen.getByTestId('move-shelf-dropdown')).toBeInTheDocument()
@@ -547,7 +550,8 @@ describe('BookDetail', () => {
     })
 
     renderDetail()
-    await waitFor(() => screen.getByTestId('move-shelf-btn'))
+    await waitFor(() => screen.getByTestId('more-actions-btn'))
+    await user.click(screen.getByTestId('more-actions-btn'))
     await user.click(screen.getByTestId('move-shelf-btn'))
     await waitFor(() => screen.getByTestId('move-shelf-dropdown'))
     await user.click(screen.getByText('Kobo'))

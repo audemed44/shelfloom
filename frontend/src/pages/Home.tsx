@@ -515,39 +515,34 @@ function NewChaptersCard({
                 </span>
               </div>
             )}
-            <div className="absolute inset-x-0 bottom-0 bg-black/85 px-2.5 pb-2.5 pt-2">
-              <div className="flex flex-wrap gap-1 pr-10 text-[10px] leading-tight text-white/80">
-                <span>{serial.total_chapters} ch</span>
-                <span className="text-white/30">·</span>
-                <span>
-                  {serial.fetched_count}/{serial.total_chapters} fetched
-                </span>
-                {serial.stubbed_chapter_count > 0 && (
-                  <span className="text-accent">
-                    {serial.stubbed_chapter_count} stubbed
-                  </span>
-                )}
-              </div>
-              <div className="mt-1.5 h-1 bg-white/15 mr-10">
-                <div
-                  className="h-full bg-primary"
-                  style={{ width: `${fetchedPct}%` }}
-                />
-              </div>
+            {/* Thin fetched-progress bar along the bottom edge */}
+            <div className="absolute inset-x-0 bottom-0 h-1 bg-black/60">
+              <div
+                className="h-full bg-primary"
+                style={{ width: `${fetchedPct}%` }}
+              />
             </div>
           </div>
         </Link>
+      </div>
+      <div className="mt-2.5 flex items-start justify-between gap-2">
+        <Link to={`/serials/${serial.id}`} className="min-w-0">
+          <p className="text-sm font-semibold leading-snug text-white line-clamp-2 group-hover:text-primary-300">
+            {serial.title}
+          </p>
+          {serial.author && (
+            <p className="mt-0.5 truncate text-xs text-white/45">
+              {serial.author}
+            </p>
+          )}
+        </Link>
         <button
           type="button"
-          onClick={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onFetchPending(serial.id)
-          }}
+          onClick={() => onFetchPending(serial.id)}
           aria-label={`Fetch pending chapters for ${serial.title ?? 'serial'}`}
           title="Fetch pending chapters"
           disabled={fetchPendingDisabled}
-          className="absolute bottom-1.5 right-1.5 z-10 grid size-8 place-items-center bg-white text-black transition-colors hover:bg-primary hover:text-white disabled:opacity-40"
+          className="grid size-8 shrink-0 place-items-center border border-white/25 text-white/80 transition-colors hover:border-primary hover:bg-primary hover:text-white disabled:opacity-40"
         >
           {isFetchingPending ? (
             <Loader2 size={13} className="animate-spin" />
@@ -556,16 +551,16 @@ function NewChaptersCard({
           )}
         </button>
       </div>
-      <div className="mt-2.5">
-        <p className="text-sm font-semibold leading-snug text-white line-clamp-2">
-          {serial.title}
-        </p>
-        {serial.author && (
-          <p className="mt-0.5 truncate text-xs text-white/45">
-            {serial.author}
-          </p>
+      <p className="mt-1.5 flex flex-wrap gap-x-1.5 text-[11px] leading-tight text-white/50 tabular-nums">
+        <span>
+          {serial.fetched_count}/{serial.total_chapters} fetched
+        </span>
+        {serial.stubbed_chapter_count > 0 && (
+          <span className="text-accent">
+            · {serial.stubbed_chapter_count} stubbed
+          </span>
         )}
-      </div>
+      </p>
     </div>
   )
 }
