@@ -16,6 +16,90 @@ from .base import (
     strip_html_entities,
 )
 
+# ---------------------------------------------------------------------------
+# Anti-piracy notices
+#
+# RoyalRoad injects one hidden sentence into every chapter ("Stolen from its
+# original source, this story is not meant to be on Amazon; report any
+# sightings.", with rotating wording). It is a <span> with a random class
+# directly inside div.chapter-inner, hidden by a per-page CSS rule such as
+#   .cjAxM2Jm...{ display: none; speak: never; }
+# Browsers never show it, but scraping drops the <style> tags and so exposes
+# it. We remove it the same way a browser hides it: by honouring those rules.
+# ---------------------------------------------------------------------------
+
+_HIDING_DECLARATION = re.compile(
+    r"display\s*:\s*none|visibility\s*:\s*hidden|speak\s*:\s*never", re.IGNORECASE
+)
+_CLASS_RULE = re.compile(r"([^{}]+)\{([^}]*)\}")
+_CLASS_NAME = re.compile(r"\.([A-Za-z_][\w-]*)")
+# RoyalRoad's random class names: "c" + base64 text. Paragraph classes start with
+# "cn" and are never used for the notice.
+_RANDOM_NOTICE_CLASS = re.compile(r"^c(?!n)[A-Za-z0-9]{40,}$")
+_NOTICE_TEXT = re.compile(
+    r"\bamazon\b|royal\s*road|stolen|unauthori[sz]ed|without (?:the author'?s? )?"
+    r"(?:consent|permission|approval)|original (?:site|source|website)"
+    r"|(?:different|another) website|genuine (?:story|version)",
+    re.IGNORECASE,
+)
+_NOTICE_MAX_CHARS = 250
+
+
+def hidden_classes_from_css(soup: BeautifulSoup) -> set[str]:
+    """Class names that the page's own <style> rules hide from readers."""
+    hidden: set[str] = set()
+    for style in soup.find_all("style"):
+        css = style.get_text() or ""
+        for selector, body in _CLASS_RULE.findall(css):
+            if _HIDING_DECLARATION.search(body):
+                hidden.update(_CLASS_NAME.findall(selector))
+    return hidden
+
+
+def remove_hidden_elements(soup: BeautifulSoup) -> int:
+    """Drop elements hidden by the page's CSS or inline display:none."""
+    removed = 0
+    hidden = hidden_classes_from_css(soup)
+    for el in soup.find_all(True):
+        if el.decomposed:
+            continue
+        classes = el.get("class") or []
+        inline = el.get("style") or ""
+        if any(c in hidden for c in classes) or re.search(
+            r"display\s*:\s*none", inline, re.IGNORECASE
+        ):
+            el.decompose()
+            removed += 1
+    return removed
+
+
+def strip_antipiracy_notices(html: str) -> tuple[str, int]:
+    """Remove RoyalRoad anti-piracy notices from already-extracted chapter HTML.
+
+    The page CSS is gone at this point, so the notice is recognised by its
+    shape: a short element placed directly inside the chapter body that either
+    carries one of RoyalRoad's random notice classes or reads like a notice.
+    Returns the cleaned HTML and the number of notices removed.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    bodies = soup.select("div.chapter-inner") or [soup]
+    removed = 0
+    for body in bodies:
+        for child in list(body.children):
+            # The notice has only ever been a bare <span>; paragraphs are never touched.
+            if not isinstance(child, Tag) or child.name != "span":
+                continue
+            text = child.get_text(" ", strip=True)
+            if not text or len(text) > _NOTICE_MAX_CHARS:
+                continue
+            classes = child.get("class") or []
+            if any(_RANDOM_NOTICE_CLASS.match(c) for c in classes) or _NOTICE_TEXT.search(text):
+                child.decompose()
+                removed += 1
+    if not removed:
+        return html, 0
+    return str(soup), removed
+
 
 class RoyalRoadAdapter:
     name = "royalroad"
@@ -104,6 +188,8 @@ class RoyalRoadAdapter:
         title_el = soup.find("h1") or soup.find("h2")
         title = strip_html_entities(title_el.get_text() if title_el else "") or "Chapter"
 
+        # Must run before <style> tags are stripped: the hiding rules live there.
+        remove_hidden_elements(soup)
         self._preprocess_raw_dom(soup)
 
         container = None
@@ -130,7 +216,7 @@ class RoyalRoadAdapter:
         self._keep_only_wanted_top_level(container)
         self._remove_problematic_inline_styles(container)
 
-        html_content = f"<div>{container.decode_contents()}</div>"
+        html_content, _ = strip_antipiracy_notices(f"<div>{container.decode_contents()}</div>")
         return ChapterContent(
             chapter_number=0,  # filled in by caller
             title=title,
