@@ -6,8 +6,7 @@ import {
   LayoutGrid,
   LayoutList,
   X,
-  ChevronLeft,
-  ChevronRight,
+  Loader2,
   BookOpen,
   Layers,
   Plus,
@@ -15,6 +14,7 @@ import {
   Star,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
+import { api } from '../api/client'
 import { useDebounce } from '../hooks/useDebounce'
 import { SkeletonCard, SkeletonRow } from '../components/library/SkeletonCard'
 import BulkUploadZone from '../components/library/BulkUploadZone'
@@ -284,40 +284,62 @@ function EmptyState({ search }: EmptyStateProps) {
   )
 }
 
-interface PaginationProps {
-  page: number
-  totalPages: number
+interface LoadMoreProps {
+  shown: number
   total: number
-  onPage: React.Dispatch<React.SetStateAction<number>>
+  hasMore: boolean
+  loading: boolean
+  onLoadMore: () => void
 }
 
-function Pagination({ page, totalPages, total, onPage }: PaginationProps) {
+/** Footer below the grid: auto-loads the next page when scrolled into view. */
+function LoadMore({
+  shown,
+  total,
+  hasMore,
+  loading,
+  onLoadMore,
+}: LoadMoreProps) {
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const node = sentinelRef.current
+    if (!node || !hasMore || loading) return
+    if (typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onLoadMore()
+      },
+      { rootMargin: '800px 0px' }
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasMore, loading, onLoadMore])
+
   return (
-    <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/10">
-      <p className="text-xs text-white/30 font-bold tracking-widest">
-        {total} Books
+    <div
+      ref={sentinelRef}
+      className="mt-10 flex flex-col items-center gap-3 border-t border-white/[0.14] pt-6"
+      data-testid="library-load-more"
+    >
+      {hasMore &&
+        (loading ? (
+          <span className="flex items-center gap-2 text-[10px] tracking-widest uppercase text-white/50">
+            <Loader2 size={12} className="animate-spin" />
+            Loading more books
+          </span>
+        ) : (
+          <button
+            onClick={onLoadMore}
+            aria-label="Load more books"
+            className="border border-white/25 px-4 py-2 text-xs font-semibold text-white/80 hover:bg-white hover:text-black transition-colors"
+          >
+            Load more
+          </button>
+        ))}
+      <p className="text-[10px] font-semibold tracking-widest text-white/40">
+        Showing {shown} of {total} books
       </p>
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => onPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-          className="p-2 text-white/40 hover:text-white hover:bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-          aria-label="Previous page"
-        >
-          <ChevronLeft size={16} />
-        </button>
-        <span className="text-xs font-black tracking-widest text-white/60">
-          {page} / {totalPages}
-        </span>
-        <button
-          onClick={() => onPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page === totalPages}
-          className="p-2 text-white/40 hover:text-white hover:bg-white/5 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
-          aria-label="Next page"
-        >
-          <ChevronRight size={16} />
-        </button>
-      </div>
     </div>
   )
 }
@@ -435,10 +457,9 @@ export default function Library() {
   // Shelves for tab bar
   const { data: shelves } = useApi<Shelf[]>('/api/shelves')
 
-  // Books — re-fetches whenever any filter/sort/page/rev changes
-  const booksPath = useMemo(() => {
+  // Books query (everything except the page) — changing it restarts the list
+  const booksQuery = useMemo(() => {
     const params = new URLSearchParams({
-      page: String(page),
       per_page: String(PER_PAGE),
       sort,
     })
@@ -469,9 +490,8 @@ export default function Library() {
       params.set('has_review', String(filters.hasReview))
     if (filters.mode !== 'and') params.set('filter_mode', filters.mode)
     if (rev > 0) params.set('_rev', String(rev))
-    return `/api/books?${params}`
+    return params.toString()
   }, [
-    page,
     debouncedSearch,
     selectedShelfId,
     sort,
@@ -481,12 +501,67 @@ export default function Library() {
     groupBySeries,
   ])
 
-  const { data: booksData, loading } =
-    useApi<PaginatedResponse<Book>>(booksPath)
-  const books = useMemo(() => booksData?.items ?? [], [booksData])
-  const total = booksData?.total ?? 0
-  const totalPages =
-    booksData?.pages ?? Math.max(1, Math.ceil(total / PER_PAGE))
+  // Pages loaded so far for the current query. Previous results stay on screen
+  // while a new query loads, so typing in search does not flicker.
+  const [loaded, setLoaded] = useState<{
+    query: string | null
+    pages: Book[][]
+    total: number
+    totalPages: number
+  }>({ query: null, pages: [], total: 0, totalPages: 1 })
+  const [fetchingPage, setFetchingPage] = useState(false)
+  const lastQueryRef = useRef(booksQuery)
+
+  useEffect(() => {
+    // A new query always starts again from the first page.
+    if (lastQueryRef.current !== booksQuery) {
+      lastQueryRef.current = booksQuery
+      if (page !== 1) {
+        setPage(1)
+        return
+      }
+    }
+    let cancelled = false
+    setFetchingPage(true)
+    api
+      .get<PaginatedResponse<Book>>(`/api/books?${booksQuery}&page=${page}`)
+      .then((data) => {
+        if (cancelled || !data) return
+        setLoaded((prev) => {
+          const pages = prev.query === booksQuery ? prev.pages.slice() : []
+          pages[page - 1] = data.items ?? []
+          return {
+            query: booksQuery,
+            pages,
+            total: data.total ?? 0,
+            totalPages:
+              data.pages ??
+              Math.max(1, Math.ceil((data.total ?? 0) / PER_PAGE)),
+          }
+        })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoaded((prev) =>
+            prev.query === null ? { ...prev, query: booksQuery } : prev
+          )
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setFetchingPage(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [booksQuery, page])
+
+  const loading = loaded.query === null
+  const books = useMemo(() => loaded.pages.flat(), [loaded.pages])
+  const total = loaded.total
+  const hasMore = loaded.query === booksQuery && page < loaded.totalPages
+  const loadNextPage = useCallback(() => {
+    if (!fetchingPage) setPage((p) => p + 1)
+  }, [fetchingPage])
 
   const toggleSeriesExpanded = useCallback((seriesId: number) => {
     setExpandedSeriesIds((prev) => {
@@ -763,13 +838,14 @@ export default function Library() {
         </div>
       )}
 
-      {/* Pagination */}
-      {!loading && totalPages > 1 && (
-        <Pagination
-          page={page}
-          totalPages={totalPages}
+      {/* Infinite scroll */}
+      {!loading && books.length > 0 && (hasMore || page > 1) && (
+        <LoadMore
+          shown={books.length}
           total={total}
-          onPage={setPage}
+          hasMore={hasMore}
+          loading={fetchingPage}
+          onLoadMore={loadNextPage}
         />
       )}
 

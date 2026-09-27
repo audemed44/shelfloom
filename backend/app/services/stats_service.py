@@ -96,23 +96,9 @@ async def get_overview(
     """
     books_owned: int = (await session.execute(select(func.count()).select_from(Book))).scalar_one()
 
-    # books_read: completed books (progress >= 99%) that have at least one
-    # session in the requested time window (or all time when no window given).
-    books_read_q = (
-        select(func.count(func.distinct(ReadingProgress.book_id)))
-        .join(Book, Book.id == ReadingProgress.book_id)
-        .join(ReadingSession, ReadingSession.book_id == ReadingProgress.book_id)
-        .where(
-            ReadingProgress.progress >= 99.0,
-            ReadingSession.dismissed == False,  # noqa: E712
-            Book.reading_state.is_(None) | (Book.reading_state != "dnf"),
-        )
-    )
-    if from_dt:
-        books_read_q = books_read_q.where(ReadingSession.start_time >= from_dt)
-    if to_dt:
-        books_read_q = books_read_q.where(ReadingSession.start_time <= to_dt)
-    books_read: int = (await session.execute(books_read_q)).scalar_one()
+    # books_read uses exactly the same rule as the completed-books list so the
+    # dashboard never shows two different "completed" numbers.
+    books_read = len(await get_books_completed(session, from_dt, to_dt))
 
     agg_q = select(
         func.coalesce(func.sum(ReadingSession.duration), 0),
@@ -171,10 +157,11 @@ async def get_books_completed(
     from_dt: datetime | None = None,
     to_dt: datetime | None = None,
 ) -> list[dict]:
-    """Books with progress >= 99.0, ordered by most-recent reading session.
+    """Books with progress >= 99.0 (excluding DNF), most recently completed first.
 
-    When ``from_dt``/``to_dt`` are given, only books whose last session falls
-    within the window are returned (HAVING on max start_time).
+    When ``from_dt``/``to_dt`` are given, only books completed within the window
+    are returned. The completion time is the last reading session, falling back
+    to the progress update time for books marked read without sessions.
     """
     q = (
         select(
@@ -194,11 +181,16 @@ async def get_books_completed(
         .where(Book.reading_state.is_(None) | (Book.reading_state != "dnf"))
         .group_by(Book.id, ReadingProgress.book_id)
     )
+    # A book counts as completed at its last reading session, or — for books
+    # marked read without any sessions — when its progress was last updated.
+    completed_at = func.coalesce(
+        func.max(ReadingSession.start_time), func.max(ReadingProgress.updated_at)
+    )
     if from_dt:
-        q = q.having(func.max(ReadingSession.start_time) >= from_dt)
+        q = q.having(completed_at >= from_dt)
     if to_dt:
-        q = q.having(func.max(ReadingSession.start_time) <= to_dt)
-    q = q.order_by(func.max(ReadingSession.start_time).desc())
+        q = q.having(completed_at <= to_dt)
+    q = q.order_by(completed_at.desc())
 
     rows = (await session.execute(q)).all()
     seen: set[str] = set()
