@@ -16,6 +16,8 @@ import {
   Upload,
   PlusCircle,
   MessageSquareText,
+  MoreHorizontal,
+  FolderInput,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
@@ -243,7 +245,7 @@ function SeriesShelf({
               </p>
               {isCurrent && (
                 <p className="mt-0.5 text-[9px] font-semibold tracking-widest text-primary-400">
-                  Reading now
+                  This book
                 </p>
               )}
             </Link>
@@ -297,6 +299,7 @@ export default function BookDetailPage() {
   const [showVerdict, setShowVerdict] = useState(false)
   const [seriesRefreshKey, setSeriesRefreshKey] = useState(0)
   const [moveOpen, setMoveOpen] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
   const [movingTo, setMovingTo] = useState<number | null>(null)
   const [coverRefreshing, setCoverRefreshing] = useState(false)
   const [coverUploading, setCoverUploading] = useState(false)
@@ -536,6 +539,8 @@ export default function BookDetailPage() {
   const ringC = 2 * Math.PI * ringR
   const pct = percent ?? 0
 
+  const menuItem =
+    'flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-medium text-white/80 hover:bg-white hover:text-black transition-colors'
   const secondaryBtn =
     'flex items-center gap-2 border border-white/25 px-4 py-2.5 text-xs font-semibold text-white/80 hover:text-black hover:bg-white hover:border-white transition-colors'
 
@@ -572,9 +577,9 @@ export default function BookDetailPage() {
           ))}
         </nav>
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:grid-rows-[auto_1fr] lg:gap-x-14 lg:gap-y-6">
+        <div className="flex flex-col gap-8 lg:grid lg:grid-cols-12 lg:grid-rows-[auto_auto_1fr] lg:gap-x-14 lg:gap-y-10">
           {/* ── Cover ── */}
-          <div className="lg:col-span-4 lg:row-start-1 animate-fade-up">
+          <div className="order-1 lg:col-span-4 lg:row-start-1 lg:row-span-2 animate-fade-up">
             <div className="book-cover relative aspect-[2/3] w-40 overflow-hidden bg-white/5 sm:w-56 lg:w-full">
               <img
                 key={coverKey}
@@ -620,8 +625,8 @@ export default function BookDetailPage() {
             </div>
           </div>
 
-          {/* ── Main info ── */}
-          <div className="lg:col-span-8 lg:col-start-5 lg:row-start-1 lg:row-span-2 flex flex-col min-w-0 animate-fade-up [animation-delay:80ms]">
+          {/* ── Main info: title and actions ── */}
+          <div className="order-2 lg:col-span-8 lg:col-start-5 lg:row-start-1 flex flex-col min-w-0 animate-fade-up [animation-delay:80ms]">
             {/* Series label */}
             {primarySeries && (
               <Link
@@ -697,8 +702,9 @@ export default function BookDetailPage() {
               ))}
             </div>
 
-            {/* Action buttons */}
-            <div className="flex flex-wrap gap-2 mb-12">
+            {/* Action buttons — primary actions stay visible, the rest live
+                in the More menu so the row never wraps on a phone. */}
+            <div className="flex flex-wrap gap-2">
               {!book.file_path?.startsWith('manual://') && (
                 <a
                   href={`/api/books/${book.id}/download`}
@@ -710,44 +716,26 @@ export default function BookDetailPage() {
                 </a>
               )}
 
-              {/* Move shelf dropdown */}
-              {!book.file_path?.startsWith('manual://') && (
-                <div className="relative">
-                  <button
-                    onClick={() => setMoveOpen((v) => !v)}
-                    disabled={movingTo != null || otherShelves.length === 0}
-                    data-testid="move-shelf-btn"
-                    className={`${secondaryBtn} disabled:opacity-40`}
-                  >
-                    Move Shelf
-                    <ChevronRight
-                      size={12}
-                      className={`transition-transform ${moveOpen ? 'rotate-90' : ''}`}
-                    />
-                  </button>
-                  {moveOpen && (
-                    <div
-                      className="absolute left-0 top-full mt-1 z-30 min-w-[180px] bg-black border border-white animate-scale-in"
-                      data-testid="move-shelf-dropdown"
-                    >
-                      {otherShelves.map((s) => (
-                        <button
-                          key={s.id}
-                          onClick={() => handleMove(s.id)}
-                          className="w-full text-left px-4 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
-                        >
-                          {s.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+              <button
+                onClick={() => handleMarkRead(percent == null || percent < 100)}
+                disabled={markingRead}
+                data-testid="mark-read-btn"
+                className={`${secondaryBtn} disabled:opacity-40 ${
+                  percent != null && percent >= 100
+                    ? '!border-primary !text-primary-300'
+                    : ''
+                }`}
+              >
+                <CheckCircle2 size={14} />
+                {percent != null && percent >= 100 && !isDnf
+                  ? 'Unmark'
+                  : 'Mark Read'}
+              </button>
 
               <button
                 onClick={() => setShowLogSession(true)}
                 data-testid="log-session-btn"
-                className={secondaryBtn}
+                className={`${secondaryBtn} hidden sm:flex`}
               >
                 <PlusCircle size={14} />
                 Log Session
@@ -756,26 +744,10 @@ export default function BookDetailPage() {
               <button
                 onClick={() => setShowVerdict(true)}
                 data-testid="review-btn"
-                className={secondaryBtn}
+                className={`${secondaryBtn} hidden sm:flex`}
               >
                 <MessageSquareText size={14} />
                 Your Verdict
-              </button>
-
-              <button
-                onClick={() => handleMarkRead(percent == null || percent < 100)}
-                disabled={markingRead}
-                data-testid="mark-read-btn"
-                className={`${secondaryBtn} disabled:opacity-40 ${
-                  percent != null && percent >= 100
-                    ? '!border-primary/40 !text-primary-300'
-                    : ''
-                }`}
-              >
-                <CheckCircle2 size={14} />
-                {percent != null && percent >= 100 && !isDnf
-                  ? 'Unmark'
-                  : 'Mark Read'}
               </button>
 
               <button
@@ -787,16 +759,112 @@ export default function BookDetailPage() {
                 Edit
               </button>
 
-              <button
-                onClick={() => setShowDelete(true)}
-                data-testid="delete-btn"
-                aria-label="Delete book"
-                className="grid size-10 place-items-center border border-red-500/40 text-red-400/70 hover:text-red-300 hover:border-red-400/60 hover:bg-red-500/10 transition-all"
-              >
-                <Trash2 size={14} />
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setActionsOpen((v) => !v)
+                    setMoveOpen(false)
+                  }}
+                  aria-label="More actions"
+                  aria-expanded={actionsOpen}
+                  data-testid="more-actions-btn"
+                  className={`${secondaryBtn} px-3 ${actionsOpen ? '!bg-white !text-black !border-white' : ''}`}
+                >
+                  <MoreHorizontal size={16} />
+                </button>
+                {actionsOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => {
+                        setActionsOpen(false)
+                        setMoveOpen(false)
+                      }}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="absolute right-0 top-full z-30 mt-1 w-56 border border-white bg-black animate-scale-in sm:left-0 sm:right-auto"
+                      data-testid="more-actions-menu"
+                    >
+                      <button
+                        onClick={() => {
+                          setActionsOpen(false)
+                          setShowLogSession(true)
+                        }}
+                        className={`${menuItem} sm:hidden`}
+                      >
+                        <PlusCircle size={14} />
+                        Log Session
+                      </button>
+                      <button
+                        onClick={() => {
+                          setActionsOpen(false)
+                          setShowVerdict(true)
+                        }}
+                        className={`${menuItem} sm:hidden`}
+                      >
+                        <MessageSquareText size={14} />
+                        Your Verdict
+                      </button>
+                      {!book.file_path?.startsWith('manual://') && (
+                        <>
+                          <button
+                            onClick={() => setMoveOpen((v) => !v)}
+                            disabled={
+                              movingTo != null || otherShelves.length === 0
+                            }
+                            data-testid="move-shelf-btn"
+                            className={`${menuItem} disabled:opacity-40`}
+                          >
+                            <FolderInput size={14} />
+                            Move Shelf
+                            <ChevronRight
+                              size={12}
+                              className={`ml-auto transition-transform ${moveOpen ? 'rotate-90' : ''}`}
+                            />
+                          </button>
+                          {moveOpen && (
+                            <div
+                              className="border-y border-white/[0.14] bg-white/[0.04]"
+                              data-testid="move-shelf-dropdown"
+                            >
+                              {otherShelves.map((s) => (
+                                <button
+                                  key={s.id}
+                                  onClick={() => {
+                                    setActionsOpen(false)
+                                    handleMove(s.id)
+                                  }}
+                                  className="w-full py-2.5 pl-11 pr-4 text-left text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+                                >
+                                  {s.name}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <button
+                        onClick={() => {
+                          setActionsOpen(false)
+                          setShowDelete(true)
+                        }}
+                        data-testid="delete-btn"
+                        aria-label="Delete book"
+                        className={`${menuItem} border-t border-white/[0.14] text-red-400 hover:!bg-red-500 hover:!text-white`}
+                      >
+                        <Trash2 size={14} />
+                        Delete book
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
+          </div>
 
+          {/* ── Main info: series, description, verdict, highlights ── */}
+          <div className="order-4 lg:col-span-8 lg:col-start-5 lg:row-start-2 lg:row-span-2 flex flex-col min-w-0 animate-fade-up [animation-delay:120ms]">
             {/* Every book in the series, visible right on the page */}
             {primarySeries && seriesBookList.length > 1 && (
               <SeriesShelf
@@ -950,7 +1018,7 @@ export default function BookDetailPage() {
           </div>
 
           {/* ── Side cards ── */}
-          <div className="lg:col-span-4 lg:row-start-2 space-y-6 self-start animate-fade-up [animation-delay:160ms]">
+          <div className="order-3 lg:col-span-4 lg:row-start-3 space-y-6 self-start animate-fade-up [animation-delay:160ms]">
             {/* Progress card */}
             <div
               className="border-t-2 border-white pt-4 space-y-6"
