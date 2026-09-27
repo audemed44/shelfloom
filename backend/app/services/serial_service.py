@@ -33,6 +33,9 @@ from app.schemas.serial import (
     VolumeConfigCreate,
     VolumePreviewResponse,
     VolumeRange,
+    VolumeSuggestion,
+    VolumeSuggestRequest,
+    VolumeSuggestResponse,
     VolumeUpdate,
 )
 from app.scrapers.base import ChapterInfo, normalize_url
@@ -1505,6 +1508,144 @@ async def preview_volume_ranges(
         )
 
     return previews
+
+
+# ---------------------------------------------------------------------------
+# Volume suggestions
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _ChapterLength:
+    number: int
+    words: int
+    estimated: bool
+
+
+def suggest_volume_splits(
+    chapters: Sequence[_ChapterLength],
+    min_words: int,
+    max_words: int,
+    ongoing: bool,
+) -> list[VolumeSuggestion]:
+    """Split chapters (in order) into volumes of roughly book length.
+
+    Walks the chapters and cuts at a chapter boundary once a volume is within
+    [min_words, max_words], picking the boundary closest to the middle of that
+    range. A single chapter that would overshoot is kept or pushed to the next
+    volume, whichever lands closer to the middle. For an ongoing serial the
+    leftover chapters become an "in progress" volume; for a finished one a
+    tiny leftover (under half the minimum) is folded into the previous volume.
+    """
+    target = (min_words + max_words) / 2
+    groups: list[list[_ChapterLength]] = []
+    current: list[_ChapterLength] = []
+    words = 0
+
+    for i, chapter in enumerate(chapters):
+        current.append(chapter)
+        words += chapter.words
+        nxt = chapters[i + 1].words if i + 1 < len(chapters) else None
+        if nxt is None:
+            break
+        if words >= max_words:
+            close = True
+        elif words >= min_words:
+            close = words + nxt > max_words or abs(words - target) <= abs(words + nxt - target)
+        else:
+            close = words + nxt > max_words and abs(words - target) < abs(words + nxt - target)
+        if close:
+            groups.append(current)
+            current, words = [], 0
+
+    if current:
+        if not ongoing and groups and words < min_words / 2:
+            groups[-1].extend(current)
+        else:
+            groups.append(current)
+
+    suggestions: list[VolumeSuggestion] = []
+    for idx, group in enumerate(groups):
+        total = sum(c.words for c in group)
+        is_last = idx == len(groups) - 1
+        suggestions.append(
+            VolumeSuggestion(
+                start=group[0].number,
+                end=group[-1].number,
+                chapter_count=len(group),
+                total_words=total,
+                estimated_pages=max(1, round(total / _WORDS_PER_PAGE)) if total else 0,
+                estimated_chapter_count=sum(1 for c in group if c.estimated),
+                in_progress=ongoing and is_last and total < min_words,
+            )
+        )
+    return suggestions
+
+
+async def suggest_volumes(
+    session: AsyncSession, serial_id: int, request: VolumeSuggestRequest
+) -> VolumeSuggestResponse:
+    """Suggest book-length volumes for the chapters no volume has built yet."""
+    serial = await get_serial(session, serial_id)
+
+    # Chapters already in a built volume or a linked ebook are done; configured
+    # but unbuilt volumes get replaced when suggestions are applied.
+    covered_to = max(
+        (
+            v.chapter_end
+            for v in serial.volumes
+            if v.book_id is not None and v.chapter_end is not None
+        ),
+        default=0,
+    )
+    rows = (
+        await session.execute(
+            select(
+                SerialChapter.chapter_number,
+                SerialChapter.word_count,
+                SerialChapter.content.isnot(None),
+                SerialChapter.is_stubbed,
+            )
+            .where(SerialChapter.serial_id == serial_id)
+            .order_by(SerialChapter.chapter_number)
+        )
+    ).all()
+    known = [int(r[1]) for r in rows if r[1] is not None and r[1] > 0]
+    average = round(sum(known) / len(known)) if known else None
+    remaining = [r for r in rows if r[0] > covered_to]
+    start = remaining[0][0] if remaining else None
+
+    def response(suggestions: list[VolumeSuggestion], reason: str | None = None):
+        return VolumeSuggestResponse(
+            start_chapter=start,
+            words_per_page=_WORDS_PER_PAGE,
+            average_chapter_words=average,
+            suggestions=suggestions,
+            reason=reason,
+        )
+
+    if not remaining:
+        return response([], "Every chapter is already in a volume.")
+    if average is None:
+        return response([], "Fetch some chapters first so their length can be measured.")
+
+    lengths: list[_ChapterLength] = []
+    for number, word_count, has_content, is_stubbed in remaining:
+        if word_count is not None:
+            lengths.append(_ChapterLength(int(number), int(word_count), False))
+        elif is_stubbed and not has_content:
+            # Removed upstream and never cached: it won't be in the EPUB.
+            lengths.append(_ChapterLength(int(number), 0, False))
+        else:
+            lengths.append(_ChapterLength(int(number), average, True))
+
+    suggestions = suggest_volume_splits(
+        lengths,
+        request.min_pages * _WORDS_PER_PAGE,
+        request.max_pages * _WORDS_PER_PAGE,
+        ongoing=serial.status != "completed",
+    )
+    return response(suggestions)
 
 
 # ---------------------------------------------------------------------------

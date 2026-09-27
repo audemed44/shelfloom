@@ -13,6 +13,7 @@ import {
 import { api } from '../../api/client'
 import { getBookCoverUrl } from '../../utils/bookCover'
 import LinkEbookModal from './LinkEbookModal'
+import VolumeSuggestions from './VolumeSuggestions'
 import type { SerialVolume, SerialVolumePreview, Shelf } from '../../types/api'
 
 interface VolumeListProps {
@@ -93,7 +94,9 @@ export default function VolumeList({
   onRefresh,
 }: VolumeListProps) {
   const [showLinkEbook, setShowLinkEbook] = useState(false)
-  const [configMode, setConfigMode] = useState<'auto' | 'custom'>('custom')
+  const [configMode, setConfigMode] = useState<'suggest' | 'auto' | 'custom'>(
+    'custom'
+  )
   const [chaptersPerVolume, setChaptersPerVolume] = useState('100')
   const [customSplits, setCustomSplits] = useState<
     Array<{ start: string; end: string; name: string }>
@@ -121,9 +124,11 @@ export default function VolumeList({
 
   useEffect(() => {
     const splits =
-      configMode === 'auto'
-        ? buildAutoSplits(totalChapters, parseInt(chaptersPerVolume, 10))
-        : getValidCustomSplits(customSplits)
+      configMode === 'suggest'
+        ? [] // the suggestion list shows its own sizes
+        : configMode === 'auto'
+          ? buildAutoSplits(totalChapters, parseInt(chaptersPerVolume, 10))
+          : getValidCustomSplits(customSplits)
 
     if (splits.length === 0) {
       setPreview([])
@@ -181,6 +186,35 @@ export default function VolumeList({
       setConfiguring(false)
     }
   }
+
+  const applySuggestions = async (splits: { start: number; end: number }[]) => {
+    setError(null)
+    try {
+      await api.post(`/api/serials/${serialId}/volumes`, { splits })
+      onRefresh()
+    } catch (err) {
+      const e = err as { data?: { detail?: string } }
+      setError(e.data?.detail ?? 'Failed to configure volumes')
+    }
+  }
+
+  const editSuggestions = (splits: { start: number; end: number }[]) => {
+    setCustomSplits(
+      splits.map((s) => ({
+        start: String(s.start),
+        end: String(s.end),
+        name: '',
+      }))
+    )
+    setConfigMode('custom')
+  }
+
+  // Suggested volumes are numbered after the ones already built or linked.
+  const builtNumbers = volumes
+    .filter((v) => v.book_id != null)
+    .map((v) => v.volume_number)
+  const firstSuggestedNumber =
+    builtNumbers.length > 0 ? Math.max(...builtNumbers) + 1 : 1
 
   const handleCustomSplit = async () => {
     const splits = getValidCustomSplits(customSplits)
@@ -344,7 +378,7 @@ export default function VolumeList({
             Configure Splits
           </p>
           <div className="flex gap-1">
-            {(['auto', 'custom'] as const).map((mode) => (
+            {(['suggest', 'auto', 'custom'] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setConfigMode(mode)}
@@ -354,13 +388,24 @@ export default function VolumeList({
                     : 'border border-white/10 text-white/40 hover:text-white hover:border-white/30'
                 }`}
               >
-                {mode === 'auto' ? 'Auto' : 'Custom'}
+                {mode === 'suggest'
+                  ? 'Suggest'
+                  : mode === 'auto'
+                    ? 'Auto'
+                    : 'Custom'}
               </button>
             ))}
           </div>
         </div>
 
-        {configMode === 'auto' ? (
+        {configMode === 'suggest' ? (
+          <VolumeSuggestions
+            serialId={serialId}
+            firstVolumeNumber={firstSuggestedNumber}
+            onApply={applySuggestions}
+            onEdit={editSuggestions}
+          />
+        ) : configMode === 'auto' ? (
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1.5">
               <label className="block text-[10px] font-black tracking-widest uppercase text-white/40">
