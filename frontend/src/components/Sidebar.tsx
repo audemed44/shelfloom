@@ -8,36 +8,37 @@ interface NavItemProps {
   icon: LucideIcon
   label: string
   end?: boolean
+  index: number
 }
 
-function NavItem({ to, icon: Icon, label, end }: NavItemProps) {
+function NavItem({ to, icon: Icon, label, end, index }: NavItemProps) {
   return (
     <NavLink
       to={to}
       end={end}
       title={label}
       className={({ isActive }) =>
-        `group relative flex items-center justify-center lg:justify-start gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-300 ${
+        `group flex items-center justify-center lg:justify-start gap-3 px-3 py-2.5 text-sm font-semibold transition-colors duration-150 ${
           isActive
-            ? 'bg-gradient-to-r from-primary/25 via-primary/10 to-transparent text-white shadow-[inset_0_0_0_1px_rgba(139,124,255,0.25)]'
-            : 'text-white/55 hover:text-white hover:bg-white/[0.05]'
+            ? 'bg-primary text-white'
+            : 'text-white/60 hover:text-white hover:bg-white/[0.06]'
         }`
       }
     >
       {({ isActive }) => (
         <>
-          <span
-            className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary transition-all duration-300 ${
-              isActive ? 'opacity-100' : 'opacity-0 scale-y-50'
-            }`}
-          />
           <Icon
-            size={19}
+            size={18}
             strokeWidth={isActive ? 2.25 : 1.75}
-            className={`shrink-0 transition-transform duration-300 group-hover:scale-110 ${
-              isActive ? 'text-primary-300' : ''
-            }`}
+            className="shrink-0 lg:hidden"
           />
+          <span
+            className={`hidden lg:block w-6 text-[11px] font-medium tabular-nums ${
+              isActive ? 'text-white/70' : 'text-white/30'
+            }`}
+          >
+            {String(index).padStart(2, '0')}
+          </span>
           <span className="hidden lg:block">{label}</span>
         </>
       )}
@@ -48,42 +49,44 @@ function NavItem({ to, icon: Icon, label, end }: NavItemProps) {
 export default function Sidebar() {
   return (
     <aside
-      className="hidden sm:flex w-20 lg:w-64 fixed top-0 left-0 h-full flex-col border-r border-white/[0.06] bg-ink-900/80 backdrop-blur-xl z-40"
+      className="hidden sm:flex w-20 lg:w-64 fixed top-0 left-0 h-full flex-col border-r border-white/[0.14] bg-black z-40"
       data-testid="sidebar"
     >
       {/* Branding — icon-only on sm/md, full logo on lg+ */}
       <div className="flex items-center justify-center lg:justify-start gap-3 px-4 py-6 lg:px-6">
         <Logo />
-        <span className="hidden lg:block font-display text-2xl font-semibold tracking-tight text-white">
+        <span className="hidden lg:block text-xl font-extrabold tracking-tighter text-white">
           Shelfloom
         </span>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 lg:px-4">
-        <p className="hidden lg:block px-3 pb-2 pt-1 text-[10px] font-semibold tracking-widest text-white/30">
+      <nav className="flex-1 px-3 lg:px-4">
+        <p className="hidden lg:block border-t border-white/[0.14] px-3 pb-2 pt-4 text-[10px] font-semibold tracking-widest text-white/40">
           Browse
         </p>
-        {NAV_ITEMS.map((item) => (
-          <NavItem key={item.to} {...item} />
-        ))}
-        <div className="my-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-        <p className="hidden lg:block px-3 pb-2 text-[10px] font-semibold tracking-widest text-white/30">
+        <div className="space-y-px">
+          {NAV_ITEMS.map((item, i) => (
+            <NavItem key={item.to} {...item} index={i + 1} />
+          ))}
+        </div>
+        <div className="my-4 h-px bg-white/[0.14] lg:hidden" />
+        <p className="hidden lg:block mt-6 border-t border-white/[0.14] px-3 pb-2 pt-4 text-[10px] font-semibold tracking-widest text-white/40">
           Organize
         </p>
-        {MORE_ITEMS.map((item) => (
-          <NavItem key={item.to} {...item} />
-        ))}
+        <div className="space-y-px">
+          {MORE_ITEMS.map((item, i) => (
+            <NavItem key={item.to} {...item} index={NAV_ITEMS.length + i + 1} />
+          ))}
+        </div>
       </nav>
 
-      <div className="hidden lg:block p-4">
-        <div className="rounded-2xl border border-white/[0.06] bg-gradient-to-br from-primary/15 via-transparent to-accent-rose/10 p-4">
-          <p className="font-display text-sm italic text-white/80">
-            &ldquo;A reader lives a thousand lives.&rdquo;
-          </p>
-          <p className="mt-1 text-[10px] tracking-widest text-white/35">
-            George R.R. Martin
-          </p>
-        </div>
+      <div className="hidden lg:block px-7 py-6">
+        <p className="text-[10px] font-semibold tracking-widest text-white/30">
+          Personal library
+        </p>
+        <p className="mt-1 text-[10px] text-white/25">
+          Self-hosted · KOReader sync
+        </p>
       </div>
     </aside>
   )

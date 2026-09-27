@@ -633,7 +633,7 @@ export default function Library() {
     >
       {/* Header */}
       <header className="mb-6 sm:mb-8 animate-fade-up">
-        <h2 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
+        <h2 className="text-5xl sm:text-7xl font-extrabold tracking-tighter leading-[0.9] text-white">
           Library
         </h2>
         {!loading && (
@@ -681,10 +681,10 @@ export default function Library() {
               setStatus(opt.value)
               resetPage()
             }}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
+            className={`shrink-0 px-3 py-1.5 text-xs font-semibold transition-colors ${
               status === opt.value
-                ? 'bg-primary text-white shadow-glow'
-                : 'bg-white/[0.04] border border-white/10 text-white/55 hover:text-white hover:border-white/25'
+                ? 'bg-primary text-white'
+                : 'border border-white/20 text-white/60 hover:text-white hover:border-white'
             }`}
           >
             {opt.label}

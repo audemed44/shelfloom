@@ -30,8 +30,8 @@ export default function LensCard({ lens, onEdit, onDelete }: LensCardProps) {
               className="w-full h-full object-cover"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-              <span className="text-3xl font-black text-primary/40 tracking-tighter select-none">
+            <div className="w-full h-full flex items-center justify-center bg-primary">
+              <span className="text-5xl font-black text-white tracking-tighter select-none">
                 {lens.name.charAt(0).toUpperCase()}
               </span>
             </div>

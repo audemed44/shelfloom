@@ -272,7 +272,7 @@ export default function SerialDetail() {
             </span>
           </div>
 
-          <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight text-white leading-[1.02] mb-2">
+          <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tighter text-white leading-[1.02] mb-2">
             {displaySerial.title ?? 'Untitled'}
           </h1>
           {displaySerial.author && (

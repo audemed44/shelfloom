@@ -108,7 +108,7 @@ export default function SeriesCard({
             {/* Selection checkbox */}
             {onToggleAll && (
               <div
-                className={`absolute top-2 left-2 size-6 rounded-full flex items-center justify-center shadow-lg cursor-pointer transition-opacity z-10 ${
+                className={`absolute top-2 left-2 size-6 flex items-center justify-center cursor-pointer transition-opacity z-10 ${
                   isAllSelected
                     ? 'bg-primary opacity-100'
                     : isPartiallySelected

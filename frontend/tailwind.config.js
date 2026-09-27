@@ -5,62 +5,65 @@ export default {
   theme: {
     extend: {
       colors: {
-        // "Midnight library" palette. `black` is remapped to a deep ink so the
-        // many existing `bg-black` surfaces pick up the new tone automatically.
-        black: '#07080c',
-        white: '#f7f6f3',
+        // Swiss palette: pure black & white with a single signal blue.
+        black: '#000000',
+        white: '#ffffff',
         primary: {
-          DEFAULT: '#8b7cff',
-          50: '#f3f1ff',
-          100: '#e7e3ff',
-          200: '#cfc7ff',
-          300: '#b3a8ff',
-          400: '#9d90ff',
-          500: '#8b7cff',
-          600: '#6f5cf5',
-          700: '#5a45dc',
-          800: '#4636b0',
-          900: '#352a85',
+          DEFAULT: '#2563ff',
+          50: '#eef3ff',
+          100: '#dbe5ff',
+          200: '#b8cbff',
+          300: '#8aa9ff',
+          400: '#5783ff',
+          500: '#2563ff',
+          600: '#0a47f0',
+          700: '#0638c4',
+          800: '#062e9c',
+          900: '#08287a',
         },
+        // Legacy accent names collapse onto the Swiss palette; red is kept as
+        // a rare secondary signal (streaks, tags).
         accent: {
-          DEFAULT: '#f5b56b',
-          rose: '#f47fb0',
-          teal: '#5fd3c6',
+          DEFAULT: '#ff3b1f',
+          rose: '#2563ff',
+          teal: '#ffffff',
         },
         ink: {
-          950: '#07080c',
-          900: '#0c0e15',
-          850: '#11131c',
-          800: '#161925',
-          700: '#1f2331',
+          950: '#000000',
+          900: '#050505',
+          850: '#0b0b0b',
+          800: '#141414',
+          700: '#222222',
         },
       },
-      // Softer weights/tracking than the original brutalist type scale.
       fontWeight: {
-        black: '750',
+        black: '800',
       },
       letterSpacing: {
-        tighter: '-0.025em',
+        tighter: '-0.045em',
+        tight: '-0.025em',
         widest: '0.14em',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['"Fraunces Variable"', 'Fraunces', 'Georgia', 'serif'],
+        sans: ['Inter', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
+        display: ['Inter', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
       },
+      // Swiss: hard edges everywhere; `full` stays for genuine dots/rings.
       borderRadius: {
-        DEFAULT: '0.375rem',
-        sm: '0.25rem',
-        md: '0.5rem',
-        lg: '0.75rem',
-        xl: '1rem',
-        '2xl': '1.25rem',
-        '3xl': '1.75rem',
+        none: '0',
+        DEFAULT: '0',
+        sm: '0',
+        md: '0',
+        lg: '0',
+        xl: '0',
+        '2xl': '0',
+        '3xl': '0',
         full: '9999px',
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(139,124,255,0.35), 0 8px 30px -8px rgba(139,124,255,0.55)',
-        card: '0 10px 30px -12px rgba(0,0,0,0.8)',
-        lift: '0 24px 48px -16px rgba(0,0,0,0.9), 0 0 0 1px rgba(255,255,255,0.06)',
+        glow: 'none',
+        card: 'none',
+        lift: '0 0 0 1px #ffffff',
       },
       keyframes: {
         'fade-up': {

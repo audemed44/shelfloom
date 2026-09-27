@@ -128,7 +128,7 @@ export default function LensDetail() {
       {/* Header */}
       <header className="mb-6 sm:mb-8 flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
+          <h2 className="text-5xl sm:text-7xl font-extrabold tracking-tighter leading-[0.9] text-white">
             {lens?.name ?? '…'}
           </h2>
           {lens && (

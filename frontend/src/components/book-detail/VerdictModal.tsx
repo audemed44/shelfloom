@@ -50,7 +50,7 @@ export default function VerdictModal({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
+        className="absolute inset-0 bg-black/70 animate-fade-in"
         onClick={onClose}
       />
       <div className="rounded-2xl shadow-lift ring-1 ring-white/[0.04] animate-scale-in relative w-full max-w-2xl bg-ink-900 border border-white/10 flex max-h-[85vh] flex-col">

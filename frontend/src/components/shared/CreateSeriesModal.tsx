@@ -51,7 +51,7 @@ export default function CreateSeriesModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -106,7 +106,7 @@ export default function CreateSeriesModal({
           <div className="space-y-1.5">
             <label className="block text-[10px] font-black tracking-widest uppercase text-white/40 flex items-center gap-2">
               Parent Series
-              <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full normal-case font-bold">
+              <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 normal-case font-bold">
                 Hierarchical
               </span>
             </label>

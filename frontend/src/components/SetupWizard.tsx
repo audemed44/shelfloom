@@ -641,7 +641,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
           <p className="text-[10px] font-black tracking-[0.3em] uppercase text-white/20 mb-1">
             Welcome to
           </p>
-          <h1 className="font-display text-3xl font-semibold tracking-tight text-white">
+          <h1 className="text-3xl font-extrabold tracking-tighter text-white">
             Shelfloom
           </h1>
         </div>
