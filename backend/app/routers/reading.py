@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
@@ -11,11 +12,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_session
 from app.models.reading import Highlight, ReadingProgress, ReadingSession
 from app.schemas.reading import (
+    BookPositionIn,
+    BookPositionOut,
     BookReadingSummary,
     HighlightOut,
     ManualSessionCreate,
     ReadingProgressOut,
     ReadingSessionOut,
+    WebSessionIn,
 )
 from app.services.book_service import BookNotFound, get_book
 
@@ -269,3 +273,90 @@ async def get_reading_summary(
         total_time_seconds=total_time,
         percent_finished=percent_finished,
     )
+
+
+# ── web reader ────────────────────────────────────────────────────────────────
+
+
+@router.get("/{book_id}/position", response_model=BookPositionOut | None)
+async def get_position(book_id: str, session: AsyncSession = Depends(get_session)):
+    """Where to resume: the newest position from KOReader or the web reader."""
+    from app.models.kosync import WEB_READER_USERNAME
+    from app.services.kosync_service import latest_progress_for_book
+
+    try:
+        await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    record = await latest_progress_for_book(session, book_id)
+    if record is None:
+        return None
+    from_web = record.username == WEB_READER_USERNAME
+    return BookPositionOut(
+        progress=record.progress,
+        percentage=record.percentage,
+        device=record.device,
+        device_id=record.device_id,
+        timestamp=record.timestamp,
+        locator=record.locator if from_web else None,
+        from_web_reader=from_web,
+    )
+
+
+@router.put("/{book_id}/position", response_model=BookPositionOut)
+async def put_position(
+    book_id: str, data: BookPositionIn, session: AsyncSession = Depends(get_session)
+):
+    """Save the web reader's position; KOReader picks it up on its next sync."""
+    from app.services.kosync_service import save_web_progress
+
+    try:
+        book = await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    record = await save_web_progress(
+        session, book, progress=data.progress, percentage=data.percentage, locator=data.locator
+    )
+    return BookPositionOut(
+        progress=record.progress,
+        percentage=record.percentage,
+        device=record.device,
+        device_id=record.device_id,
+        timestamp=record.timestamp,
+        locator=record.locator,
+        from_web_reader=True,
+    )
+
+
+@router.put("/{book_id}/web-session", response_model=ReadingSessionOut)
+async def put_web_session(
+    book_id: str, data: WebSessionIn, session: AsyncSession = Depends(get_session)
+):
+    """Record (or extend) a reading session in the web reader.
+
+    The reader re-sends the same start time as the session goes on, so one
+    sitting stays one session.
+    """
+    from app.models.kosync import WEB_READER_DEVICE
+
+    try:
+        await get_book(session, book_id)
+    except BookNotFound as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    start = data.start_time.replace(tzinfo=None) if data.start_time.tzinfo else data.start_time
+    key = f"web:{book_id}:{int(start.replace(tzinfo=UTC).timestamp())}"
+    record = await session.scalar(select(ReadingSession).where(ReadingSession.source_key == key))
+    if record is None:
+        record = ReadingSession(
+            book_id=book_id,
+            start_time=start,
+            device=WEB_READER_DEVICE,
+            source="web",
+            source_key=key,
+        )
+        session.add(record)
+    record.duration = data.duration
+    record.pages_read = data.pages_read
+    await session.commit()
+    await session.refresh(record)
+    return ReadingSessionOut.model_validate(record)
