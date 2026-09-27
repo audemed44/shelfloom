@@ -19,10 +19,10 @@ import type { WebSerial, SerialVolume, Shelf } from '../types/api'
 import { getSerialCoverSources } from '../utils/serialCover'
 
 const STATUS_STYLES: Record<string, string> = {
-  ongoing: 'bg-green-500/20 text-green-400',
-  completed: 'bg-primary/20 text-primary',
-  paused: 'bg-amber-500/20 text-amber-400',
-  error: 'bg-red-500/20 text-red-400',
+  ongoing: 'bg-primary text-white',
+  completed: 'bg-white text-black',
+  paused: 'bg-black border border-white/30 text-white/70',
+  error: 'bg-accent text-white',
 }
 
 function fmtDate(iso: string | null | undefined): string {
