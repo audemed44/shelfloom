@@ -34,7 +34,7 @@ export default function Serials() {
       <header className="mb-6 sm:mb-8">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
+            <h1 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
               Serials
             </h1>
             <p className="text-white/40 text-base sm:text-lg font-medium mt-2 normal-case">
@@ -87,7 +87,7 @@ export default function Serials() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="animate-pulse">
-              <div className="aspect-[2/3] bg-white/5 border border-white/5" />
+              <div className="aspect-[2/3] rounded-xl skeleton" />
               <div className="mt-2 h-3 bg-white/5 w-3/4" />
               <div className="mt-1 h-2 bg-white/5 w-1/2" />
             </div>

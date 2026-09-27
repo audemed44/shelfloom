@@ -162,7 +162,7 @@ export default function SerialDetail() {
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 animate-pulse space-y-6">
         <div className="h-3 w-40 bg-white/10" />
         <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-8">
-          <div className="w-40 aspect-[2/3] bg-white/5" />
+          <div className="w-40 aspect-[2/3] rounded-xl skeleton" />
           <div className="space-y-4 pt-2">
             <div className="h-3 w-20 bg-white/10" />
             <div className="h-12 w-80 bg-white/10" />
@@ -214,7 +214,7 @@ export default function SerialDetail() {
       {/* Header */}
       <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-8 mb-12">
         {/* Cover */}
-        <div className="relative group w-40 aspect-[2/3] bg-white/5 border border-white/10 overflow-hidden shrink-0">
+        <div className="relative group book-cover w-40 aspect-[2/3] rounded-xl bg-white/5 overflow-hidden shrink-0">
           {coverSrc && (
             <img
               src={coverSrc}
@@ -272,7 +272,7 @@ export default function SerialDetail() {
             </span>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl font-black tracking-tighter text-white leading-[0.95] uppercase mb-2">
+          <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight text-white leading-[1.02] mb-2">
             {displaySerial.title ?? 'Untitled'}
           </h1>
           {displaySerial.author && (

@@ -1040,7 +1040,7 @@ export default function DataManagement() {
           <ArrowLeft size={11} />
           Settings
         </button>
-        <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
+        <h2 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
           Data Management
         </h2>
         <p className="text-white/40 text-base font-medium mt-2 normal-case">

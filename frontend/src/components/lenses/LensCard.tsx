@@ -22,7 +22,7 @@ export default function LensCard({ lens, onEdit, onDelete }: LensCardProps) {
     <div className="group relative" data-testid="lens-card">
       {/* Cover */}
       <Link to={`/lenses/${lens.id}`} className="block">
-        <div className="aspect-[2/3] bg-slate-900/60 border border-white/10 overflow-hidden mb-3">
+        <div className="book-cover aspect-[2/3] rounded-xl bg-ink-800 overflow-hidden mb-3 transition-all duration-500 group-hover:-translate-y-1.5 group-hover:shadow-lift">
           {coverUrl ? (
             <img
               src={coverUrl}

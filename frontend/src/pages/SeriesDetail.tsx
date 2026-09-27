@@ -296,7 +296,7 @@ export default function SeriesDetail() {
               </nav>
 
               <h1
-                className="text-3xl font-black tracking-tighter text-white uppercase"
+                className="font-display text-3xl font-semibold tracking-tight text-white"
                 data-testid="series-title"
               >
                 {series.name}

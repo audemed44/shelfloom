@@ -65,7 +65,7 @@ interface ShelfTabsProps {
 
 function ShelfTabs({ shelves, selectedId, onSelect }: ShelfTabsProps) {
   return (
-    <div className="flex gap-0 border-b border-white/10 mb-6 overflow-x-auto no-scrollbar">
+    <div className="flex gap-1 border-b border-white/[0.08] mb-6 overflow-x-auto no-scrollbar">
       <TabButton
         active={!selectedId}
         onClick={() => onSelect(null)}
@@ -97,9 +97,9 @@ function TabButton({ active, onClick, children, ...rest }: TabButtonProps) {
     <button
       onClick={onClick}
       {...rest}
-      className={`px-5 py-3 text-xs font-black tracking-widest whitespace-nowrap border-b-2 -mb-px transition-colors ${
+      className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
         active
-          ? 'text-primary border-primary'
+          ? 'text-white border-primary'
           : 'text-white/40 border-transparent hover:text-white/60'
       }`}
     >
@@ -150,7 +150,7 @@ function Controls({
           placeholder="Search title, author or series..."
           value={search}
           onChange={(e) => onSearch(e.target.value)}
-          className="w-full bg-white/5 border border-white/10 pl-9 pr-4 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-primary/60 normal-case"
+          className="w-full rounded-xl bg-white/[0.04] border border-white/10 pl-9 pr-4 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-primary/60 normal-case"
           data-testid="search-input"
         />
       </div>
@@ -160,7 +160,7 @@ function Controls({
         <select
           value={sort}
           onChange={(e) => onSort(e.target.value)}
-          className="flex-1 sm:flex-none bg-black border border-white/10 px-3 py-2.5 text-xs font-black tracking-widest text-white/60 focus:outline-none focus:border-primary/60"
+          className="flex-1 sm:flex-none rounded-xl bg-ink-850 border border-white/10 px-3 py-2.5 text-xs font-medium text-white/70 focus:outline-none focus:border-primary/60"
           data-testid="sort-select"
         >
           {SORT_OPTIONS.map((o) => (
@@ -173,7 +173,7 @@ function Controls({
         {/* Group by series toggle */}
         <button
           onClick={() => onGroupBySeries(!groupBySeries)}
-          className={`p-2.5 border transition-colors ${
+          className={`rounded-xl p-2.5 border transition-colors ${
             groupBySeries
               ? 'bg-primary text-white border-primary'
               : 'text-white/40 border-white/10 hover:text-white hover:bg-white/5'
@@ -187,7 +187,7 @@ function Controls({
         {/* Filters button */}
         <button
           onClick={onFiltersClick}
-          className={`relative p-2.5 border transition-colors ${
+          className={`relative rounded-xl p-2.5 border transition-colors ${
             activeFilterCount > 0
               ? 'bg-primary text-white border-primary'
               : 'text-white/40 border-white/10 hover:text-white hover:bg-white/5'
@@ -205,7 +205,7 @@ function Controls({
 
         <button
           onClick={() => onShowRatings(!showRatings)}
-          className={`flex items-center gap-2 px-3 py-2.5 border transition-colors ${
+          className={`flex items-center gap-2 rounded-xl px-3 py-2.5 border transition-colors ${
             showRatings
               ? 'bg-primary text-white border-primary'
               : 'text-white/40 border-white/10 hover:text-white hover:bg-white/5'
@@ -220,7 +220,10 @@ function Controls({
         </button>
 
         {/* View toggle */}
-        <div className="flex border border-white/10" data-testid="view-toggle">
+        <div
+          className="flex overflow-hidden rounded-xl border border-white/10"
+          data-testid="view-toggle"
+        >
           <button
             onClick={() => onView('grid')}
             className={`p-2.5 transition-colors ${
@@ -623,14 +626,14 @@ export default function Library() {
 
   return (
     <div
-      className={`p-4 sm:p-6 lg:p-12 ${
+      className={`mx-auto max-w-[1600px] px-4 py-6 sm:p-6 lg:p-12 ${
         isSelecting ? 'pb-mobile-bottom-toolbar sm:pb-6 lg:pb-12' : ''
       }`}
       data-testid="library-page-shell"
     >
       {/* Header */}
-      <header className="mb-6 sm:mb-8">
-        <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
+      <header className="mb-6 sm:mb-8 animate-fade-up">
+        <h2 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
           Library
         </h2>
         {!loading && (
@@ -649,7 +652,7 @@ export default function Library() {
         </div>
         <button
           onClick={() => setShowManualModal(true)}
-          className="flex items-center justify-center gap-2 px-6 py-4 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 transition-colors sm:self-stretch"
+          className="flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-xs font-medium border border-white/10 bg-white/[0.03] text-white/60 hover:text-white hover:border-white/30 transition-colors sm:self-stretch"
           data-testid="add-manual-book-btn"
         >
           <Plus size={14} />
@@ -670,7 +673,7 @@ export default function Library() {
       )}
 
       {/* Status filter pills */}
-      <div className="flex gap-2 mb-5">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 mb-5 no-scrollbar sm:mx-0 sm:px-0">
         {STATUS_OPTIONS.map((opt) => (
           <button
             key={String(opt.value)}
@@ -678,10 +681,10 @@ export default function Library() {
               setStatus(opt.value)
               resetPage()
             }}
-            className={`px-3 py-1.5 text-[10px] font-black tracking-widest uppercase rounded transition-colors ${
+            className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-medium transition-all ${
               status === opt.value
-                ? 'bg-primary text-white'
-                : 'bg-white/5 border border-white/10 text-white/40 hover:text-white hover:border-white/20'
+                ? 'bg-primary text-white shadow-glow'
+                : 'bg-white/[0.04] border border-white/10 text-white/55 hover:text-white hover:border-white/25'
             }`}
           >
             {opt.label}
@@ -726,7 +729,7 @@ export default function Library() {
       {loading ? (
         view === 'grid' ? (
           <div
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4"
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-6 sm:gap-x-5 sm:gap-y-8"
             data-testid="book-grid"
           >
             {Array.from({ length: 12 }).map((_, i) => (

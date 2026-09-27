@@ -30,7 +30,7 @@ export default function Lenses() {
       {/* Header */}
       <header className="mb-6 sm:mb-8 flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
+          <h2 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
             Lenses
           </h2>
           <p className="text-white/40 text-base font-medium mt-2 normal-case">

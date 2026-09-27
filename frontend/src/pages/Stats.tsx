@@ -417,8 +417,8 @@ function LineChart({
           >
             <defs>
               <linearGradient id="line-fill-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#258cf4" stopOpacity="0.25" />
-                <stop offset="100%" stopColor="#258cf4" stopOpacity="0" />
+                <stop offset="0%" stopColor="#8b7cff" stopOpacity="0.25" />
+                <stop offset="100%" stopColor="#8b7cff" stopOpacity="0" />
               </linearGradient>
             </defs>
             {processed.length > 1 && (
@@ -427,7 +427,7 @@ function LineChart({
                 <polyline
                   points={ptStr}
                   fill="none"
-                  stroke="#258cf4"
+                  stroke="#8b7cff"
                   strokeWidth="2.5"
                   strokeLinejoin="round"
                   strokeLinecap="round"
@@ -435,7 +435,7 @@ function LineChart({
               </>
             )}
             {processed.length === 1 && (
-              <circle cx={W / 2} cy={H / 2} r="4" fill="#258cf4" />
+              <circle cx={W / 2} cy={H / 2} r="4" fill="#8b7cff" />
             )}
             {hovPt && (
               <>
@@ -452,7 +452,7 @@ function LineChart({
                   cx={hovPt.x.toFixed(1)}
                   cy={hovPt.y.toFixed(1)}
                   r="4"
-                  fill="#258cf4"
+                  fill="#8b7cff"
                   stroke="#000"
                   strokeWidth="2"
                 />
@@ -748,7 +748,7 @@ function RadialClock({ data }: { data: { hour: number; seconds: number }[] }) {
           <path
             key={i}
             d={s.path}
-            fill="#258cf4"
+            fill="#8b7cff"
             fillOpacity={s.opacity}
             style={{ cursor: 'default' }}
             onMouseMove={(e) =>
@@ -901,9 +901,9 @@ function RadarChart({
         })}
         <polygon
           points={dataPoly}
-          fill="#258cf4"
+          fill="#8b7cff"
           fillOpacity="0.15"
-          stroke="#258cf4"
+          stroke="#8b7cff"
           strokeWidth="1.5"
           strokeLinejoin="round"
         />
@@ -913,7 +913,7 @@ function RadarChart({
             cx={p.x.toFixed(1)}
             cy={p.y.toFixed(1)}
             r="5"
-            fill="#258cf4"
+            fill="#8b7cff"
             style={{ cursor: 'default' }}
             onMouseMove={(e) =>
               setTip({
@@ -975,7 +975,7 @@ function SunburstChart({ monthlyData }: { monthlyData: TimeSeriesEntry[] }) {
   const innerR = 28,
     midR = 52,
     outerR = 76
-  const QCOLORS = ['#258cf4', '#1e7ae0', '#1668c7', '#0e58b0']
+  const QCOLORS = ['#8b7cff', '#7563f5', '#5f4de0', '#4a3cc0']
 
   const arcPath = (
     r1: number,
@@ -1155,7 +1155,7 @@ function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
           y={srcY.toFixed(1)}
           width={nodeW}
           height={srcH.toFixed(1)}
-          fill="#258cf4"
+          fill="#8b7cff"
           fillOpacity="0.7"
           rx="2"
           style={{ cursor: 'default' }}
@@ -1187,7 +1187,7 @@ function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
             <path
               key={i}
               d={d}
-              fill="#258cf4"
+              fill="#8b7cff"
               fillOpacity={0.06 + (rn.h / srcH) * 0.22}
               style={{ cursor: 'default' }}
               onMouseMove={(e) =>
@@ -1208,7 +1208,7 @@ function AlluvialChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
               y={n.y.toFixed(1)}
               width={nodeW}
               height={n.h.toFixed(1)}
-              fill="#258cf4"
+              fill="#8b7cff"
               fillOpacity={0.4 + (n.total_seconds / total) * 0.5}
               rx="2"
               style={{ cursor: 'default' }}
@@ -1352,9 +1352,9 @@ function ScatterChart({ byAuthor }: { byAuthor: AuthorEntry[] }) {
                 cx={bx.toFixed(1)}
                 cy={by.toFixed(1)}
                 r={br.toFixed(1)}
-                fill="#258cf4"
+                fill="#8b7cff"
                 fillOpacity={0.12 + (p.r / maxR) * 0.45}
-                stroke="#258cf4"
+                stroke="#8b7cff"
                 strokeWidth="1"
                 strokeOpacity="0.35"
                 style={{ cursor: 'default' }}
@@ -1740,7 +1740,7 @@ function OverviewTab({
           <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
             {label}
           </p>
-          <h2 className="text-4xl font-black tracking-tighter">
+          <h2 className="font-display text-4xl font-semibold tracking-tight">
             {value ?? '—'}
           </h2>
           {sub && (
@@ -1791,7 +1791,7 @@ function OverviewTab({
               <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
                 Current Streak
               </p>
-              <p className="text-4xl font-black">
+              <p className="font-display text-4xl font-semibold">
                 {streaks !== null ? `${streaks.current} Days` : '—'}
               </p>
             </div>
@@ -1799,7 +1799,7 @@ function OverviewTab({
               <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
                 Longest Streak
               </p>
-              <p className="text-4xl font-black">
+              <p className="font-display text-4xl font-semibold">
                 {streaks !== null ? `${streaks.longest} Days` : '—'}
               </p>
             </div>
@@ -2253,7 +2253,7 @@ function StreaksTab({
         <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
           Current Streak
         </p>
-        <p className="text-5xl font-black tracking-tighter">
+        <p className="font-display text-5xl font-semibold tracking-tight">
           {streaks?.current ?? 0}
         </p>
         <p className="text-[10px] text-white/30 font-bold mt-1">days</p>
@@ -2269,7 +2269,7 @@ function StreaksTab({
         <p className="text-[10px] font-black tracking-widest text-white/40 mb-1">
           Longest Streak
         </p>
-        <p className="text-5xl font-black tracking-tighter">
+        <p className="font-display text-5xl font-semibold tracking-tight">
           {streaks?.longest ?? 0}
         </p>
         <p className="text-[10px] text-white/30 font-bold mt-1">days</p>
@@ -2441,7 +2441,7 @@ export default function Stats() {
       {/* Page header */}
       <header className="flex flex-wrap items-center justify-between gap-4 px-4 md:px-6 py-4 md:py-5 border-b border-white/10 sticky top-0 bg-black/90 backdrop-blur-md z-40">
         <h1
-          className="text-3xl font-black tracking-tighter"
+          className="font-display text-3xl font-semibold tracking-tight"
           data-testid="stats-heading"
         >
           Reading Stats

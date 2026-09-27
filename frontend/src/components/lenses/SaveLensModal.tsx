@@ -104,9 +104,12 @@ export default function SaveLensModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
       <div
-        className="relative w-full max-w-md bg-black border border-white/10 flex flex-col"
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+      />
+      <div
+        className="rounded-2xl shadow-lift ring-1 ring-white/[0.04] animate-scale-in relative w-full max-w-md bg-ink-900 border border-white/10 flex flex-col"
         data-testid="save-lens-modal"
       >
         {/* Header */}

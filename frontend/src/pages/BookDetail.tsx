@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Link, useLocation, useParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -6,6 +6,7 @@ import {
   Edit2,
   Trash2,
   ChevronRight,
+  ChevronLeft,
   BookOpen,
   Clock,
   CheckCircle2,
@@ -64,7 +65,7 @@ interface SessionDisplay extends ReadingSession {
 
 function SessionRow({ session }: { session: SessionDisplay }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-white/5 last:border-0">
+    <div className="flex items-center justify-between py-3 border-b border-white/[0.06] last:border-0">
       <div className="flex items-center gap-3">
         <Clock size={13} className="text-white/30 shrink-0" />
         <span className="text-xs text-white/60 normal-case">
@@ -82,11 +83,177 @@ function SessionRow({ session }: { session: SessionDisplay }) {
             {session.pages_read} pages
           </span>
         )}
-        <span className="text-white font-black">
+        <span className="text-white font-semibold">
           {fmtDuration(session.duration ?? session.duration_seconds)}
         </span>
       </div>
     </div>
+  )
+}
+
+// ── series shelf ───────────────────────────────────────────────────────────────
+
+function fmtSequence(seq: number | null | undefined): string {
+  if (seq == null) return '—'
+  return Number.isInteger(seq) ? String(seq) : String(seq)
+}
+
+function SeriesShelf({
+  books,
+  currentBookId,
+  seriesId,
+  seriesName,
+  sequence,
+}: {
+  books: SeriesBook[]
+  currentBookId: string | number
+  seriesId: number
+  seriesName: string
+  sequence: number | null
+}) {
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const currentRef = useRef<HTMLAnchorElement>(null)
+  const currentIndex = books.findIndex(
+    (b) => String(b.book_id) === String(currentBookId)
+  )
+
+  // Centre the current book inside the shelf without moving the page.
+  useEffect(() => {
+    const scroller = scrollerRef.current
+    const current = currentRef.current
+    if (!scroller || !current) return
+    scroller.scrollLeft =
+      current.offsetLeft - scroller.clientWidth / 2 + current.clientWidth / 2
+  }, [books, currentBookId])
+
+  const scrollBy = (dir: -1 | 1) => {
+    const el = scrollerRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' })
+  }
+
+  return (
+    <section
+      className="surface overflow-hidden p-4 sm:p-6 mb-10"
+      data-testid="series-shelf"
+    >
+      <div className="flex items-end justify-between gap-4 mb-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold tracking-widest text-primary-300">
+            {sequence != null
+              ? `Book ${fmtSequence(sequence)} of ${books.length}`
+              : `${books.length} books`}
+          </p>
+          <h2 className="font-display text-xl sm:text-2xl font-semibold text-white truncate">
+            In this series
+          </h2>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => scrollBy(-1)}
+            aria-label="Scroll series left"
+            className="hidden sm:grid size-8 place-items-center rounded-full border border-white/10 text-white/60 hover:text-white hover:border-white/30 transition-colors"
+          >
+            <ChevronLeft size={15} />
+          </button>
+          <button
+            onClick={() => scrollBy(1)}
+            aria-label="Scroll series right"
+            className="hidden sm:grid size-8 place-items-center rounded-full border border-white/10 text-white/60 hover:text-white hover:border-white/30 transition-colors"
+          >
+            <ChevronRight size={15} />
+          </button>
+          <Link
+            to={`/series/${seriesId}`}
+            className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-white/75 hover:bg-primary hover:text-white transition-colors"
+          >
+            <span className="hidden sm:inline">{seriesName}</span>
+            <span className="sm:hidden">View series</span>
+            <ArrowRight size={13} />
+          </Link>
+        </div>
+      </div>
+
+      {/* Reading-order track */}
+      <div className="flex gap-1 h-1 mb-4" aria-hidden="true">
+        {books.map((sb, i) => (
+          <div
+            key={sb.book_id}
+            className={`flex-1 rounded-full transition-colors ${
+              i === currentIndex
+                ? 'bg-primary shadow-[0_0_10px_rgba(139,124,255,0.8)]'
+                : i < currentIndex
+                  ? 'bg-primary/35'
+                  : 'bg-white/10'
+            }`}
+          />
+        ))}
+      </div>
+
+      <div
+        ref={scrollerRef}
+        className="relative -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 pt-2 sm:-mx-6 sm:gap-4 sm:px-6 no-scrollbar"
+        data-testid="series-shelf-list"
+      >
+        {books.map((sb) => {
+          const isCurrent = String(sb.book_id) === String(currentBookId)
+          return (
+            <Link
+              key={sb.book_id}
+              ref={isCurrent ? currentRef : undefined}
+              to={`/books/${sb.book_id}`}
+              aria-current={isCurrent ? 'page' : undefined}
+              data-testid="series-shelf-book"
+              className="group w-24 shrink-0 snap-start sm:w-28"
+            >
+              <div
+                className={`book-cover relative aspect-[2/3] overflow-hidden rounded-lg bg-ink-700 transition-all duration-300 ${
+                  isCurrent
+                    ? 'ring-2 ring-primary ring-offset-2 ring-offset-ink-850'
+                    : 'opacity-80 group-hover:opacity-100 group-hover:-translate-y-1'
+                }`}
+              >
+                <div className="absolute inset-0 grid place-items-center p-2 text-center text-[10px] leading-tight text-white/40">
+                  {sb.title}
+                </div>
+                <img
+                  src={getBookCoverUrl(sb.book_id, sb.cover_path)}
+                  alt=""
+                  loading="lazy"
+                  className="relative h-full w-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none'
+                  }}
+                />
+                <span
+                  className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-bold backdrop-blur ${
+                    isCurrent
+                      ? 'bg-primary text-white'
+                      : 'bg-black/70 text-white/80'
+                  }`}
+                >
+                  #{fmtSequence(sb.sequence)}
+                </span>
+              </div>
+              <p
+                className={`mt-2 text-xs leading-snug line-clamp-2 ${
+                  isCurrent
+                    ? 'font-semibold text-white'
+                    : 'text-white/60 group-hover:text-white'
+                }`}
+              >
+                {sb.title}
+              </p>
+              {isCurrent && (
+                <p className="mt-0.5 text-[9px] font-semibold tracking-widest text-primary-300">
+                  Reading now
+                </p>
+              )}
+            </Link>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -314,7 +481,7 @@ export default function BookDetailPage() {
         <div className="h-3 w-40 bg-white/10 rounded mb-10" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           <div className="lg:col-span-5">
-            <div className="aspect-[2/3] bg-white/5 rounded-xl" />
+            <div className="aspect-[2/3] skeleton rounded-2xl w-48 mx-auto sm:w-60 lg:w-full" />
           </div>
           <div className="lg:col-span-7 space-y-6 pt-4">
             <div className="h-4 w-32 bg-white/10 rounded" />
@@ -366,752 +533,698 @@ export default function BookDetailPage() {
     { to: null, label: book.title },
   ]
 
-  // Circular progress (conic-gradient)
+  const seriesBookList = Array.isArray(seriesBooks) ? seriesBooks : []
+  const coverUrl = getBookCoverUrl(book.id, book.cover_path, coverKey)
+  const ringR = 26
+  const ringC = 2 * Math.PI * ringR
   const pct = percent ?? 0
-  const circularStyle = {
-    background: `conic-gradient(#258cf4 ${pct}%, #1a1a1a ${pct}%)`,
-  }
+
+  const secondaryBtn =
+    'flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2.5 text-xs font-medium text-white/70 hover:text-white hover:border-white/25 hover:bg-white/[0.07] transition-all'
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      {/* Breadcrumb */}
-      <nav
-        className="flex items-center gap-1.5 text-[10px] tracking-widest uppercase text-white/40 mb-10"
-        aria-label="breadcrumb"
+    <div className="relative">
+      {/* Blurred cover wash behind the hero */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[520px] overflow-hidden"
+        aria-hidden="true"
       >
-        {crumbs.map((c, i) => (
-          <span key={i} className="flex items-center gap-1.5">
-            {i > 0 && <ChevronRight size={10} className="text-white/20" />}
-            {c.to ? (
-              <Link to={c.to} className="hover:text-primary transition-colors">
-                {c.label}
-              </Link>
-            ) : (
-              <span className={i === crumbs.length - 1 ? 'text-white/70' : ''}>
-                {c.label}
-              </span>
-            )}
-          </span>
-        ))}
-      </nav>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
-        {/* ── Left Column ── */}
-        <div className="lg:col-span-5 space-y-6 order-2 lg:order-1">
-          {/* Cover */}
-          <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden bg-white/5 border border-white/10 shadow-2xl shadow-primary/5">
-            <img
-              key={coverKey}
-              src={getBookCoverUrl(book.id, book.cover_path, coverKey)}
-              alt={book.title}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
-            />
-            {/* Genre + tag overlay at bottom of cover */}
-            {(genres.length > 0 || book.tags?.length > 0) && (
-              <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-2 bg-gradient-to-t from-black/90 to-transparent pointer-events-none">
-                {genres.map((genre) => (
-                  <span
-                    key={genre.id}
-                    className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
-                  >
-                    {genre.name}
-                  </span>
-                ))}
-                {book.tags?.map((t) => (
-                  <span
-                    key={t.id}
-                    className="bg-amber-500/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
-                  >
-                    {t.name}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div className="absolute bottom-2 right-2 flex gap-1.5">
-              <label
-                title="Upload cover image"
-                className={`p-2 bg-black/60 border border-white/10 text-white/50 hover:text-white hover:border-white/30 rounded-lg transition-all cursor-pointer ${coverUploading ? 'opacity-40 pointer-events-none' : ''}`}
-              >
-                {coverUploading ? (
-                  <Loader2 size={13} className="animate-spin" />
-                ) : (
-                  <Upload size={13} />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleUploadCover}
-                />
-              </label>
-              <button
-                onClick={handleRefreshCover}
-                disabled={coverRefreshing}
-                data-testid="refresh-cover-btn"
-                title="Refresh cover from file"
-                className="p-2 bg-black/60 border border-white/10 text-white/50 hover:text-white hover:border-white/30 rounded-lg transition-all disabled:opacity-40"
-              >
-                {coverRefreshing ? (
-                  <Loader2 size={13} className="animate-spin" />
-                ) : (
-                  <RefreshCw size={13} />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Progress card */}
-          <div
-            className="bg-slate-900/60 border border-white/10 rounded-xl p-6 space-y-6"
-            data-testid={percent != null ? 'reading-progress' : undefined}
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-1">
-                  Book Progress
-                </p>
-                {percent != null ? (
-                  <p className="text-3xl font-black tracking-tight">
-                    {percent}%{' '}
-                    <span className="text-sm font-normal text-white/40">
-                      Complete
-                    </span>
-                  </p>
-                ) : (
-                  <p className="text-lg font-black tracking-tight text-white/30">
-                    Not started
-                  </p>
-                )}
-                {summary && summary.total_time_seconds > 0 && (
-                  <p className="text-[10px] text-white/30 tracking-widest uppercase mt-1">
-                    {fmtDuration(summary.total_time_seconds)} ·{' '}
-                    {summary.total_sessions} session
-                    {summary.total_sessions !== 1 ? 's' : ''}
-                  </p>
-                )}
-              </div>
-
-              {percent != null && (
-                <div
-                  className="relative size-16 rounded-full p-0.5 shrink-0"
-                  style={circularStyle}
-                >
-                  <div className="size-full bg-black rounded-full" />
-                </div>
-              )}
-            </div>
-
-            {/* Weekly activity bars */}
-            <div>
-              <div className="flex items-end gap-1 h-14">
-                {weeklyBars.map((bar) => (
-                  <div
-                    key={bar.label}
-                    className={`flex-1 rounded-t-sm transition-all ${bar.active ? 'bg-primary/70' : 'bg-white/10'}`}
-                    style={{ height: `${bar.heightPct}%` }}
-                  />
-                ))}
-              </div>
-              <div className="flex justify-between mt-1.5">
-                {weeklyBars.map((bar) => (
-                  <span
-                    key={bar.label}
-                    className="flex-1 text-center text-[9px] font-bold uppercase tracking-tighter text-white/30"
-                  >
-                    {bar.label}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Series navigation tree */}
-          {primarySeries && (
-            <div
-              className="bg-slate-900/60 border border-white/10 rounded-xl p-6 space-y-6"
-              data-testid="series-nav"
-            >
-              {/* Prev / Next navigation */}
-              {(primarySeries.prev_book || primarySeries.next_book) && (
-                <div className="flex gap-2">
-                  {primarySeries.prev_book ? (
-                    <Link
-                      to={`/books/${primarySeries.prev_book.id}`}
-                      data-testid="prev-book-link"
-                      className="flex-1 min-w-0 flex items-center gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
-                    >
-                      <ChevronRight
-                        size={13}
-                        className="text-white/40 shrink-0 rotate-180"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-[9px] tracking-widest uppercase text-white/30">
-                          Previous
-                        </p>
-                        <p className="text-xs text-white/80 normal-case truncate">
-                          {primarySeries.prev_book.title}
-                        </p>
-                      </div>
-                    </Link>
-                  ) : (
-                    <div className="flex-1" />
-                  )}
-                  {primarySeries.next_book ? (
-                    <Link
-                      to={`/books/${primarySeries.next_book.id}`}
-                      data-testid="next-book-link"
-                      className="flex-1 min-w-0 flex items-center justify-end gap-2 px-3 py-2 bg-white/5 border border-white/10 rounded hover:border-white/20 transition-colors"
-                    >
-                      <div className="min-w-0 text-right">
-                        <p className="text-[9px] tracking-widest uppercase text-white/30">
-                          Next
-                        </p>
-                        <p className="text-xs text-white/80 normal-case truncate">
-                          {primarySeries.next_book.title}
-                        </p>
-                      </div>
-                      <ChevronRight
-                        size={13}
-                        className="text-white/40 shrink-0"
-                      />
-                    </Link>
-                  ) : (
-                    <div className="flex-1" />
-                  )}
-                </div>
-              )}
-
-              {/* Hierarchy */}
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/40 mb-4">
-                  Navigation Tree
-                </p>
-                <div className="space-y-2">
-                  {/* All ancestors from root down to direct series */}
-                  {seriesAncestors.map((s, i) => {
-                    const isLast = i === seriesAncestors.length - 1
-                    return (
-                      <div
-                        key={s.id}
-                        className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
-                        style={{ paddingLeft: `${i * 1}rem` }}
-                      >
-                        {i > 0 && (
-                          <span className="text-white/10 border-l border-white/10 self-stretch mr-1" />
-                        )}
-                        <span className="text-white/30">
-                          {i === 0 ? 'Collection' : 'Series'}
-                        </span>
-                        <ChevronRight size={10} className="text-white/20" />
-                        <Link
-                          to={`/series/${s.id}`}
-                          className={
-                            isLast
-                              ? 'text-primary hover:underline'
-                              : 'text-white/60 hover:text-primary hover:underline transition-colors'
-                          }
-                        >
-                          {s.name}
-                        </Link>
-                      </div>
-                    )
-                  })}
-                  {/* Current book position */}
-                  {primarySeries.sequence != null && (
-                    <div
-                      className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
-                      style={{
-                        paddingLeft: `${seriesAncestors.length * 1}rem`,
-                      }}
-                    >
-                      <span className="text-white/30">Current</span>
-                      <ChevronRight size={10} className="text-white/20" />
-                      <span className="text-white/80">
-                        Book {primarySeries.sequence}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Series book list */}
-              {seriesBooks && seriesBooks.length > 0 && (
-                <div className="pt-4 border-t border-white/10">
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white/40">
-                      Series Progress
-                    </p>
-                    <Link
-                      to={`/series/${primarySeries.series_id}`}
-                      className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
-                    >
-                      {seriesBooks.length} Books
-                    </Link>
-                  </div>
-
-                  {/* Progress dots */}
-                  <div className="flex gap-1 h-1 mb-4">
-                    {seriesBooks.map((sb) => (
-                      <div
-                        key={sb.book_id}
-                        className={`flex-1 rounded-full ${String(sb.book_id) === String(book.id) ? 'bg-primary' : 'bg-white/10'}`}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="space-y-2">
-                    {seriesBooks.slice(0, 5).map((sb) => {
-                      const isCurrent = String(sb.book_id) === String(book.id)
-                      return (
-                        <Link
-                          key={sb.book_id}
-                          to={`/books/${sb.book_id}`}
-                          className={`flex items-center gap-3 ${isCurrent ? '' : 'opacity-50 hover:opacity-100 transition-opacity'}`}
-                        >
-                          <div
-                            className={`size-7 rounded text-[9px] font-black flex items-center justify-center shrink-0 ${isCurrent ? 'bg-primary text-white' : 'bg-white/10 text-white/50'}`}
-                          >
-                            {sb.sequence != null
-                              ? String(sb.sequence).padStart(2, '0')
-                              : '—'}
-                          </div>
-                          <div className="flex-1 min-w-0 border-b border-white/5 pb-2 flex items-center justify-between">
-                            <span
-                              className={`text-xs truncate normal-case ${isCurrent ? 'font-bold text-white' : 'font-medium text-white/70'}`}
-                            >
-                              {sb.title}
-                            </span>
-                            {isCurrent ? (
-                              <CheckCircle2
-                                size={13}
-                                className="text-primary shrink-0 ml-2"
-                              />
-                            ) : (
-                              <ArrowRight
-                                size={13}
-                                className="text-white/20 shrink-0 ml-2"
-                              />
-                            )}
-                          </div>
-                        </Link>
-                      )
-                    })}
-                    {seriesBooks.length > 5 && (
-                      <Link
-                        to={`/series/${primarySeries.series_id}`}
-                        className="text-[10px] text-primary hover:underline uppercase tracking-widest font-black pl-10 block pt-1"
-                      >
-                        +{seriesBooks.length - 5} more
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Right Column ── */}
-        <div className="lg:col-span-7 flex flex-col order-1 lg:order-2">
-          {/* Series label */}
-          {primarySeries && (
-            <div className="flex items-center gap-3 mb-4">
-              <span className="bg-primary/20 text-primary px-3 py-1 rounded text-[10px] font-black uppercase tracking-widest">
-                {primarySeries.sequence != null
-                  ? `Book ${primarySeries.sequence}`
-                  : 'Series'}
-              </span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-white/40">
-                of {primarySeries.series_name}
-              </span>
-            </div>
-          )}
-
-          {/* Title + Author */}
-          <div className="mb-6">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter text-white leading-[0.95] mb-3 uppercase">
-              {book.title}
-            </h1>
-            {book.author && (
-              <p className="text-xl font-light text-white/50 tracking-tight normal-case">
-                {book.author}
-              </p>
-            )}
-          </div>
-
-          {/* Format / shelf / genre badges */}
-          <div className="flex flex-wrap gap-2 mb-8" data-testid="book-badges">
-            {book.format && (
-              <span className="px-2.5 py-0.5 text-[10px] font-black tracking-widest uppercase border border-primary/40 text-primary rounded">
-                {fmtFormat(book.format)}
-              </span>
-            )}
-            {currentShelf && (
-              <span className="px-2.5 py-0.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/50 rounded">
-                {currentShelf.name}
-              </span>
-            )}
-            {primarySeries && (
-              <span className="px-2.5 py-0.5 text-[10px] font-black tracking-widest uppercase border border-white/20 text-white/40 rounded normal-case">
-                {primarySeries.series_name}
-                {primarySeries.sequence != null
-                  ? ` #${primarySeries.sequence}`
-                  : ''}
-              </span>
-            )}
-            {genres.map((genre) => (
-              <span
-                key={genre.id}
-                className="px-2.5 py-0.5 text-[10px] font-black tracking-widest bg-primary/15 border border-primary/30 text-primary rounded normal-case"
-              >
-                {genre.name}
-              </span>
-            ))}
-            {book.tags?.map((t) => (
-              <span
-                key={t.id}
-                className="px-2.5 py-0.5 text-[10px] font-black tracking-widest bg-amber-500/15 border border-amber-500/30 text-amber-400 rounded normal-case"
-              >
-                {t.name}
-              </span>
-            ))}
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex flex-wrap gap-3 mb-10">
-            {!book.file_path?.startsWith('manual://') && (
-              <a
-                href={`/api/books/${book.id}/download`}
-                className="flex items-center gap-2 px-6 py-3 text-[10px] font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 rounded-lg transition-all"
-                data-testid="download-btn"
-              >
-                <Download size={14} />
-                Download
-              </a>
-            )}
-
-            {/* Move shelf dropdown */}
-            {!book.file_path?.startsWith('manual://') && (
-              <div className="relative">
-                <button
-                  onClick={() => setMoveOpen((v) => !v)}
-                  disabled={movingTo != null || otherShelves.length === 0}
-                  data-testid="move-shelf-btn"
-                  className="flex items-center gap-2 px-6 py-3 text-[10px] font-black tracking-widest uppercase bg-white/5 border border-white/10 text-white/70 hover:text-white hover:border-white/30 disabled:opacity-40 rounded-lg transition-all"
-                >
-                  Move Shelf
-                  <ChevronRight
-                    size={12}
-                    className={`transition-transform ${moveOpen ? 'rotate-90' : ''}`}
-                  />
-                </button>
-                {moveOpen && (
-                  <div
-                    className="absolute left-0 top-full mt-1 z-30 min-w-[160px] bg-black border border-white/20 rounded-lg shadow-xl"
-                    data-testid="move-shelf-dropdown"
-                  >
-                    {otherShelves.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => handleMove(s.id)}
-                        className="w-full text-left px-4 py-2.5 text-xs text-white/70 normal-case hover:bg-white/5 hover:text-white transition-colors"
-                      >
-                        {s.name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <button
-              onClick={() => setShowLogSession(true)}
-              data-testid="log-session-btn"
-              className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 rounded-lg transition-all"
-            >
-              <PlusCircle size={13} />
-              Log Session
-            </button>
-
-            <button
-              onClick={() => setShowVerdict(true)}
-              data-testid="review-btn"
-              className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 rounded-lg transition-all"
-            >
-              <MessageSquareText size={13} />
-              Your Verdict
-            </button>
-
-            <button
-              onClick={() => handleMarkRead(percent == null || percent < 100)}
-              disabled={markingRead}
-              data-testid="mark-read-btn"
-              className={`flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border rounded-lg transition-all disabled:opacity-40 ${
-                percent != null && percent >= 100
-                  ? 'border-primary/40 text-primary/70 hover:text-primary hover:border-primary'
-                  : 'border-white/10 text-white/40 hover:text-white hover:border-white/30'
-              }`}
-            >
-              <CheckCircle2 size={13} />
-              {percent != null && percent >= 100 && !isDnf
-                ? 'Unmark'
-                : 'Mark Read'}
-            </button>
-
-            <button
-              onClick={() => setShowEdit(true)}
-              data-testid="edit-btn"
-              className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border border-white/10 text-white/40 hover:text-white hover:border-white/30 rounded-lg transition-all"
-            >
-              <Edit2 size={13} />
-              Edit
-            </button>
-
-            <button
-              onClick={() => setShowDelete(true)}
-              data-testid="delete-btn"
-              className="flex items-center gap-2 px-4 py-3 text-[10px] font-black tracking-widest uppercase border border-red-500/20 text-red-400/50 hover:text-red-400 hover:border-red-400/50 rounded-lg transition-all"
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-
-          {/* Metadata grid */}
-          <div className="mb-10 border border-white/10 bg-slate-900/40 p-6">
-            <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-6">
-              <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
-                Your Verdict
-              </p>
-              <button
-                onClick={() => setShowVerdict(true)}
-                className="text-[10px] font-black tracking-widest uppercase text-primary hover:underline"
-              >
-                Edit
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-4">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
-                    Rating
-                  </p>
-                  {book.rating != null ? (
-                    <div className="flex items-center gap-2">
-                      <StarRating value={book.rating} readOnly size={16} />
-                      <span className="text-sm font-black tracking-widest text-white/70">
-                        {book.rating.toFixed(1)} / 5
-                      </span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-white/30 normal-case">Unrated</p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
-                    Outcome
-                  </p>
-                  {isDnf ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black tracking-widest uppercase bg-red-500/10 border border-red-400/30 text-red-400">
-                      <AlertTriangle size={12} />
-                      DNF
-                    </span>
-                  ) : (
-                    <span className="text-sm text-white/50 normal-case">
-                      {percent != null && percent >= 100
-                        ? 'Completed'
-                        : percent != null && percent > 0
-                          ? 'In progress'
-                          : 'No verdict yet'}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">
-                  Review
-                </p>
-                {book.review ? (
-                  <p className="text-sm text-white/70 normal-case leading-relaxed whitespace-pre-wrap">
-                    {book.review}
-                  </p>
-                ) : (
-                  <p className="text-sm text-white/30 normal-case">
-                    No review yet.
-                  </p>
-                )}
-                {book.review_updated_at && (
-                  <p className="mt-3 text-[10px] font-black tracking-widest uppercase text-white/30">
-                    Updated {fmtDate(book.review_updated_at)}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Metadata grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 py-8 border-y border-white/10 mb-10">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
-                Series
-              </p>
-              <p className="text-base font-medium normal-case">
-                {primarySeries?.series_name ?? '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-1">
-                Pages
-              </p>
-              <p className="text-base font-medium">
-                {book.page_count ? book.page_count.toLocaleString() : '—'}
-              </p>
-            </div>
-          </div>
-
-          {/* Description */}
-          {book.description && (
-            <div className="mb-8">
-              <h2 className="text-[10px] font-black tracking-widest uppercase text-white/40 mb-3">
-                Description
-              </h2>
-              <p className="text-sm text-white/70 normal-case leading-relaxed">
-                {book.description}
-              </p>
-            </div>
-          )}
-
-          {/* Highlights */}
-          {highlights.length > 0 && (
-            <section
-              className="space-y-4 mb-8"
-              data-testid="highlights-section"
-            >
-              <h2 className="text-sm font-black uppercase tracking-widest text-white/80">
-                Recent Highlights
-              </h2>
-              <div className="space-y-5">
-                {highlights.map((h, i) => (
-                  <div
-                    key={h.id}
-                    className={`relative pl-5 border-l-2 ${i === 0 ? 'border-primary/50' : 'border-white/10'}`}
-                  >
-                    <p className="text-base leading-relaxed text-white/80 normal-case italic">
-                      &ldquo;{h.text}&rdquo;
-                    </p>
-                    {h.note && (
-                      <p className="text-sm text-primary/70 normal-case mt-1">
-                        {h.note}
-                      </p>
-                    )}
-                    {h.chapter && (
-                      <div className="mt-1.5 flex gap-3 text-[10px] font-bold uppercase tracking-widest text-white/30">
-                        <span>{h.chapter}</span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Reading sessions */}
-          {sessions.length > 0 && (
-            <section className="space-y-3" data-testid="sessions-section">
-              <h2 className="flex items-center gap-2 text-[10px] font-black tracking-widest uppercase text-white/40">
-                <BookOpen size={12} />
-                Reading Sessions
-              </h2>
-              <div className="bg-white/5 border border-white/10 rounded-xl px-4">
-                {sessions.slice(0, 5).map((s) => (
-                  <SessionRow key={s.id} session={s} />
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
+        <div
+          className="absolute inset-0 scale-125 bg-cover bg-center opacity-30 blur-3xl saturate-150"
+          style={{ backgroundImage: `url("${coverUrl}")` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/70 to-black" />
       </div>
 
-      {/* Footer: publication details */}
-      {(book.date_published ||
-        book.publisher ||
-        book.language ||
-        book.isbn ||
-        genres.length > 0 ||
-        book.format) && (
-        <footer className="mt-20 pt-8 border-t border-white/10 opacity-70">
-          <div className="flex flex-wrap gap-x-12 gap-y-4 text-[10px] font-black uppercase tracking-widest">
-            {book.date_published && (
-              <div className="flex flex-col gap-1">
-                <span className="text-white/30">Published</span>
-                <span>{book.date_published}</span>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Breadcrumb */}
+        <nav
+          className="flex items-center gap-1.5 overflow-x-auto no-scrollbar whitespace-nowrap text-xs text-white/45 mb-6 sm:mb-10"
+          aria-label="breadcrumb"
+        >
+          {crumbs.map((c, i) => (
+            <span key={i} className="flex items-center gap-1.5 shrink-0">
+              {i > 0 && <ChevronRight size={12} className="text-white/25" />}
+              {c.to ? (
+                <Link
+                  to={c.to}
+                  className="hover:text-primary-300 transition-colors"
+                >
+                  {c.label}
+                </Link>
+              ) : (
+                <span
+                  className={
+                    i === crumbs.length - 1
+                      ? 'text-white/75 max-w-[16rem] truncate'
+                      : ''
+                  }
+                >
+                  {c.label}
+                </span>
+              )}
+            </span>
+          ))}
+        </nav>
+
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:grid-rows-[auto_1fr] lg:gap-x-14 lg:gap-y-6">
+          {/* ── Cover ── */}
+          <div className="lg:col-span-4 lg:row-start-1 animate-fade-up">
+            <div className="book-cover relative mx-auto aspect-[2/3] w-48 overflow-hidden rounded-2xl bg-white/5 sm:w-60 lg:w-full">
+              <img
+                key={coverKey}
+                src={coverUrl}
+                alt={book.title}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+
+              <div className="absolute bottom-2 right-2 flex gap-1.5">
+                <label
+                  title="Upload cover image"
+                  className={`grid size-8 place-items-center rounded-full bg-black/60 backdrop-blur border border-white/15 text-white/70 hover:text-white hover:border-white/40 transition-all cursor-pointer ${coverUploading ? 'opacity-40 pointer-events-none' : ''}`}
+                >
+                  {coverUploading ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Upload size={13} />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleUploadCover}
+                  />
+                </label>
+                <button
+                  onClick={handleRefreshCover}
+                  disabled={coverRefreshing}
+                  data-testid="refresh-cover-btn"
+                  title="Refresh cover from file"
+                  className="grid size-8 place-items-center rounded-full bg-black/60 backdrop-blur border border-white/15 text-white/70 hover:text-white hover:border-white/40 transition-all disabled:opacity-40"
+                >
+                  {coverRefreshing ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={13} />
+                  )}
+                </button>
               </div>
-            )}
-            {book.publisher && (
-              <div className="flex flex-col gap-1">
-                <span className="text-white/30">Publisher</span>
-                <span className="normal-case">{book.publisher}</span>
-              </div>
-            )}
-            {book.language && (
-              <div className="flex flex-col gap-1">
-                <span className="text-white/30">Language</span>
-                <span>{book.language}</span>
-              </div>
-            )}
-            {book.isbn && (
-              <div className="flex flex-col gap-1">
-                <span className="text-white/30">ISBN</span>
-                <span>{book.isbn}</span>
-              </div>
-            )}
-            {genres.length > 0 && (
-              <div className="flex flex-col gap-1">
-                <span className="text-white/30">Genres</span>
-                <div className="flex flex-wrap gap-1">
-                  {genres.map((genre) => (
-                    <span
-                      key={genre.id}
-                      className="bg-primary/15 border border-primary/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-primary normal-case"
-                    >
-                      {genre.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {book.format && (
-              <div className="flex flex-col gap-1">
-                <span className="text-white/30">Format</span>
-                <span>{fmtFormat(book.format)}</span>
-              </div>
-            )}
-            {book.tags && book.tags.length > 0 && (
-              <div className="flex flex-col gap-1">
-                <span className="text-white/30">Tags</span>
-                <div className="flex flex-wrap gap-1">
-                  {book.tags.map((t) => (
-                    <span
-                      key={t.id}
-                      className="bg-amber-500/15 border border-amber-500/30 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-amber-400 normal-case"
-                    >
-                      {t.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            <div className="flex flex-col gap-1">
-              <span className="text-white/30">Last Read</span>
-              <span className="normal-case">{fmtDate(book.last_read)}</span>
             </div>
           </div>
-        </footer>
-      )}
+
+          {/* ── Main info ── */}
+          <div className="lg:col-span-8 lg:col-start-5 lg:row-start-1 lg:row-span-2 flex flex-col min-w-0 animate-fade-up [animation-delay:80ms]">
+            {/* Series label */}
+            {primarySeries && (
+              <Link
+                to={`/series/${primarySeries.series_id}`}
+                className="group mb-4 inline-flex max-w-full items-center gap-2 self-center lg:self-start"
+              >
+                <span className="shrink-0 rounded-full bg-primary/20 px-3 py-1 text-[10px] font-semibold tracking-widest text-primary-300 ring-1 ring-primary/30">
+                  {primarySeries.sequence != null
+                    ? `Book ${primarySeries.sequence}`
+                    : 'Series'}
+                </span>
+                <span className="truncate text-sm text-white/55 group-hover:text-white transition-colors">
+                  of {primarySeries.series_name}
+                </span>
+              </Link>
+            )}
+
+            {/* Title + Author */}
+            <div className="mb-6 text-center lg:text-left">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-semibold text-white leading-[1.02] mb-3 break-words">
+                {book.title}
+              </h1>
+              {book.author && (
+                <p className="text-lg sm:text-xl text-white/55">
+                  {book.author}
+                </p>
+              )}
+              {book.rating != null && (
+                <div className="mt-3 flex justify-center lg:justify-start">
+                  <StarRating value={book.rating} readOnly size={16} />
+                </div>
+              )}
+            </div>
+
+            {/* Format / shelf / genre badges */}
+            <div
+              className="flex flex-wrap justify-center lg:justify-start gap-2 mb-8"
+              data-testid="book-badges"
+            >
+              {book.format && (
+                <span className="rounded-full px-3 py-1 text-[11px] font-semibold border border-primary/40 text-primary-300">
+                  {fmtFormat(book.format)}
+                </span>
+              )}
+              {currentShelf && (
+                <span className="rounded-full px-3 py-1 text-[11px] font-medium border border-white/15 text-white/60">
+                  {currentShelf.name}
+                </span>
+              )}
+              {primarySeries && (
+                <span className="rounded-full px-3 py-1 text-[11px] font-medium border border-white/15 text-white/50">
+                  {primarySeries.series_name}
+                  {primarySeries.sequence != null
+                    ? ` #${primarySeries.sequence}`
+                    : ''}
+                </span>
+              )}
+              {genres.map((genre) => (
+                <span
+                  key={genre.id}
+                  className="rounded-full px-3 py-1 text-[11px] font-medium bg-primary/15 text-primary-200"
+                >
+                  {genre.name}
+                </span>
+              ))}
+              {book.tags?.map((t) => (
+                <span
+                  key={t.id}
+                  className="rounded-full px-3 py-1 text-[11px] font-medium bg-accent/15 text-accent"
+                >
+                  {t.name}
+                </span>
+              ))}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-wrap justify-center lg:justify-start gap-2.5 mb-10">
+              {!book.file_path?.startsWith('manual://') && (
+                <a
+                  href={`/api/books/${book.id}/download`}
+                  className="flex items-center gap-2 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 px-5 py-2.5 text-xs font-semibold text-white shadow-glow hover:brightness-110 transition-all"
+                  data-testid="download-btn"
+                >
+                  <Download size={14} />
+                  Download
+                </a>
+              )}
+
+              {/* Move shelf dropdown */}
+              {!book.file_path?.startsWith('manual://') && (
+                <div className="relative">
+                  <button
+                    onClick={() => setMoveOpen((v) => !v)}
+                    disabled={movingTo != null || otherShelves.length === 0}
+                    data-testid="move-shelf-btn"
+                    className={`${secondaryBtn} disabled:opacity-40`}
+                  >
+                    Move Shelf
+                    <ChevronRight
+                      size={12}
+                      className={`transition-transform ${moveOpen ? 'rotate-90' : ''}`}
+                    />
+                  </button>
+                  {moveOpen && (
+                    <div
+                      className="absolute left-0 top-full mt-2 z-30 min-w-[180px] overflow-hidden rounded-xl bg-ink-800/95 backdrop-blur border border-white/15 shadow-lift animate-scale-in"
+                      data-testid="move-shelf-dropdown"
+                    >
+                      {otherShelves.map((s) => (
+                        <button
+                          key={s.id}
+                          onClick={() => handleMove(s.id)}
+                          className="w-full text-left px-4 py-2.5 text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+                        >
+                          {s.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                onClick={() => setShowLogSession(true)}
+                data-testid="log-session-btn"
+                className={secondaryBtn}
+              >
+                <PlusCircle size={14} />
+                Log Session
+              </button>
+
+              <button
+                onClick={() => setShowVerdict(true)}
+                data-testid="review-btn"
+                className={secondaryBtn}
+              >
+                <MessageSquareText size={14} />
+                Your Verdict
+              </button>
+
+              <button
+                onClick={() => handleMarkRead(percent == null || percent < 100)}
+                disabled={markingRead}
+                data-testid="mark-read-btn"
+                className={`${secondaryBtn} disabled:opacity-40 ${
+                  percent != null && percent >= 100
+                    ? '!border-primary/40 !text-primary-300'
+                    : ''
+                }`}
+              >
+                <CheckCircle2 size={14} />
+                {percent != null && percent >= 100 && !isDnf
+                  ? 'Unmark'
+                  : 'Mark Read'}
+              </button>
+
+              <button
+                onClick={() => setShowEdit(true)}
+                data-testid="edit-btn"
+                className={secondaryBtn}
+              >
+                <Edit2 size={14} />
+                Edit
+              </button>
+
+              <button
+                onClick={() => setShowDelete(true)}
+                data-testid="delete-btn"
+                aria-label="Delete book"
+                className="grid size-10 place-items-center rounded-full border border-red-500/25 text-red-400/60 hover:text-red-300 hover:border-red-400/60 hover:bg-red-500/10 transition-all"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+
+            {/* Every book in the series, visible right on the page */}
+            {primarySeries && seriesBookList.length > 1 && (
+              <SeriesShelf
+                books={seriesBookList}
+                currentBookId={book.id}
+                seriesId={primarySeries.series_id}
+                seriesName={primarySeries.series_name}
+                sequence={primarySeries.sequence}
+              />
+            )}
+
+            {/* Description */}
+            {book.description && (
+              <div className="mb-10">
+                <h2 className="text-[10px] font-semibold tracking-widest text-white/40 mb-3">
+                  Description
+                </h2>
+                <p className="text-[15px] text-white/75 leading-relaxed">
+                  {book.description}
+                </p>
+              </div>
+            )}
+
+            {/* Verdict */}
+            <div className="surface mb-10 p-5 sm:p-6">
+              <div className="flex items-center justify-between mb-5">
+                <p className="font-display text-lg font-semibold text-white">
+                  Your Verdict
+                </p>
+                <button
+                  onClick={() => setShowVerdict(true)}
+                  className="text-xs font-medium text-primary-300 hover:text-white transition-colors"
+                >
+                  Edit
+                </button>
+              </div>
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-center gap-8">
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-widest text-white/35 mb-1.5">
+                      Rating
+                    </p>
+                    {book.rating != null ? (
+                      <div className="flex items-center gap-2">
+                        <StarRating value={book.rating} readOnly size={16} />
+                        <span className="text-sm font-semibold text-white/70">
+                          {book.rating.toFixed(1)} / 5
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-white/35">Unrated</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-widest text-white/35 mb-1.5">
+                      Outcome
+                    </p>
+                    {isDnf ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-widest bg-red-500/10 border border-red-400/30 text-red-400">
+                        <AlertTriangle size={12} />
+                        DNF
+                      </span>
+                    ) : (
+                      <span className="text-sm text-white/60">
+                        {percent != null && percent >= 100
+                          ? 'Completed'
+                          : percent != null && percent > 0
+                            ? 'In progress'
+                            : 'No verdict yet'}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-widest text-white/35 mb-1.5">
+                      Pages
+                    </p>
+                    <p className="text-sm text-white/70">
+                      {book.page_count ? book.page_count.toLocaleString() : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest text-white/35 mb-2">
+                    Review
+                  </p>
+                  {book.review ? (
+                    <p className="font-display text-base text-white/80 leading-relaxed whitespace-pre-wrap">
+                      {book.review}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-white/35">No review yet.</p>
+                  )}
+                  {book.review_updated_at && (
+                    <p className="mt-3 text-[10px] font-semibold tracking-widest text-white/30">
+                      Updated {fmtDate(book.review_updated_at)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Highlights */}
+            {highlights.length > 0 && (
+              <section
+                className="space-y-4 mb-10"
+                data-testid="highlights-section"
+              >
+                <h2 className="font-display text-xl font-semibold text-white">
+                  Recent Highlights
+                </h2>
+                <div className="space-y-4">
+                  {highlights.map((h) => (
+                    <figure
+                      key={h.id}
+                      className="relative overflow-hidden rounded-2xl border border-white/[0.07] bg-gradient-to-br from-white/[0.05] to-transparent p-5 pl-6"
+                    >
+                      <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary to-accent-rose" />
+                      <p className="font-display text-base sm:text-lg leading-relaxed text-white/85 italic">
+                        &ldquo;{h.text}&rdquo;
+                      </p>
+                      {h.note && (
+                        <p className="text-sm text-primary-300/90 mt-2">
+                          {h.note}
+                        </p>
+                      )}
+                      {h.chapter && (
+                        <div className="mt-2 flex gap-3 text-[10px] font-semibold tracking-widest text-white/35">
+                          <span>{h.chapter}</span>
+                        </div>
+                      )}
+                    </figure>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Reading sessions */}
+            {sessions.length > 0 && (
+              <section className="space-y-3" data-testid="sessions-section">
+                <h2 className="flex items-center gap-2 font-display text-xl font-semibold text-white">
+                  <BookOpen size={16} className="text-primary-300" />
+                  Reading Sessions
+                </h2>
+                <div className="surface px-4">
+                  {sessions.slice(0, 5).map((s) => (
+                    <SessionRow key={s.id} session={s} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+
+          {/* ── Side cards ── */}
+          <div className="lg:col-span-4 lg:row-start-2 space-y-6 self-start animate-fade-up [animation-delay:160ms]">
+            {/* Progress card */}
+            <div
+              className="surface p-6 space-y-6"
+              data-testid={percent != null ? 'reading-progress' : undefined}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest text-white/40 mb-1">
+                    Book Progress
+                  </p>
+                  {percent != null ? (
+                    <p className="font-display text-4xl font-semibold tabular-nums">
+                      {percent}%{' '}
+                      <span className="font-sans text-sm font-normal text-white/40">
+                        Complete
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="font-display text-xl font-semibold text-white/35">
+                      Not started
+                    </p>
+                  )}
+                  {summary && summary.total_time_seconds > 0 && (
+                    <p className="text-xs text-white/40 mt-1">
+                      {fmtDuration(summary.total_time_seconds)} ·{' '}
+                      {summary.total_sessions} session
+                      {summary.total_sessions !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+
+                {percent != null && (
+                  <svg
+                    viewBox="0 0 64 64"
+                    className="size-16 shrink-0 -rotate-90"
+                    aria-hidden="true"
+                  >
+                    <defs>
+                      <linearGradient id="progress-ring" x1="0" x2="1">
+                        <stop offset="0%" stopColor="#b3a8ff" />
+                        <stop offset="100%" stopColor="#f47fb0" />
+                      </linearGradient>
+                    </defs>
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r={ringR}
+                      fill="none"
+                      stroke="rgba(255,255,255,0.08)"
+                      strokeWidth="6"
+                    />
+                    <circle
+                      cx="32"
+                      cy="32"
+                      r={ringR}
+                      fill="none"
+                      stroke="url(#progress-ring)"
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeDasharray={ringC}
+                      strokeDashoffset={ringC * (1 - Math.min(pct, 100) / 100)}
+                      className="transition-[stroke-dashoffset] duration-1000"
+                    />
+                  </svg>
+                )}
+              </div>
+
+              {/* Weekly activity bars */}
+              <div>
+                <div className="flex items-end gap-1.5 h-14">
+                  {weeklyBars.map((bar) => (
+                    <div
+                      key={bar.label}
+                      className={`flex-1 rounded-md transition-all ${bar.active ? 'bg-gradient-to-t from-primary-600 to-primary-300' : 'bg-white/[0.07]'}`}
+                      style={{ height: `${bar.heightPct}%` }}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between mt-1.5">
+                  {weeklyBars.map((bar) => (
+                    <span
+                      key={bar.label}
+                      className="flex-1 text-center text-[10px] text-white/35"
+                    >
+                      {bar.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Series navigation */}
+            {primarySeries && (
+              <div className="surface p-6 space-y-6" data-testid="series-nav">
+                {/* Prev / Next navigation */}
+                {(primarySeries.prev_book || primarySeries.next_book) && (
+                  <div className="flex gap-2">
+                    {primarySeries.prev_book ? (
+                      <Link
+                        to={`/books/${primarySeries.prev_book.id}`}
+                        data-testid="prev-book-link"
+                        className="group flex-1 min-w-0 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:border-primary/40 transition-colors"
+                      >
+                        <ChevronLeft
+                          size={14}
+                          className="text-white/40 shrink-0 group-hover:-translate-x-0.5 transition-transform"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-semibold tracking-widest text-white/35">
+                            Previous
+                          </p>
+                          <p className="text-xs text-white/85 truncate">
+                            {primarySeries.prev_book.title}
+                          </p>
+                        </div>
+                      </Link>
+                    ) : (
+                      <div className="flex-1" />
+                    )}
+                    {primarySeries.next_book ? (
+                      <Link
+                        to={`/books/${primarySeries.next_book.id}`}
+                        data-testid="next-book-link"
+                        className="group flex-1 min-w-0 flex items-center justify-end gap-2 px-3 py-2.5 rounded-xl bg-white/[0.04] border border-white/10 hover:border-primary/40 transition-colors"
+                      >
+                        <div className="min-w-0 text-right">
+                          <p className="text-[9px] font-semibold tracking-widest text-white/35">
+                            Next
+                          </p>
+                          <p className="text-xs text-white/85 truncate">
+                            {primarySeries.next_book.title}
+                          </p>
+                        </div>
+                        <ChevronRight
+                          size={14}
+                          className="text-white/40 shrink-0 group-hover:translate-x-0.5 transition-transform"
+                        />
+                      </Link>
+                    ) : (
+                      <div className="flex-1" />
+                    )}
+                  </div>
+                )}
+
+                {/* Hierarchy */}
+                <div>
+                  <p className="text-[10px] font-semibold tracking-widest text-white/40 mb-4">
+                    Navigation Tree
+                  </p>
+                  <div className="space-y-2">
+                    {seriesAncestors.map((s, i) => {
+                      const isLast = i === seriesAncestors.length - 1
+                      return (
+                        <div
+                          key={s.id}
+                          className="flex items-center gap-2 text-xs"
+                          style={{ paddingLeft: `${i * 1}rem` }}
+                        >
+                          <span className="text-[9px] font-semibold tracking-widest text-white/30">
+                            {i === 0 ? 'Collection' : 'Series'}
+                          </span>
+                          <ChevronRight size={11} className="text-white/20" />
+                          <Link
+                            to={`/series/${s.id}`}
+                            className={
+                              isLast
+                                ? 'text-primary-300 hover:underline'
+                                : 'text-white/65 hover:text-primary-300 hover:underline transition-colors'
+                            }
+                          >
+                            {s.name}
+                          </Link>
+                        </div>
+                      )
+                    })}
+                    {primarySeries.sequence != null && (
+                      <div
+                        className="flex items-center gap-2 text-xs"
+                        style={{
+                          paddingLeft: `${seriesAncestors.length * 1}rem`,
+                        }}
+                      >
+                        <span className="text-[9px] font-semibold tracking-widest text-white/30">
+                          Current
+                        </span>
+                        <ChevronRight size={11} className="text-white/20" />
+                        <span className="text-white/85">
+                          Book {primarySeries.sequence}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer: publication details */}
+        {(book.date_published ||
+          book.publisher ||
+          book.language ||
+          book.isbn ||
+          book.format) && (
+          <footer className="mt-16 pt-8 border-t border-white/[0.07]">
+            <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-8 gap-y-5 text-sm">
+              {book.date_published && (
+                <div className="flex flex-col gap-1">
+                  <dt className="text-[10px] font-semibold tracking-widest text-white/35">
+                    Published
+                  </dt>
+                  <dd className="text-white/75">{book.date_published}</dd>
+                </div>
+              )}
+              {book.publisher && (
+                <div className="flex flex-col gap-1">
+                  <dt className="text-[10px] font-semibold tracking-widest text-white/35">
+                    Publisher
+                  </dt>
+                  <dd className="text-white/75">{book.publisher}</dd>
+                </div>
+              )}
+              {book.language && (
+                <div className="flex flex-col gap-1">
+                  <dt className="text-[10px] font-semibold tracking-widest text-white/35">
+                    Language
+                  </dt>
+                  <dd className="text-white/75 uppercase">{book.language}</dd>
+                </div>
+              )}
+              {book.isbn && (
+                <div className="flex flex-col gap-1">
+                  <dt className="text-[10px] font-semibold tracking-widest text-white/35">
+                    ISBN
+                  </dt>
+                  <dd className="text-white/75 font-mono text-xs">
+                    {book.isbn}
+                  </dd>
+                </div>
+              )}
+              {book.format && (
+                <div className="flex flex-col gap-1">
+                  <dt className="text-[10px] font-semibold tracking-widest text-white/35">
+                    Format
+                  </dt>
+                  <dd className="text-white/75">{fmtFormat(book.format)}</dd>
+                </div>
+              )}
+              <div className="flex flex-col gap-1">
+                <dt className="text-[10px] font-semibold tracking-widest text-white/35">
+                  Last Read
+                </dt>
+                <dd className="text-white/75">{fmtDate(book.last_read)}</dd>
+              </div>
+            </dl>
+          </footer>
+        )}
+      </div>
 
       {/* Modals */}
       {showEdit && (

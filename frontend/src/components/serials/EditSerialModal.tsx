@@ -53,15 +53,15 @@ export default function EditSerialModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
       data-testid="edit-serial-modal"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="relative w-full max-w-2xl bg-black border border-white/10 shadow-2xl my-auto">
+      <div className="rounded-2xl shadow-lift ring-1 ring-white/[0.04] animate-scale-in relative w-full max-w-2xl bg-ink-900 border border-white/10 shadow-2xl my-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-black z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-ink-900 z-10">
           <div>
             <h2 className="text-sm font-black tracking-widest uppercase text-white">
               Edit Serial

@@ -32,7 +32,7 @@ export default function SerialCard({ serial }: SerialCardProps) {
       data-testid={`serial-card-${serial.id}`}
     >
       {/* Cover */}
-      <div className="aspect-[2/3] bg-white/5 border border-white/10 group-hover:border-primary transition-colors overflow-hidden relative">
+      <div className="book-cover aspect-[2/3] rounded-xl bg-white/5 overflow-hidden transition-all duration-500 ease-out group-hover:-translate-y-1.5 group-hover:shadow-lift">
         {coverSrc && (
           <img
             src={coverSrc}
@@ -78,7 +78,7 @@ export default function SerialCard({ serial }: SerialCardProps) {
 
       {/* Meta */}
       <div className="mt-2 px-0.5">
-        <p className="text-sm font-black tracking-tighter leading-tight line-clamp-2">
+        <p className="text-sm font-semibold leading-snug text-white/90 line-clamp-2">
           {serial.title ?? 'Untitled'}
         </p>
         {serial.author && (

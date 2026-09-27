@@ -49,9 +49,12 @@ export default function VerdictModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
-      <div className="relative w-full max-w-2xl bg-black border border-white/10 flex max-h-[85vh] flex-col">
-        <div className="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black">
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+      />
+      <div className="rounded-2xl shadow-lift ring-1 ring-white/[0.04] animate-scale-in relative w-full max-w-2xl bg-ink-900 border border-white/10 flex max-h-[85vh] flex-col">
+        <div className="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-ink-900">
           <div>
             <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
               Your Verdict
@@ -142,7 +145,7 @@ export default function VerdictModal({
           </section>
         </div>
 
-        <div className="sticky bottom-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10 bg-black">
+        <div className="sticky bottom-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10 bg-ink-900">
           <button
             type="button"
             onClick={onClose}

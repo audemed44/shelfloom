@@ -73,34 +73,33 @@ export default function BookCard({
 
   const coverContent = (
     <div
-      className={`aspect-[2/3] bg-white/5 border transition-colors overflow-hidden relative ${
-        isSelected
-          ? 'border-primary'
-          : 'border-white/10 group-hover:border-primary'
+      className={`book-cover aspect-[2/3] rounded-xl bg-white/5 overflow-hidden transition-all duration-500 ease-out group-hover:-translate-y-1.5 group-hover:shadow-lift ${
+        isSelected ? 'ring-2 ring-primary ring-offset-2 ring-offset-black' : ''
       }`}
     >
       <img
         src={coverSrc}
         alt={book.title}
-        className="w-full h-full object-cover"
+        loading="lazy"
+        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
         onError={(e) => {
           e.currentTarget.style.display = 'none'
         }}
       />
       {/* Format badge */}
       <div className="absolute top-2 right-2">
-        <span className="bg-black/70 text-[9px] font-black tracking-widest px-1.5 py-0.5 text-white/50">
+        <span className="rounded-full bg-black/60 backdrop-blur text-[9px] font-semibold tracking-widest px-2 py-0.5 text-white/70">
           {fmtFormat(book.format)}
         </span>
       </div>
 
       {/* Genre + tag badges */}
       {(genres.length > 0 || book.tags?.length > 0) && (
-        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 py-1.5 bg-gradient-to-t from-black/80 to-transparent">
+        <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 px-2 pb-2 pt-6 bg-gradient-to-t from-black/85 to-transparent">
           {genres.slice(0, 2).map((genre) => (
             <span
               key={genre.id}
-              className="bg-primary/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
+              className="rounded-full bg-primary/85 text-[9px] font-medium px-2 py-0.5 text-white leading-tight"
             >
               {genre.name}
             </span>
@@ -108,7 +107,7 @@ export default function BookCard({
           {book.tags?.slice(0, 2).map((t) => (
             <span
               key={t.id}
-              className="bg-amber-500/80 text-[8px] font-black tracking-widest px-1.5 py-0.5 text-white normal-case leading-tight"
+              className="rounded-full bg-accent/85 text-[9px] font-medium px-2 py-0.5 text-ink-900 leading-tight"
             >
               {t.name}
             </span>
@@ -160,7 +159,7 @@ export default function BookCard({
       {isInProgress && (
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/60">
           <div
-            className="h-full bg-primary transition-all"
+            className="h-full bg-gradient-to-r from-primary-400 to-accent-rose transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -169,14 +168,12 @@ export default function BookCard({
   )
 
   const metaContent = (
-    <div className="mt-2 px-0.5">
-      <p className="text-sm font-black tracking-tighter leading-tight line-clamp-2">
+    <div className="mt-3 px-0.5">
+      <p className="text-sm font-semibold leading-snug text-white/90 line-clamp-2 group-hover:text-white">
         {book.title}
       </p>
       {book.author && (
-        <p className="text-xs text-white/40 mt-0.5 normal-case truncate">
-          {book.author}
-        </p>
+        <p className="text-xs text-white/45 mt-0.5 truncate">{book.author}</p>
       )}
       <div className="mt-1.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">

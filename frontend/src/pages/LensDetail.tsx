@@ -128,7 +128,7 @@ export default function LensDetail() {
       {/* Header */}
       <header className="mb-6 sm:mb-8 flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-4xl sm:text-6xl font-black tracking-tighter text-white">
+          <h2 className="font-display text-4xl sm:text-6xl font-semibold tracking-tight text-white">
             {lens?.name ?? '…'}
           </h2>
           {lens && (
@@ -214,14 +214,11 @@ export default function LensDetail() {
       {booksLoading ? (
         view === 'grid' ? (
           <div
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4"
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-x-3 gap-y-6 sm:gap-x-5 sm:gap-y-8"
             data-testid="book-grid"
           >
             {Array.from({ length: 12 }).map((_, i) => (
-              <div
-                key={i}
-                className="aspect-[2/3] bg-white/5 border border-white/10 animate-pulse"
-              />
+              <div key={i} className="aspect-[2/3] rounded-xl skeleton" />
             ))}
           </div>
         ) : (
