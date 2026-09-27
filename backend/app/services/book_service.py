@@ -113,8 +113,11 @@ async def list_books(
     query = select(Book)
 
     if search:
+        from app.models.genre import BookGenre, Genre
         from app.models.series import BookSeries, Series
+        from app.models.tag import BookTag, Tag
 
+        # Match title/author, or the name of any series, genre or tag on the book.
         pattern = f"%{search}%"
         series_match = (
             select(BookSeries.book_id)
@@ -122,7 +125,25 @@ async def list_books(
             .where(BookSeries.book_id == Book.id, Series.name.ilike(pattern))
             .exists()
         )
-        query = query.where(Book.title.ilike(pattern) | Book.author.ilike(pattern) | series_match)
+        genre_match = (
+            select(BookGenre.book_id)
+            .join(Genre, BookGenre.genre_id == Genre.id)
+            .where(BookGenre.book_id == Book.id, Genre.name.ilike(pattern))
+            .exists()
+        )
+        tag_match = (
+            select(BookTag.book_id)
+            .join(Tag, BookTag.tag_id == Tag.id)
+            .where(BookTag.book_id == Book.id, Tag.name.ilike(pattern))
+            .exists()
+        )
+        query = query.where(
+            Book.title.ilike(pattern)
+            | Book.author.ilike(pattern)
+            | series_match
+            | genre_match
+            | tag_match
+        )
     if shelf_id is not None:
         query = query.where(Book.shelf_id == shelf_id)
 
