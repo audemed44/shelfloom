@@ -14,11 +14,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmupdf-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# uv installs the exact versions pinned in backend/uv.lock, so the image runs
+# the same dependencies the tests ran against (a plain `pip install .` would
+# pick up whatever is newest on PyPI at build time).
+COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /bin/uv
+
 WORKDIR /app
 
-# Copy backend and install (includes app/ package that setuptools needs)
+ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+# Dependencies first (cached layer), then the app itself.
+# --locked fails the build if uv.lock is out of date with pyproject.toml.
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --locked --no-dev --no-install-project --no-cache
 COPY backend/ .
-RUN pip install --no-cache-dir .
+RUN uv sync --locked --no-dev --no-editable --no-cache
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy built frontend next to backend at /app/frontend/dist
 COPY --from=frontend-build /build/dist /app/frontend/dist
