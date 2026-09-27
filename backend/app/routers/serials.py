@@ -25,6 +25,8 @@ from app.schemas.serial import (
     VolumeConfigCreate,
     VolumePreviewResponse,
     VolumeResponse,
+    VolumeSuggestRequest,
+    VolumeSuggestResponse,
     VolumeUpdate,
 )
 from app.scrapers.registry import get_adapter, list_adapter_names
@@ -63,6 +65,7 @@ from app.services.serial_service import (
     refresh_serial_cover,
     start_chapter_fetch_job,
     start_pending_chapter_batch,
+    suggest_volumes,
     update_from_source,
     update_serial,
     update_volume,
@@ -378,6 +381,22 @@ async def preview_volumes_endpoint(
 ):
     try:
         return await preview_volume_ranges(session, serial_id, body.splits)
+    except SerialNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.post(
+    "/serials/{serial_id}/volumes/suggest",
+    response_model=VolumeSuggestResponse,
+)
+async def suggest_volumes_endpoint(
+    serial_id: int,
+    body: VolumeSuggestRequest | None = None,
+    session: AsyncSession = Depends(get_session),
+):
+    """Suggest book-length volumes (default 500–600 pages) for unbuilt chapters."""
+    try:
+        return await suggest_volumes(session, serial_id, body or VolumeSuggestRequest())
     except SerialNotFound as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
 

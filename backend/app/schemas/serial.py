@@ -232,6 +232,40 @@ class VolumeResponse(BaseModel):
     total_words: int | None = None
 
 
+class VolumeSuggestRequest(BaseModel):
+    """Target size for suggested volumes, in estimated pages (280 words/page)."""
+
+    min_pages: int = Field(default=500, ge=50, le=5000)
+    max_pages: int = Field(default=600, ge=50, le=5000)
+
+    @model_validator(mode="after")
+    def _check_bounds(self) -> VolumeSuggestRequest:
+        if self.max_pages < self.min_pages:
+            raise ValueError("max_pages must be >= min_pages")
+        return self
+
+
+class VolumeSuggestion(BaseModel):
+    start: int
+    end: int
+    chapter_count: int
+    total_words: int
+    estimated_pages: int
+    # Some chapters aren't fetched yet, so their length is an average guess.
+    estimated_chapter_count: int = 0
+    # The last volume of an ongoing serial: it will keep growing.
+    in_progress: bool = False
+
+
+class VolumeSuggestResponse(BaseModel):
+    start_chapter: int | None
+    words_per_page: int
+    average_chapter_words: int | None
+    suggestions: list[VolumeSuggestion]
+    # Why nothing could be suggested, when the list is empty.
+    reason: str | None = None
+
+
 class VolumePreviewResponse(BaseModel):
     start: int
     end: int
