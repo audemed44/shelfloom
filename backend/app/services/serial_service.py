@@ -23,6 +23,7 @@ from app.schemas.serial import (
     ChapterFetchLogEntry,
     ChapterFetchStatusResponse,
     ChapterResponse,
+    EbookVolumeLink,
     PendingChapterBatchStatusResponse,
     PendingChapterFetchResponse,
     SerialCreate,
@@ -57,6 +58,14 @@ class ScrapingError(Exception):
 
 
 class VolumeGenerationError(Exception):
+    pass
+
+
+class EbookLinkError(Exception):
+    pass
+
+
+class EbookNotFound(EbookLinkError):
     pass
 
 
@@ -320,6 +329,8 @@ async def _mark_generated_volumes_stale(
         )
     )
     for vol in vol_result.scalars().all():
+        if vol.kind != "generated" or vol.chapter_start is None or vol.chapter_end is None:
+            continue
         if any(vol.chapter_start <= n <= vol.chapter_end for n in changed_numbers):
             vol.is_stale = True
 
@@ -868,7 +879,11 @@ async def auto_split_volumes(
 
     n = config.chapters_per_volume
     splits: list[VolumeRange] = []
-    start = 1
+    # Chapters already covered by linked ebooks don't need generated volumes.
+    ebook_ends = [
+        v.chapter_end for v in serial.volumes if v.kind == "ebook" and v.chapter_end is not None
+    ]
+    start = max(ebook_ends, default=0) + 1
     while start <= serial.total_chapters:
         end = min(start + n - 1, serial.total_chapters)
         splits.append(VolumeRange(start=start, end=end))
@@ -953,6 +968,12 @@ async def generate_volume(
 
     serial = await get_serial(session, serial_id)
     vol = await _get_volume(session, serial_id, volume_id)
+    if vol.kind == "ebook":
+        raise VolumeGenerationError(
+            "This volume is a linked ebook; it is never generated or rebuilt"
+        )
+    if vol.chapter_start is None or vol.chapter_end is None:
+        raise VolumeGenerationError("Volume has no chapter range to generate")
 
     # Snapshot scalar values before any commits expire these ORM objects.
     chapter_start = vol.chapter_start
@@ -1081,7 +1102,7 @@ async def generate_all_volumes(
 ) -> list[SerialVolume]:
     volumes = await list_volumes(session, serial_id)
     # Snapshot ids before generate_volume commits expire these objects.
-    volume_ids = [(vol.id, vol.volume_number) for vol in volumes]
+    volume_ids = [(vol.id, vol.volume_number) for vol in volumes if vol.kind == "generated"]
     results: list[SerialVolume] = []
     for vol_id, vol_num in volume_ids:
         try:
@@ -1122,7 +1143,9 @@ async def delete_volume(
     delete_book: bool = False,
 ) -> None:
     vol = await _get_volume(session, serial_id, volume_id)
-    if delete_book and vol.book_id is not None:
+    # A linked ebook is the user's own file: removing it from the serial only
+    # unlinks it, even if delete_book was requested.
+    if delete_book and vol.book_id is not None and vol.kind == "generated":
         from app.models.book import Book
 
         book = await session.scalar(select(Book).where(Book.id == vol.book_id))
@@ -1169,6 +1192,110 @@ async def add_single_volume(
     return vol
 
 
+async def link_ebook_volume(
+    session: AsyncSession, serial_id: int, data: EbookVolumeLink
+) -> SerialVolume:
+    """Attach an existing library book (e.g. the author's published ebook) as a volume.
+
+    The book keeps its own file; Shelfloom never generates or rebuilds it. It is
+    placed at ``volume_number`` in the serial's reading order (later volumes
+    shift down one) and added to the serial's series at that position.
+    """
+    from sqlalchemy import update
+
+    from app.models.book import Book
+
+    serial = await get_serial(session, serial_id)
+    series_id = serial.series_id
+    book = await session.scalar(select(Book).where(Book.id == data.book_id))
+    if book is None:
+        raise EbookNotFound(f"Book {data.book_id} not found")
+    book_id, book_title = book.id, book.title
+
+    volumes = sorted(serial.volumes, key=lambda v: v.volume_number)
+    if any(v.book_id == book_id for v in volumes):
+        raise EbookLinkError("This book is already a volume of this serial")
+
+    max_number = max((v.volume_number for v in volumes), default=0)
+    position = data.volume_number or max_number + 1
+    position = min(position, max_number + 1)
+
+    # Snapshot what we need from the volumes that move before touching the DB.
+    shifted = [
+        (
+            v.id,
+            v.volume_number,
+            v.book_id,
+            v.kind == "generated" and v.generated_at is not None and v.name is None,
+        )
+        for v in volumes
+        if v.volume_number >= position
+    ]
+    if shifted:
+        # Shift in two steps (to negative, then back) so the unique
+        # (serial_id, volume_number) index is never violated mid-update.
+        await session.execute(
+            update(SerialVolume)
+            .where(SerialVolume.serial_id == serial_id, SerialVolume.volume_number >= position)
+            .values(volume_number=-(SerialVolume.volume_number + 1))
+            .execution_options(synchronize_session=False)
+        )
+        await session.execute(
+            update(SerialVolume)
+            .where(SerialVolume.serial_id == serial_id, SerialVolume.volume_number < 0)
+            .values(volume_number=-SerialVolume.volume_number)
+            .execution_options(synchronize_session=False)
+        )
+        stale_ids = [vol_id for vol_id, _, _, retitle in shifted if retitle]
+        if stale_ids:
+            # A generated EPUB without a custom name has "Volume N" in its title.
+            await session.execute(
+                update(SerialVolume)
+                .where(SerialVolume.id.in_(stale_ids))
+                .values(is_stale=True)
+                .execution_options(synchronize_session=False)
+            )
+        if series_id is not None:
+            for _, old_number, vol_book_id, _ in shifted:
+                if vol_book_id is None:
+                    continue
+                entry = await session.scalar(
+                    select(BookSeries).where(
+                        BookSeries.book_id == vol_book_id, BookSeries.series_id == series_id
+                    )
+                )
+                if entry is not None and entry.sequence == float(old_number):
+                    entry.sequence = float(old_number + 1)
+        await session.flush()
+        session.expire_all()
+
+    vol = SerialVolume(
+        serial_id=serial_id,
+        volume_number=position,
+        kind="ebook",
+        book_id=book_id,
+        name=data.name or book_title,
+        chapter_start=data.chapter_start,
+        chapter_end=data.chapter_end,
+    )
+    session.add(vol)
+
+    if series_id is not None:
+        entry = await session.scalar(
+            select(BookSeries).where(
+                BookSeries.book_id == book_id, BookSeries.series_id == series_id
+            )
+        )
+        if entry is None:
+            session.add(BookSeries(book_id=book_id, series_id=series_id, sequence=float(position)))
+        else:
+            entry.sequence = float(position)
+
+    await session.commit()
+    await session.refresh(vol)
+    return vol
+
+
 # ---------------------------------------------------------------------------
 # Word count / page estimation
 # ---------------------------------------------------------------------------
@@ -1176,12 +1303,31 @@ async def add_single_volume(
 
 async def get_volume_metrics(session: AsyncSession, serial_id: int) -> dict[int, VolumeMetrics]:
     """Return derived metrics for all configured volumes of a serial."""
-    volumes = await list_volumes(session, serial_id)
+    all_volumes = await list_volumes(session, serial_id)
+    metrics: dict[int, VolumeMetrics] = {}
+    volumes = []
+    for volume in all_volumes:
+        if volume.kind == "ebook" or volume.chapter_start is None or volume.chapter_end is None:
+            # Linked ebooks are complete books: no fetch progress to report.
+            count = (
+                volume.chapter_end - volume.chapter_start + 1
+                if volume.chapter_start is not None and volume.chapter_end is not None
+                else 0
+            )
+            metrics[volume.id] = VolumeMetrics(
+                total_words=0,
+                fetched_chapter_count=0,
+                chapter_count=max(0, count),
+                is_partial=False,
+                stubbed_missing_count=0,
+            )
+        else:
+            volumes.append(volume)
     if not volumes:
-        return {}
+        return metrics
 
-    min_chapter = min(volume.chapter_start for volume in volumes)
-    max_chapter = max(volume.chapter_end for volume in volumes)
+    min_chapter = min(volume.chapter_start for volume in volumes)  # type: ignore[type-var]
+    max_chapter = max(volume.chapter_end for volume in volumes)  # type: ignore[type-var]
     result = await session.execute(
         select(
             SerialChapter.chapter_number,
@@ -1205,7 +1351,6 @@ async def get_volume_metrics(session: AsyncSession, serial_id: int) -> dict[int,
         for row in result.all()
     }
 
-    metrics: dict[int, VolumeMetrics] = {}
     for volume in volumes:
         total_words = 0
         fetched_chapter_count = 0
