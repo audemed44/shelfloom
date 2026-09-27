@@ -20,7 +20,10 @@ from app.schemas.serial import (
     SerialCreate,
     SerialDashboardResponse,
     SerialResponse,
+    SerialSeriesMergeRequest,
+    SerialSeriesMergeResponse,
     SerialUpdate,
+    SeriesMergeCandidate,
     SingleVolumeCreate,
     VolumeConfigCreate,
     VolumePreviewResponse,
@@ -39,6 +42,7 @@ from app.services.serial_service import (
     ScrapingError,
     SerialAlreadyExists,
     SerialNotFound,
+    SeriesAdoptError,
     VolumeGenerationError,
     acknowledge_serial,
     add_serial,
@@ -60,9 +64,11 @@ from app.services.serial_service import (
     list_serials,
     list_serials_for_dashboard,
     list_volumes,
+    merge_series_into_serial,
     preview_volume_ranges,
     rebuild_volume,
     refresh_serial_cover,
+    series_merge_candidates,
     start_chapter_fetch_job,
     start_pending_chapter_batch,
     suggest_volumes,
@@ -478,6 +484,37 @@ async def link_ebook_volume_endpoint(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     metrics = await get_volume_metrics(session, serial_id)
     return _enrich_volumes([vol], metrics)[0]
+
+
+@router.get(
+    "/serials/{serial_id}/series-merge-candidates",
+    response_model=list[SeriesMergeCandidate],
+)
+async def series_merge_candidates_endpoint(
+    serial_id: int, session: AsyncSession = Depends(get_session)
+):
+    """Other series that look like this serial's story (e.g. the ebooks' series)."""
+    try:
+        return await series_merge_candidates(session, serial_id)
+    except SerialNotFound as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+
+
+@router.post("/serials/{serial_id}/merge-series", response_model=SerialSeriesMergeResponse)
+async def merge_series_into_serial_endpoint(
+    serial_id: int, body: SerialSeriesMergeRequest, session: AsyncSession = Depends(get_session)
+):
+    """Merge another series into this serial's series, optionally linking its books."""
+    from app.services.series_service import SeriesMergeError, SeriesNotFound
+
+    try:
+        return await merge_series_into_serial(
+            session, serial_id, body.series_id, link_as_volumes=body.link_as_volumes
+        )
+    except (SerialNotFound, SeriesNotFound) as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except (SeriesAdoptError, SeriesMergeError, EbookLinkError) as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 
 
 @router.get("/serials/{serial_id}/volumes", response_model=list[VolumeResponse])

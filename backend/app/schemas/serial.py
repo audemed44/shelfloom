@@ -232,6 +232,35 @@ class VolumeResponse(BaseModel):
     total_words: int | None = None
 
 
+class SeriesMergeCandidateBook(BaseModel):
+    book_id: str
+    title: str
+    sequence: float | None
+    linked: bool  # already a volume of this serial
+
+
+class SeriesMergeCandidate(BaseModel):
+    series_id: int
+    name: str
+    book_count: int
+    reasons: list[str]  # "same_name" and/or "linked_ebook"
+    books: list[SeriesMergeCandidateBook]
+
+
+class SerialSeriesMergeRequest(BaseModel):
+    series_id: int
+    # Also add the series' books to the serial as ebook volumes, in order.
+    link_as_volumes: bool = True
+
+
+class SerialSeriesMergeResponse(BaseModel):
+    series_id: int
+    series_name: str
+    merged_from: str
+    moved_books: int
+    linked_volumes: int
+
+
 class VolumeSuggestRequest(BaseModel):
     """Target size for suggested volumes, in estimated pages (280 words/page)."""
 

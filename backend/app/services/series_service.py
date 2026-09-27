@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, nullslast, select
+import json
+from dataclasses import dataclass
+
+from sqlalchemy import func, nullslast, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,6 +30,18 @@ class BookNotFound(Exception):
 
 class ReadingOrderNotFound(Exception):
     pass
+
+
+class SeriesMergeError(Exception):
+    pass
+
+
+@dataclass
+class SeriesMergeResult:
+    target: Series
+    moved_books: int
+    already_in_target: int
+    source_name: str
 
 
 # ── series ────────────────────────────────────────────────────────────────────
@@ -85,6 +100,101 @@ async def delete_series(session: AsyncSession, series_id: int) -> None:
     series = await get_series(session, series_id)
     await session.delete(series)
     await session.commit()
+
+
+async def merge_series(session: AsyncSession, source_id: int, target_id: int) -> SeriesMergeResult:
+    """Move everything in ``source`` into ``target``, then delete ``source``.
+
+    Books keep their position in the source series unless they are already in
+    the target, in which case the target's position wins. Reading orders,
+    sub-series, web serials and lens filters that pointed at the source now
+    point at the target. The target keeps its name; it picks up the source's
+    description and cover only when it has none of its own.
+    """
+    from app.models.lens import Lens
+    from app.models.serial import WebSerial
+
+    if source_id == target_id:
+        raise SeriesMergeError("A series can't be merged into itself")
+    source = await get_series(session, source_id)
+    target = await get_series(session, target_id)
+
+    # Merging a series into one of its own sub-series would create a cycle.
+    ancestor_id = target.parent_id
+    while ancestor_id is not None:
+        if ancestor_id == source_id:
+            raise SeriesMergeError(
+                f'"{target.name}" is inside "{source.name}"; merge it the other way round'
+            )
+        ancestor_id = await session.scalar(select(Series.parent_id).where(Series.id == ancestor_id))
+
+    source_name = source.name
+    in_target = set(
+        (
+            await session.execute(
+                select(BookSeries.book_id).where(BookSeries.series_id == target_id)
+            )
+        ).scalars()
+    )
+    source_entries = [(e.book_id, e.sequence) for e in source.book_entries]
+    moved = 0
+    for book_id, sequence in source_entries:
+        if book_id in in_target:
+            continue
+        session.add(BookSeries(book_id=book_id, series_id=target_id, sequence=sequence))
+        moved += 1
+
+    await session.execute(
+        update(Series)
+        .where(Series.parent_id == source_id, Series.id != target_id)
+        .values(parent_id=target_id)
+        .execution_options(synchronize_session=False)
+    )
+    if target.parent_id == source_id:
+        target.parent_id = source.parent_id
+    await session.execute(
+        update(ReadingOrder)
+        .where(ReadingOrder.series_id == source_id)
+        .values(series_id=target_id)
+        .execution_options(synchronize_session=False)
+    )
+    await session.execute(
+        update(WebSerial)
+        .where(WebSerial.series_id == source_id)
+        .values(series_id=target_id)
+        .execution_options(synchronize_session=False)
+    )
+    for lens in (await session.execute(select(Lens))).scalars():
+        try:
+            state = json.loads(lens.filter_state)
+        except (TypeError, ValueError):
+            continue
+        ids = state.get("series_ids") if isinstance(state, dict) else None
+        if isinstance(ids, list) and source_id in ids:
+            replaced: list[int] = []
+            for sid in ids:
+                sid = target_id if sid == source_id else sid
+                if sid not in replaced:
+                    replaced.append(sid)
+            state["series_ids"] = replaced
+            lens.filter_state = json.dumps(state)
+
+    if not target.description and source.description:
+        target.description = source.description
+    if not target.cover_path and source.cover_path:
+        target.cover_path = source.cover_path
+
+    await session.flush()
+    await session.execute(BookSeries.__table__.delete().where(BookSeries.series_id == source_id))
+    await session.execute(Series.__table__.delete().where(Series.id == source_id))
+    await session.commit()
+    session.expire_all()
+    return SeriesMergeResult(
+        target=await get_series(session, target_id),
+        moved_books=moved,
+        already_in_target=len(source_entries) - moved,
+        source_name=source_name,
+    )
 
 
 async def add_book_to_series(
