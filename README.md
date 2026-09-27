@@ -30,6 +30,12 @@ Self-hosted book library manager with deep KOReader integration and rich reading
     <td colspan="3"><img src="docs/screenshots/serial-chapters-desktop.png" alt="Serial chapter list loading more chapters as you scroll" /></td>
   </tr>
   <tr>
+    <td colspan="3"><img src="docs/screenshots/reader-desktop.png" alt="EPUB web reader" /></td>
+  </tr>
+  <tr>
+    <td colspan="3"><img src="docs/screenshots/reader-sync-koreader-to-web.png" alt="A page read in KOReader and the web reader continuing from it" /></td>
+  </tr>
+  <tr>
     <td colspan="3"><img src="docs/screenshots/serial-ebook-volumes.png" alt="Published ebooks linked to a serial as its first volumes, ahead of generated volumes" /></td>
   </tr>
   <tr>
@@ -50,6 +56,9 @@ Self-hosted book library manager with deep KOReader integration and rich reading
     <td><img src="docs/screenshots/search-mobile.png" alt="Quick search on mobile" /></td>
     <td><img src="docs/screenshots/stats-mobile.png" alt="Reading stats on mobile" /></td>
     <td><img src="docs/screenshots/serial-mobile.png" alt="Web serial detail on mobile" /></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/reader-mobile.png" alt="Web reader on mobile" /></td>
   </tr>
 </table>
 
