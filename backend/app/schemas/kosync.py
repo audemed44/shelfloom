@@ -12,10 +12,11 @@ class KoSyncUserCreate(BaseModel):
 
 class KoSyncProgressIn(BaseModel):
     document: str  # document identifier (KOReader uses partial MD5 or filename)
-    progress: str  # e.g., "0.5" or XPointer string
-    percentage: float  # 0.0–100.0 (KOSync uses 0–100 not 0–1)
+    progress: str  # KOReader XPointer (reflowable) or page number (PDF)
+    percentage: float  # 0–1, as KOReader sends it (0–100 is scaled down)
     device: str
-    device_id: str
+    device_id: str | None = None
+    metadata: dict | None = None  # sent by newer KOReader versions; unused
 
 
 class KoSyncProgressOut(BaseModel):
@@ -23,4 +24,5 @@ class KoSyncProgressOut(BaseModel):
     progress: str
     percentage: float
     device: str
+    device_id: str | None = None
     timestamp: int

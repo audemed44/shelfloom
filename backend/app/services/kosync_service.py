@@ -1,59 +1,227 @@
-"""KOSync protocol service."""
+"""KOSync protocol service.
+
+Implements the progress-sync server KOReader's built-in "Progress sync" plugin
+talks to (see koreader/plugins/kosync.koplugin). Positions are also linked to
+library books, so Shelfloom's web reader and KOReader share one position per
+book even when the book's file (and so its digest) changes.
+"""
 
 from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from datetime import UTC, datetime
+from pathlib import PurePath
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.kosync import KoSyncProgress, KoSyncUser
+from app.models.book import Book, BookHash
+from app.models.kosync import (
+    WEB_READER_DEVICE,
+    WEB_READER_DEVICE_ID,
+    WEB_READER_USERNAME,
+    KoSyncProgress,
+    KoSyncUser,
+)
+from app.models.reading import ReadingProgress
 
 log = logging.getLogger(__name__)
 
-
-def _hash_password(password: str) -> str:
-    """Simple SHA-256 password hash (sufficient for KOSync's local-only auth)."""
-    return hashlib.sha256(password.encode()).hexdigest()
+_MD5_HEX = re.compile(r"^[0-9a-f]{32}$")
 
 
-async def register_user(
-    session: AsyncSession,
-    username: str,
-    password: str,
-) -> KoSyncUser | None:
+# ── users ─────────────────────────────────────────────────────────────────────
+#
+# KOReader never sends the password itself: it sends md5(password) as the
+# "userkey", both when registering and in the x-auth-key header. We store
+# sha256(userkey). Accounts created before this scheme stored sha256(password);
+# they still work over Basic auth and are upgraded on their next login.
+
+
+def _hash_key(userkey: str) -> str:
+    return hashlib.sha256(userkey.encode()).hexdigest()
+
+
+def userkey_for_password(password: str) -> str:
+    """The userkey KOReader would send for this password."""
+    return hashlib.md5(password.encode()).hexdigest()
+
+
+def _as_userkey(secret: str) -> str:
+    """Registration input from KOReader is already a userkey (32 hex chars)."""
+    return secret if _MD5_HEX.match(secret) else userkey_for_password(secret)
+
+
+async def register_user(session: AsyncSession, username: str, password: str) -> KoSyncUser | None:
+    """Register a user. ``password`` may be a plain password or a KOReader userkey.
+
+    Returns None if the username is taken.
     """
-    Register a new KOSync user.
-    Returns None if username already exists.
-    """
-    existing = await session.execute(select(KoSyncUser).where(KoSyncUser.username == username))
-    if existing.scalar_one_or_none() is not None:
+    existing = await session.get(KoSyncUser, username)
+    if existing is not None:
         return None
-
-    user = KoSyncUser(username=username, password_hash=_hash_password(password))
+    user = KoSyncUser(username=username, password_hash=_hash_key(_as_userkey(password)))
     session.add(user)
     await session.commit()
     return user
 
 
-async def authenticate_user(
-    session: AsyncSession,
-    username: str,
-    password: str,
-) -> KoSyncUser | None:
-    """
-    Authenticate a KOSync user.
-    Returns user if credentials are correct, None otherwise.
-    """
-    result = await session.execute(select(KoSyncUser).where(KoSyncUser.username == username))
-    user = result.scalar_one_or_none()
-    if user is None:
-        return None
-    if user.password_hash != _hash_password(password):
+async def authenticate_key(session: AsyncSession, username: str, userkey: str) -> KoSyncUser | None:
+    """Check KOReader's x-auth-user / x-auth-key credentials."""
+    user = await session.get(KoSyncUser, username)
+    if user is None or user.password_hash != _hash_key(userkey):
         return None
     return user
+
+
+async def authenticate_user(
+    session: AsyncSession, username: str, password: str
+) -> KoSyncUser | None:
+    """Check Basic-auth credentials (a plain password, or a userkey)."""
+    user = await session.get(KoSyncUser, username)
+    if user is None:
+        return None
+    if user.password_hash == _hash_key(_as_userkey(password)):
+        return user
+    if user.password_hash == _hash_key(password):
+        # Legacy account (sha256 of the plain password): upgrade it so the
+        # same account also works from KOReader.
+        user.password_hash = _hash_key(userkey_for_password(password))
+        await session.commit()
+        return user
+    return None
+
+
+async def list_users(session: AsyncSession) -> list[str]:
+    rows = await session.execute(select(KoSyncUser.username).order_by(KoSyncUser.username))
+    return list(rows.scalars())
+
+
+async def delete_user(session: AsyncSession, username: str) -> bool:
+    user = await session.get(KoSyncUser, username)
+    if user is None:
+        return False
+    await session.delete(user)
+    await session.commit()
+    return True
+
+
+# ── document → book ───────────────────────────────────────────────────────────
+
+
+def filename_digest(file_path: str) -> str:
+    """KOReader's "filename" document matching: md5 of the file's name."""
+    return hashlib.md5(PurePath(file_path).name.encode()).hexdigest()
+
+
+async def resolve_book_id(session: AsyncSession, document: str) -> str | None:
+    """Find the library book a KOReader document digest refers to.
+
+    Checks the book's current partial MD5, then every partial MD5 the book has
+    had (KOReader caches the digest from the first time it opened a file, so it
+    keeps sending the old one after the file changes), then the filename digest.
+    """
+    if not document:
+        return None
+    book_id = await session.scalar(select(Book.id).where(Book.file_hash_md5_ko == document))
+    if book_id is not None:
+        return book_id
+    book_id = await session.scalar(
+        select(BookHash.book_id)
+        .where(BookHash.hash_md5_ko == document)
+        .order_by(BookHash.recorded_at.desc())
+        .limit(1)
+    )
+    if book_id is not None:
+        return book_id
+    for bid, path in await session.execute(select(Book.id, Book.file_path)):
+        if filename_digest(path) == document:
+            return bid
+    return None
+
+
+# ── progress ──────────────────────────────────────────────────────────────────
+
+
+def _now_ts() -> int:
+    return int(datetime.now(tz=UTC).timestamp())
+
+
+def _normalise_percentage(value: float) -> float:
+    """KOReader sends 0–1. Accept 0–100 from older clients and scale it down."""
+    if value > 1:
+        value = value / 100
+    return max(0.0, min(1.0, value))
+
+
+def progress_dict(record: KoSyncProgress, document: str | None = None) -> dict:
+    return {
+        "document": document or record.document,
+        "progress": record.progress,
+        "percentage": record.percentage,
+        "device": record.device,
+        "device_id": record.device_id,
+        "timestamp": record.timestamp,
+    }
+
+
+async def _mirror_to_reading_progress(
+    session: AsyncSession, book_id: str, device: str, percentage: float, position: str
+) -> None:
+    """Keep the book page's per-device progress in step with synced positions."""
+    record = await session.scalar(
+        select(ReadingProgress).where(
+            ReadingProgress.book_id == book_id, ReadingProgress.device == device
+        )
+    )
+    if record is None:
+        record = ReadingProgress(book_id=book_id, device=device)
+        session.add(record)
+    record.progress = round(percentage * 100, 2)
+    record.position = position
+    record.updated_at = datetime.now(UTC).replace(tzinfo=None)
+
+
+async def save_progress(
+    session: AsyncSession,
+    *,
+    username: str,
+    document: str,
+    progress: str,
+    percentage: float,
+    device: str,
+    device_id: str | None,
+    book_id: str | None = None,
+    locator: str | None = None,
+) -> KoSyncProgress:
+    """Store a device's latest position for a document (one row per device)."""
+    percentage = _normalise_percentage(percentage)
+    if book_id is None:
+        book_id = await resolve_book_id(session, document)
+
+    key = KoSyncProgress.device_id == device_id if device_id else KoSyncProgress.device == device
+    record = await session.scalar(
+        select(KoSyncProgress).where(
+            KoSyncProgress.username == username, KoSyncProgress.document == document, key
+        )
+    )
+    if record is None:
+        record = KoSyncProgress(username=username, document=document)
+        session.add(record)
+    record.progress = progress
+    record.percentage = percentage
+    record.device = device
+    record.device_id = device_id
+    record.book_id = book_id
+    record.locator = locator
+    record.timestamp = _now_ts()
+
+    if book_id is not None:
+        await _mirror_to_reading_progress(session, book_id, device, percentage, progress)
+    await session.commit()
+    return record
 
 
 async def push_progress(
@@ -63,72 +231,81 @@ async def push_progress(
     progress: str,
     percentage: float,
     device: str,
+    device_id: str | None = None,
 ) -> dict:
-    """
-    Store or update reading progress from KOReader.
-    Returns the stored progress data.
-    """
-    now_ts = int(datetime.now(tz=UTC).timestamp())
-
-    # Upsert KoSyncProgress for this user/document/device
-    result = await session.execute(
-        select(KoSyncProgress).where(
-            KoSyncProgress.username == username,
-            KoSyncProgress.document == document,
-            KoSyncProgress.device == device,
-        )
+    """Store progress sent by KOReader."""
+    record = await save_progress(
+        session,
+        username=username,
+        document=document,
+        progress=progress,
+        percentage=percentage,
+        device=device,
+        device_id=device_id,
     )
-    record = result.scalar_one_or_none()
-
-    if record is None:
-        record = KoSyncProgress(
-            username=username,
-            document=document,
-            device=device,
-        )
-        session.add(record)
-
-    record.progress = progress
-    record.percentage = percentage
-    record.timestamp = now_ts
-
-    await session.commit()
-
-    return {
-        "document": document,
-        "progress": progress,
-        "percentage": percentage,
-        "device": device,
-        "timestamp": now_ts,
-    }
+    return progress_dict(record)
 
 
-async def pull_progress(
-    session: AsyncSession,
-    username: str,
-    document: str,
-) -> dict | None:
+async def latest_progress_for_book(
+    session: AsyncSession, book_id: str, username: str | None = None
+) -> KoSyncProgress | None:
+    """The most recent position for a book, across all its digests.
+
+    With ``username``, only that account's positions and the web reader's count;
+    without, every account's (the web reader acts for the library owner).
     """
-    Pull the latest reading progress for a document (highest percentage across devices).
-    Returns None if no progress found.
-    """
-    result = await session.execute(
-        select(KoSyncProgress)
-        .where(
-            KoSyncProgress.username == username,
-            KoSyncProgress.document == document,
+    query = select(KoSyncProgress).where(KoSyncProgress.book_id == book_id)
+    if username is not None:
+        query = query.where(
+            or_(
+                KoSyncProgress.username == username,
+                KoSyncProgress.username == WEB_READER_USERNAME,
+            )
         )
-        .order_by(KoSyncProgress.percentage.desc())
+    return await session.scalar(
+        query.order_by(KoSyncProgress.timestamp.desc(), KoSyncProgress.id.desc()).limit(1)
     )
-    record = result.scalars().first()
 
+
+async def pull_progress(session: AsyncSession, username: str, document: str) -> dict | None:
+    """The latest position for a document, as KOReader asks for it.
+
+    The newest record wins (not the furthest), so going back to re-read a
+    chapter on one device carries over. If the digest belongs to a library book,
+    positions saved under the book's other digests and by the web reader count.
+    """
+    book_id = await resolve_book_id(session, document)
+    if book_id is not None:
+        record = await latest_progress_for_book(session, book_id, username)
+    else:
+        record = await session.scalar(
+            select(KoSyncProgress)
+            .where(KoSyncProgress.username == username, KoSyncProgress.document == document)
+            .order_by(KoSyncProgress.timestamp.desc(), KoSyncProgress.id.desc())
+            .limit(1)
+        )
     if record is None:
         return None
+    return progress_dict(record, document)
 
-    return {
-        "document": document,
-        "progress": record.progress,
-        "percentage": record.percentage,
-        "device": record.device,
-        "timestamp": record.timestamp,
-    }
+
+async def save_web_progress(
+    session: AsyncSession,
+    book: Book,
+    *,
+    progress: str,
+    percentage: float,
+    locator: str | None,
+) -> KoSyncProgress:
+    """Store the web reader's position so KOReader picks it up on its next sync."""
+    return await save_progress(
+        session,
+        username=WEB_READER_USERNAME,
+        document=book.file_hash_md5_ko or f"book:{book.id}",
+        progress=progress,
+        percentage=percentage,
+        device=WEB_READER_DEVICE,
+        device_id=WEB_READER_DEVICE_ID,
+        book_id=book.id,
+        locator=locator,
+    )
