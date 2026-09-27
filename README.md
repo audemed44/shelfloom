@@ -132,9 +132,15 @@ volumes:
 
 Then follow the import instructions below.
 
-### KOReader Sync
+### KOReader Sync and the web reader
 
-Shelfloom includes a built-in KOSync-compatible server. Point KOReader's sync plugin at `http://<your-host>:8000` and register an account — progress syncs automatically.
+Shelfloom runs a sync server for KOReader's built-in **Progress sync** plugin, and has a web reader for EPUBs (the **Read** button on a book). Both share one reading position per book, so you can read a chapter in the browser and pick up on your e-reader, or the other way round. No KOReader plugin is needed.
+
+1. In KOReader, open a book and go to **Tools → Progress sync → Custom sync server**. Enter `http://<your-host>:8000/api/kosync` (Settings → KOReader Sync shows the exact address).
+2. **Register / Login**, with a new account or one created in Settings → KOReader Sync.
+3. Turn on **Automatically keep documents in sync**. Under **Sync behavior**, "Sync to a newer state: Silently" and "Sync to an older state: Prompt" work well. Leave **Document matching method** on Binary.
+
+Books are matched by file, so this works however the files reach the device (Syncthing, USB, OPDS). Positions follow a book when its file changes, including when a web serial volume is rebuilt with chapters added. The web reader converts positions to KOReader's own format; `frontend/scripts/koreader-xpointer-check` checks that conversion against KOReader's engine.
 
 ### KOReader `.sdr` Reading Data
 

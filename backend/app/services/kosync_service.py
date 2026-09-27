@@ -94,9 +94,32 @@ async def authenticate_user(
     return None
 
 
-async def list_users(session: AsyncSession) -> list[str]:
-    rows = await session.execute(select(KoSyncUser.username).order_by(KoSyncUser.username))
-    return list(rows.scalars())
+async def list_accounts(session: AsyncSession) -> list[dict]:
+    """KOReader sync accounts, each with its most recent sync (if any)."""
+    usernames = list(
+        (await session.execute(select(KoSyncUser.username).order_by(KoSyncUser.username))).scalars()
+    )
+    accounts = []
+    for username in usernames:
+        row = (
+            await session.execute(
+                select(KoSyncProgress, Book.title)
+                .outerjoin(Book, Book.id == KoSyncProgress.book_id)
+                .where(KoSyncProgress.username == username)
+                .order_by(KoSyncProgress.timestamp.desc(), KoSyncProgress.id.desc())
+                .limit(1)
+            )
+        ).first()
+        record, title = row if row else (None, None)
+        accounts.append(
+            {
+                "username": username,
+                "last_synced_at": record.timestamp if record else None,
+                "last_device": record.device if record else None,
+                "last_book_title": title,
+            }
+        )
+    return accounts
 
 
 async def delete_user(session: AsyncSession, username: str) -> bool:

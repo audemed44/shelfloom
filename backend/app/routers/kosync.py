@@ -13,21 +13,30 @@ from __future__ import annotations
 import base64
 import binascii
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
-from app.schemas.kosync import KoSyncProgressIn, KoSyncUserCreate
+from app.schemas.kosync import (
+    KoSyncProgressIn,
+    KoSyncUserCreate,
+    SyncAccountCreate,
+    SyncAccountOut,
+)
 from app.services.kosync_service import (
     authenticate_key,
     authenticate_user,
+    delete_user,
+    list_accounts,
     pull_progress,
     push_progress,
     register_user,
 )
 
 router = APIRouter(prefix="/kosync", tags=["kosync"])
+# Managing accounts from Shelfloom's settings (not part of the KOSync protocol).
+accounts_router = APIRouter(prefix="/sync-accounts", tags=["kosync"])
 
 # Error bodies follow the reference koreader-sync-server.
 _UNAUTHORIZED = {"code": 2001, "message": "Unauthorized"}
@@ -139,3 +148,28 @@ async def get_progress_query(
 ):
     """Older form with the document as a query parameter."""
     return await _get_progress(document, username, session)
+
+
+# ── account management (Shelfloom UI) ─────────────────────────────────────────
+
+
+@accounts_router.get("", response_model=list[SyncAccountOut])
+async def list_sync_accounts(session: AsyncSession = Depends(get_session)):
+    return await list_accounts(session)
+
+
+@accounts_router.post("", response_model=SyncAccountOut, status_code=status.HTTP_201_CREATED)
+async def create_sync_account(
+    data: SyncAccountCreate, session: AsyncSession = Depends(get_session)
+):
+    """Create an account to sign in with from KOReader's Progress sync."""
+    user = await register_user(session, data.username.strip(), data.password)
+    if user is None:
+        raise HTTPException(status_code=409, detail="That username is already taken")
+    return SyncAccountOut(username=user.username)
+
+
+@accounts_router.delete("/{username}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_sync_account(username: str, session: AsyncSession = Depends(get_session)):
+    if not await delete_user(session, username):
+        raise HTTPException(status_code=404, detail="No such account")
