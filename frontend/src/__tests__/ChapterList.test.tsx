@@ -311,4 +311,48 @@ describe('ChapterList', () => {
     expect(screen.getByText('running')).toBeInTheDocument()
     expect(screen.getByText('range 2–2')).toBeInTheDocument()
   })
+
+  it('loads additional chapters instead of paginating', async () => {
+    fetchSpy.mockRestore()
+    const all = Array.from({ length: 70 }, (_, i) => makeChapter(i + 1))
+    const requested: string[] = []
+    fetchSpy = vi.spyOn(global, 'fetch').mockImplementation((url) => {
+      const requestUrl = url.toString()
+      requested.push(requestUrl)
+      const match = requestUrl.match(/chapters\?offset=(\d+)&limit=(\d+)/)
+      if (match) {
+        const offset = Number(match[1])
+        const limit = Number(match[2])
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => all.slice(offset, offset + limit),
+        }) as Promise<Response>
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => status,
+      }) as Promise<Response>
+    })
+
+    render(<ChapterList serialId={1} totalChapters={70} />)
+
+    await waitFor(() =>
+      expect(screen.getByText('Showing 50 of 70 chapters')).toBeInTheDocument()
+    )
+    expect(screen.queryByText('Next')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load more' }))
+
+    await waitFor(() =>
+      expect(screen.getByText('Showing 70 of 70 chapters')).toBeInTheDocument()
+    )
+    expect(screen.getByText('Chapter 70')).toBeInTheDocument()
+    expect(screen.getByText('Chapter 1')).toBeInTheDocument()
+    expect(requested).toContain('/api/serials/1/chapters?offset=50&limit=50')
+    expect(
+      screen.queryByRole('button', { name: 'Load more' })
+    ).not.toBeInTheDocument()
+  })
 })

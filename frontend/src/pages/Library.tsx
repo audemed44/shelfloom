@@ -147,7 +147,7 @@ function Controls({
         />
         <input
           type="text"
-          placeholder="Search by title or author..."
+          placeholder="Search title, author or series..."
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           className="w-full bg-white/5 border border-white/10 pl-9 pr-4 py-2.5 text-sm text-white placeholder-white/20 focus:outline-none focus:border-primary/60 normal-case"
