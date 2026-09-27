@@ -382,19 +382,57 @@ describe('Library', () => {
     })
   })
 
-  it('does not show pagination when total <= per_page', async () => {
+  it('does not offer more books when total <= per_page', async () => {
     renderLibrary()
     await waitFor(() => screen.getAllByTestId('book-card'))
-    expect(screen.queryByLabelText('Next page')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Load more books')).not.toBeInTheDocument()
   })
 
-  it('shows pagination when total exceeds per_page', async () => {
+  it('appends the next page instead of paginating', async () => {
     fetchSpy.mockRestore()
-    mockFetch({ total: 50 })
+    const pageBooks = (page: number) =>
+      Array.from({ length: page === 1 ? 25 : 5 }, (_, i) => ({
+        ...MOCK_BOOKS[0],
+        id: `p${page}-${i}`,
+        title: `Page ${page} Book ${i + 1}`,
+      }))
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      const u = url.toString()
+      if (u.startsWith('/api/books?')) {
+        const page = Number(new URL(u, 'http://x').searchParams.get('page'))
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            items: pageBooks(page),
+            total: 30,
+            page,
+            per_page: 25,
+            pages: 2,
+          }),
+        }) as Promise<Response>
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => (u.includes('/api/shelves') ? MOCK_SHELVES : []),
+      }) as Promise<Response>
+    })
     renderLibrary()
     await waitFor(() =>
-      expect(screen.getByLabelText('Next page')).toBeInTheDocument()
+      expect(screen.getAllByTestId('book-card')).toHaveLength(25)
     )
+    expect(screen.getByText('Showing 25 of 30 books')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Load more books'))
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId('book-card')).toHaveLength(30)
+    )
+    expect(screen.getByText('Page 1 Book 1')).toBeInTheDocument()
+    expect(screen.getByText('Page 2 Book 5')).toBeInTheDocument()
+    expect(screen.getByText('Showing 30 of 30 books')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Load more books')).not.toBeInTheDocument()
   })
 
   it('uses backend pages for grouped pagination instead of raw total', async () => {
@@ -451,7 +489,7 @@ describe('Library', () => {
     localStorage.setItem('shelfloom:groupBySeries', 'true')
     renderLibrary()
     await waitFor(() => screen.getByTestId('series-card'))
-    expect(screen.queryByLabelText('Next page')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Load more books')).not.toBeInTheDocument()
     localStorage.removeItem('shelfloom:groupBySeries')
   })
 

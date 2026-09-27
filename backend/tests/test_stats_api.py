@@ -147,6 +147,28 @@ async def test_overview_dismissed_excluded(
 
 
 @pytest.mark.asyncio
+async def test_overview_counts_books_marked_read_without_sessions(
+    client: AsyncClient, db_session: AsyncSession, shelf: Shelf
+) -> None:
+    """Overview and books-completed must agree, even with no reading sessions."""
+    book = await _make_book(db_session, shelf.id, "Marked Read")
+    await _make_progress(db_session, book.id, 100.0)
+
+    overview = (await client.get("/api/stats/overview")).json()
+    completed = (await client.get("/api/stats/books-completed")).json()
+    assert overview["books_read"] == 1
+    assert [b["book_id"] for b in completed] == [book.id]
+
+    # A window that includes "now" still counts it; a past window does not.
+    past = (datetime.now(UTC) - timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%S")
+    older = (datetime.now(UTC) - timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%S")
+    windowed = (await client.get(f"/api/stats/overview?from={past}")).json()
+    assert windowed["books_read"] == 1
+    before = (await client.get(f"/api/stats/overview?from={older}&to={past}")).json()
+    assert before["books_read"] == 0
+
+
+@pytest.mark.asyncio
 async def test_overview_excludes_dnf_books_from_completed_count(
     client: AsyncClient, db_session: AsyncSession, shelf: Shelf
 ) -> None:
