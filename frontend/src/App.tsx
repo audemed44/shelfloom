@@ -1,20 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import Home from './pages/Home'
-import Library from './pages/Library'
-import BookDetail from './pages/BookDetail'
-import Stats from './pages/Stats'
-import Serials from './pages/Serials'
-import SerialDetail from './pages/SerialDetail'
-import SeriesList from './pages/SeriesList'
-import SeriesDetail from './pages/SeriesDetail'
-import Settings from './pages/Settings'
-import DataManagement from './pages/DataManagement'
-import Lenses from './pages/Lenses'
-import LensDetail from './pages/LensDetail'
-import NotFound from './pages/NotFound'
-import SetupWizard from './components/SetupWizard'
+
+// Every page except the dashboard is split into its own chunk and loaded on
+// first visit, which keeps the initial download small on mobile.
+const Library = lazy(() => import('./pages/Library'))
+const BookDetail = lazy(() => import('./pages/BookDetail'))
+const Stats = lazy(() => import('./pages/Stats'))
+const Serials = lazy(() => import('./pages/Serials'))
+const SerialDetail = lazy(() => import('./pages/SerialDetail'))
+const SeriesList = lazy(() => import('./pages/SeriesList'))
+const SeriesDetail = lazy(() => import('./pages/SeriesDetail'))
+const Settings = lazy(() => import('./pages/Settings'))
+const DataManagement = lazy(() => import('./pages/DataManagement'))
+const Lenses = lazy(() => import('./pages/Lenses'))
+const LensDetail = lazy(() => import('./pages/LensDetail'))
+const NotFound = lazy(() => import('./pages/NotFound'))
+const SetupWizard = lazy(() => import('./components/SetupWizard'))
 
 export default function App() {
   const [showWizard, setShowWizard] = useState(false)
@@ -39,7 +42,9 @@ export default function App() {
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       {showWizard && wizardChecked && (
-        <SetupWizard onComplete={() => setShowWizard(false)} />
+        <Suspense fallback={null}>
+          <SetupWizard onComplete={() => setShowWizard(false)} />
+        </Suspense>
       )}
       <Routes>
         <Route path="/" element={<Layout />}>
