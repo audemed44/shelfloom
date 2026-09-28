@@ -111,6 +111,13 @@ async def list_accounts(session: AsyncSession) -> list[dict]:
             )
         ).first()
         record, title = row if row else (None, None)
+        if record is not None and record.book_id is None:
+            # The book may have been added or linked since this was synced.
+            book_id = await resolve_book_id(session, record.document)
+            if book_id is not None:
+                await _link_records(session, record.document, book_id)
+                await session.commit()
+                title = await session.scalar(select(Book.title).where(Book.id == book_id))
         accounts.append(
             {
                 "username": username,
@@ -162,7 +169,102 @@ async def resolve_book_id(session: AsyncSession, document: str) -> str | None:
     for bid, path in await session.execute(select(Book.id, Book.file_path)):
         if filename_digest(path) == document:
             return bid
-    return None
+    return await _match_unfingerprinted(session, document)
+
+
+async def _match_unfingerprinted(session: AsyncSession, document: str) -> str | None:
+    """Fingerprint books that never had their KOReader digest recorded.
+
+    Books imported before digests were kept, or whose digest failed, can't be
+    matched until it's computed. This records them as a side effect, so it only
+    reads each file once.
+    """
+    from app.models.shelf import Shelf
+    from app.services.hash_service import koreader_partial_md5
+
+    rows = (
+        await session.execute(
+            select(Book, Shelf.path)
+            .join(Shelf, Shelf.id == Book.shelf_id)
+            .where(Book.file_hash_md5_ko.is_(None))
+        )
+    ).all()
+    found = None
+    for book, shelf_path in rows:
+        if (book.file_path or "").startswith("manual://"):
+            continue
+        path = PurePath(shelf_path) / book.file_path
+        digest = koreader_partial_md5(path)
+        if digest is None:
+            continue
+        book.file_hash_md5_ko = digest
+        if digest == document:
+            found = book.id
+    if rows:
+        await session.commit()
+    return found
+
+
+# ── documents that don't match a library book ─────────────────────────────────
+#
+# KOReader identifies a book by a digest of its file. When the copy on the
+# device isn't byte-identical to any version Shelfloom has seen (for example a
+# file Calibre rewrote while sending it to the device), the digest matches
+# nothing. Once a digest is known to belong to a book (a .sdr names it, or the
+# book's file is about to change) it is kept for good, so it matches from then on.
+
+LINKED_DIGEST_SHA_PREFIX = "kosync:"
+
+
+async def _link_records(session: AsyncSession, document: str, book_id: str) -> None:
+    """Point every synced position for ``document`` at ``book_id`` (not committed)."""
+    records = (
+        (await session.execute(select(KoSyncProgress).where(KoSyncProgress.document == document)))
+        .scalars()
+        .all()
+    )
+    for record in records:
+        record.book_id = book_id
+        if record.username != WEB_READER_USERNAME:
+            await _mirror_to_reading_progress(
+                session, book_id, record.device, record.percentage, record.progress
+            )
+
+
+async def remember_digest(session: AsyncSession, book: Book, document: str | None) -> None:
+    """Keep ``document`` as one of ``book``'s KOReader digests for good.
+
+    Called whenever Shelfloom learns a digest for a book (from a .sdr, from a
+    file that's about to change), so it keeps matching after the
+    book's current digest moves on, and positions already synced under it are
+    linked to the book. Not committed.
+    """
+    if not document:
+        return
+    existing = await session.scalar(
+        select(BookHash.id)
+        .where(BookHash.book_id == book.id, BookHash.hash_md5_ko == document)
+        .limit(1)
+    )
+    if existing is None:
+        session.add(
+            BookHash(
+                book_id=book.id,
+                # Not the hash of a file Shelfloom has read: marked so it can't
+                # be mistaken for one when matching files by content.
+                hash_sha=f"{LINKED_DIGEST_SHA_PREFIX}{document}",
+                hash_md5="",
+                hash_md5_ko=document,
+                page_count=book.page_count,
+            )
+        )
+    stale = await session.scalar(
+        select(KoSyncProgress.id)
+        .where(KoSyncProgress.document == document, KoSyncProgress.book_id.is_(None))
+        .limit(1)
+    )
+    if stale is not None:
+        await _link_records(session, document, book.id)
 
 
 # ── progress ──────────────────────────────────────────────────────────────────

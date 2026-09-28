@@ -123,6 +123,13 @@ async def import_sdr(
                     )
                 )
         book.file_hash_md5_ko = sdr_data.partial_md5
+    if sdr_data.partial_md5:
+        # This is the digest KOReader syncs progress under. Keep it in the
+        # book's history (a later file change replaces the current value) and
+        # link positions already synced under it.
+        from app.services.kosync_service import remember_digest
+
+        await remember_digest(session, book, sdr_data.partial_md5)
 
     # Upsert reading progress
     result = await session.execute(
