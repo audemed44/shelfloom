@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useLocation, useParams, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -301,6 +302,28 @@ export default function BookDetailPage() {
   const [seriesRefreshKey, setSeriesRefreshKey] = useState(0)
   const [moveOpen, setMoveOpen] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
+  const moreBtnRef = useRef<HTMLButtonElement>(null)
+  const [menuAnchor, setMenuAnchor] = useState({ top: 0, left: 0 })
+
+  // Close the More menu on Escape, and on wider screens when the page scrolls
+  // or resizes (the dropdown is pinned to where the button was).
+  useEffect(() => {
+    if (!actionsOpen) return
+    const close = () => {
+      setActionsOpen(false)
+      setMoveOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    const onMove = () => window.innerWidth >= 640 && close()
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
+    }
+  }, [actionsOpen])
   const [movingTo, setMovingTo] = useState<number | null>(null)
   const [coverRefreshing, setCoverRefreshing] = useState(false)
   const [coverUploading, setCoverUploading] = useState(false)
@@ -826,7 +849,20 @@ export default function BookDetailPage() {
 
               <div className="relative">
                 <button
+                  ref={moreBtnRef}
                   onClick={() => {
+                    const rect = moreBtnRef.current?.getBoundingClientRect()
+                    if (rect) {
+                      // Where the dropdown goes on wider screens: under the
+                      // button, kept inside the window.
+                      setMenuAnchor({
+                        top: rect.bottom + 4,
+                        left: Math.max(
+                          8,
+                          Math.min(rect.left, window.innerWidth - 224 - 8)
+                        ),
+                      })
+                    }
                     setActionsOpen((v) => !v)
                     setMoveOpen(false)
                   }}
@@ -837,93 +873,106 @@ export default function BookDetailPage() {
                 >
                   <MoreHorizontal size={16} />
                 </button>
-                {actionsOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 z-20"
-                      onClick={() => {
-                        setActionsOpen(false)
-                        setMoveOpen(false)
-                      }}
-                      aria-hidden="true"
-                    />
-                    <div
-                      className="absolute right-0 top-full z-30 mt-1 w-56 border border-white bg-black shadow-[0_0_0_9999px_rgba(0,0,0,0.4)] animate-scale-in sm:left-0 sm:right-auto sm:shadow-none"
-                      data-testid="more-actions-menu"
-                    >
-                      <button
+                {actionsOpen &&
+                  // Rendered on <body>: the action row can wrap anywhere and
+                  // sits inside animated (transformed) containers, which
+                  // would clip or re-anchor a positioned menu. On phones it's
+                  // a sheet above the bottom bar; wider, a dropdown.
+                  createPortal(
+                    <>
+                      <div
+                        className="fixed inset-0 z-40 bg-black/60 sm:bg-transparent"
                         onClick={() => {
                           setActionsOpen(false)
-                          setShowLogSession(true)
+                          setMoveOpen(false)
                         }}
-                        className={`${menuItem} sm:hidden`}
+                        aria-hidden="true"
+                      />
+                      <div
+                        role="menu"
+                        className="fixed inset-x-0 bottom-mobile-bottom-nav z-50 max-h-[70vh] overflow-y-auto border-t border-white bg-black animate-slide-up sm:inset-x-auto sm:bottom-auto sm:left-[var(--menu-left)] sm:top-[var(--menu-top)] sm:w-56 sm:border sm:animate-scale-in"
+                        style={
+                          {
+                            '--menu-top': `${menuAnchor.top}px`,
+                            '--menu-left': `${menuAnchor.left}px`,
+                          } as React.CSSProperties
+                        }
+                        data-testid="more-actions-menu"
                       >
-                        <PlusCircle size={14} />
-                        Log Session
-                      </button>
-                      <button
-                        onClick={() => {
-                          setActionsOpen(false)
-                          setShowVerdict(true)
-                        }}
-                        className={`${menuItem} sm:hidden`}
-                      >
-                        <MessageSquareText size={14} />
-                        Your Verdict
-                      </button>
-                      {!book.file_path?.startsWith('manual://') && (
-                        <>
-                          <button
-                            onClick={() => setMoveOpen((v) => !v)}
-                            disabled={
-                              movingTo != null || otherShelves.length === 0
-                            }
-                            data-testid="move-shelf-btn"
-                            className={`${menuItem} disabled:opacity-40`}
-                          >
-                            <FolderInput size={14} />
-                            Move Shelf
-                            <ChevronRight
-                              size={12}
-                              className={`ml-auto transition-transform ${moveOpen ? 'rotate-90' : ''}`}
-                            />
-                          </button>
-                          {moveOpen && (
-                            <div
-                              className="border-y border-white/[0.14] bg-white/[0.04]"
-                              data-testid="move-shelf-dropdown"
+                        <button
+                          onClick={() => {
+                            setActionsOpen(false)
+                            setShowLogSession(true)
+                          }}
+                          className={`${menuItem} sm:hidden`}
+                        >
+                          <PlusCircle size={14} />
+                          Log Session
+                        </button>
+                        <button
+                          onClick={() => {
+                            setActionsOpen(false)
+                            setShowVerdict(true)
+                          }}
+                          className={`${menuItem} sm:hidden`}
+                        >
+                          <MessageSquareText size={14} />
+                          Your Verdict
+                        </button>
+                        {!book.file_path?.startsWith('manual://') && (
+                          <>
+                            <button
+                              onClick={() => setMoveOpen((v) => !v)}
+                              disabled={
+                                movingTo != null || otherShelves.length === 0
+                              }
+                              data-testid="move-shelf-btn"
+                              className={`${menuItem} disabled:opacity-40`}
                             >
-                              {otherShelves.map((s) => (
-                                <button
-                                  key={s.id}
-                                  onClick={() => {
-                                    setActionsOpen(false)
-                                    handleMove(s.id)
-                                  }}
-                                  className="w-full py-2.5 pl-11 pr-4 text-left text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
-                                >
-                                  {s.name}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-                      <button
-                        onClick={() => {
-                          setActionsOpen(false)
-                          setShowDelete(true)
-                        }}
-                        data-testid="delete-btn"
-                        aria-label="Delete book"
-                        className={`${menuItem} border-t border-white/[0.14] text-red-400 hover:!bg-red-500 hover:!text-white`}
-                      >
-                        <Trash2 size={14} />
-                        Delete book
-                      </button>
-                    </div>
-                  </>
-                )}
+                              <FolderInput size={14} />
+                              Move Shelf
+                              <ChevronRight
+                                size={12}
+                                className={`ml-auto transition-transform ${moveOpen ? 'rotate-90' : ''}`}
+                              />
+                            </button>
+                            {moveOpen && (
+                              <div
+                                className="border-y border-white/[0.14] bg-white/[0.04]"
+                                data-testid="move-shelf-dropdown"
+                              >
+                                {otherShelves.map((s) => (
+                                  <button
+                                    key={s.id}
+                                    onClick={() => {
+                                      setActionsOpen(false)
+                                      handleMove(s.id)
+                                    }}
+                                    className="w-full py-2.5 pl-11 pr-4 text-left text-sm text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+                                  >
+                                    {s.name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                        <button
+                          onClick={() => {
+                            setActionsOpen(false)
+                            setShowDelete(true)
+                          }}
+                          data-testid="delete-btn"
+                          aria-label="Delete book"
+                          className={`${menuItem} border-t border-white/[0.14] text-red-400 hover:!bg-red-500 hover:!text-white`}
+                        >
+                          <Trash2 size={14} />
+                          Delete book
+                        </button>
+                      </div>
+                    </>,
+                    document.body
+                  )}
               </div>
             </div>
           </div>
