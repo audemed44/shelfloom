@@ -191,6 +191,13 @@ describe('Home', () => {
     })
   })
 
+  it('continues an EPUB straight into the web reader', async () => {
+    await renderHome()
+    const action = await screen.findByTestId('hero-book-action')
+    expect(action).toHaveTextContent('Read')
+    expect(action).toHaveAttribute('href', '/books/book-1/read')
+  })
+
   it('shows empty state when no books in progress', async () => {
     fetchSpy.mockImplementation((url) => {
       if (String(url).includes('/api/books')) {

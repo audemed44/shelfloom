@@ -243,20 +243,26 @@ function SectionTitle({
 }
 
 // ---------------------------------------------------------------------------
-// Hero — solid blue panel
+// Hero — the book in progress
 // ---------------------------------------------------------------------------
 
 function HeroBook({ book }: { book: Book & { reading_progress?: number } }) {
   const progress = Math.round(book.reading_progress ?? 0)
   const cover = getBookCoverUrl(book.id, book.cover_path)
+  const canRead =
+    book.format === 'epub' && !book.file_path?.startsWith('manual://')
   return (
-    <Link
-      to={`/books/${book.id}`}
-      className="group grid grid-cols-[auto_1fr] bg-primary text-white transition-colors hover:bg-primary-600"
+    <div
+      className="group relative grid grid-cols-[auto_1fr] border border-white/[0.14] border-t-white border-t-2 bg-white/[0.02] transition-colors hover:bg-white/[0.05]"
       data-testid="hero-book"
     >
-      <div className="w-28 p-4 sm:w-44 sm:p-6">
-        <div className="book-cover aspect-[2/3] overflow-hidden bg-black/20">
+      <Link
+        to={`/books/${book.id}`}
+        className="w-28 p-4 sm:w-44 sm:p-6"
+        aria-label={book.title}
+        tabIndex={-1}
+      >
+        <div className="book-cover aspect-[2/3] overflow-hidden bg-white/5">
           <img
             src={cover}
             alt=""
@@ -266,40 +272,47 @@ function HeroBook({ book }: { book: Book & { reading_progress?: number } }) {
             }}
           />
         </div>
-      </div>
+      </Link>
       <div className="flex min-w-0 flex-col justify-between gap-4 py-4 pr-4 sm:py-6 sm:pr-8">
         <div>
-          <p className="text-[10px] font-semibold tracking-widest text-white/75">
+          <p className="text-[10px] font-semibold tracking-widest text-primary-400">
             Continue reading
           </p>
-          <p className="mt-2 text-2xl font-extrabold leading-[0.95] tracking-tighter line-clamp-3 sm:text-5xl">
+          <Link
+            to={`/books/${book.id}`}
+            className="mt-2 block text-2xl font-extrabold leading-[0.95] tracking-tighter text-white line-clamp-3 hover:underline hover:decoration-primary hover:underline-offset-4 sm:text-5xl"
+          >
             {book.title}
-          </p>
+          </Link>
           {book.author && (
-            <p className="mt-2 truncate text-sm font-medium text-white/80 sm:text-base">
+            <p className="mt-2 truncate text-sm font-medium text-white/55 sm:text-base">
               {book.author}
             </p>
           )}
         </div>
         <div>
           <div className="flex items-end justify-between gap-4">
-            <p className="text-4xl font-extrabold leading-none tracking-tighter tabular-nums sm:text-7xl">
+            <p className="text-4xl font-extrabold leading-none tracking-tighter tabular-nums text-white sm:text-7xl">
               <span>{progress}</span>
-              <span className="text-2xl sm:text-4xl">%</span>
+              <span className="text-2xl text-white/50 sm:text-4xl">%</span>
             </p>
-            <span className="inline-flex items-center gap-2 text-xs font-semibold transition-transform duration-200 group-hover:translate-x-1">
-              Open <ArrowRight size={14} />
-            </span>
+            <Link
+              to={canRead ? `/books/${book.id}/read` : `/books/${book.id}`}
+              className="inline-flex shrink-0 items-center gap-2 bg-primary px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-primary-600 sm:px-4"
+              data-testid="hero-book-action"
+            >
+              {canRead ? 'Read' : 'Open'} <ArrowRight size={14} />
+            </Link>
           </div>
-          <div className="mt-3 h-1 bg-white/25">
+          <div className="mt-3 h-1 bg-white/15">
             <div
-              className="h-full bg-white transition-[width] duration-1000"
+              className="h-full bg-primary transition-[width] duration-1000"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
       </div>
-    </Link>
+    </div>
   )
 }
 
