@@ -47,7 +47,9 @@ jobs:
 
       - name: Type check
         working-directory: frontend
-        run: npx tsc --noEmit
+        # tsconfig.json only holds project references ("files": []), so plain
+        # `tsc --noEmit` checks nothing; -b builds the app and node projects.
+        run: npx tsc -b
 
       - name: Test
         working-directory: frontend
