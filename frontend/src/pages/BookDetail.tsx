@@ -1395,46 +1395,52 @@ export default function BookDetailPage() {
         )}
       </div>
 
-      {/* Modals */}
-      {showEdit && (
-        <EditBookModal
-          book={book}
-          currentSeries={seriesMemberships ?? []}
-          onClose={() => setShowEdit(false)}
-          onSaved={(updated) => {
-            setBook(updated)
-            setShowEdit(false)
-          }}
-          onSeriesChange={() => setSeriesRefreshKey((k) => k + 1)}
-        />
-      )}
-      {showVerdict && (
-        <VerdictModal
-          book={book}
-          onClose={() => setShowVerdict(false)}
-          onSaved={(updated) => {
-            setBook(updated)
-            setShowVerdict(false)
-          }}
-        />
-      )}
-      {showDelete && (
-        <DeleteBookModal
-          book={book}
-          onClose={() => setShowDelete(false)}
-          onDeleted={() => navigate('/library')}
-        />
-      )}
-      {showLogSession && book && (
-        <LogSessionModal
-          bookId={String(book.id)}
-          onClose={() => setShowLogSession(false)}
-          onSaved={() => {
-            setShowLogSession(false)
-            setSummaryKey((k) => k + 1)
-            setSessionsKey((k) => k + 1)
-          }}
-        />
+      {/* Modals, on <body>: the page's main area is its own stacking context,
+          so from inside it they'd sit under the phone's bottom bar. */}
+      {createPortal(
+        <>
+          {showEdit && (
+            <EditBookModal
+              book={book}
+              currentSeries={seriesMemberships ?? []}
+              onClose={() => setShowEdit(false)}
+              onSaved={(updated) => {
+                setBook(updated)
+                setShowEdit(false)
+              }}
+              onSeriesChange={() => setSeriesRefreshKey((k) => k + 1)}
+            />
+          )}
+          {showVerdict && (
+            <VerdictModal
+              book={book}
+              onClose={() => setShowVerdict(false)}
+              onSaved={(updated) => {
+                setBook(updated)
+                setShowVerdict(false)
+              }}
+            />
+          )}
+          {showDelete && (
+            <DeleteBookModal
+              book={book}
+              onClose={() => setShowDelete(false)}
+              onDeleted={() => navigate('/library')}
+            />
+          )}
+          {showLogSession && book && (
+            <LogSessionModal
+              bookId={String(book.id)}
+              onClose={() => setShowLogSession(false)}
+              onSaved={() => {
+                setShowLogSession(false)
+                setSummaryKey((k) => k + 1)
+                setSessionsKey((k) => k + 1)
+              }}
+            />
+          )}
+        </>,
+        document.body
       )}
     </div>
   )
