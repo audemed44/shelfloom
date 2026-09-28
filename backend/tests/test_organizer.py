@@ -19,6 +19,7 @@ from app.services.organizer import (
     list_rename_logs,
     organize_book,
     organize_shelf,
+    prune_empty_dirs,
     resolve_template,
     safe_move_with_sdr,
     sanitize_component,
@@ -441,6 +442,51 @@ def test_safe_move_no_sdr(tmp_path):
     assert dst.exists()
 
 
+# ── prune_empty_dirs ──────────────────────────────────────────────────────────
+
+
+def test_prune_removes_empty_chain_up_to_root(tmp_path):
+    leaf = tmp_path / "Author" / "Series"
+    leaf.mkdir(parents=True)
+
+    prune_empty_dirs(leaf, tmp_path)
+
+    assert not (tmp_path / "Author").exists()
+    assert tmp_path.is_dir()  # root itself is never removed
+
+
+def test_prune_stops_at_non_empty_dir(tmp_path):
+    leaf = tmp_path / "Author" / "Series"
+    leaf.mkdir(parents=True)
+    (tmp_path / "Author" / "Other.epub").write_bytes(b"x")
+
+    prune_empty_dirs(leaf, tmp_path)
+
+    assert not leaf.exists()
+    assert (tmp_path / "Author").is_dir()
+
+
+def test_prune_leaves_non_empty_start(tmp_path):
+    leaf = tmp_path / "Series"
+    leaf.mkdir()
+    (leaf / "book.epub").write_bytes(b"x")
+
+    prune_empty_dirs(leaf, tmp_path)
+
+    assert (leaf / "book.epub").exists()
+
+
+def test_prune_ignores_paths_outside_root(tmp_path):
+    root = tmp_path / "shelf"
+    root.mkdir()
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+
+    prune_empty_dirs(outside, root)
+
+    assert outside.is_dir()
+
+
 # ── organize_book (service) ───────────────────────────────────────────────────
 
 
@@ -507,6 +553,27 @@ async def test_organize_book_apply_moves_file(db_session, tmp_path):
     assert expected_dst.exists()
     assert not src.exists()
     assert book.file_path == "Frank Herbert/Dune.epub"
+
+
+async def test_organize_book_removes_emptied_source_dirs(db_session, tmp_path):
+    shelf = await _make_shelf(db_session, tmp_path)
+    book = await _make_book(
+        db_session,
+        shelf.id,
+        title="Dune",
+        author="Frank Herbert",
+        file_path="Old Author/Old Series/Dune.epub",
+    )
+    src = Path(shelf.path) / "Old Author" / "Old Series" / "Dune.epub"
+    src.parent.mkdir(parents=True)
+    src.write_bytes(b"epub content")
+
+    result = await organize_book(
+        db_session, book, shelf, template="{author}/{title}.{format}", dry_run=False
+    )
+
+    assert result.moved is True
+    assert not (Path(shelf.path) / "Old Author").exists()
 
 
 async def test_organize_book_already_correct(db_session, tmp_path):
