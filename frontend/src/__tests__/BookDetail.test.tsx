@@ -427,6 +427,21 @@ describe('BookDetail', () => {
     )
   })
 
+  it('shows the More menu outside the page layout and closes it on Escape', async () => {
+    const user = userEvent.setup()
+    renderDetail()
+    await waitFor(() => screen.getByTestId('more-actions-btn'))
+    await user.click(screen.getByTestId('more-actions-btn'))
+    // Rendered on <body> so a wrapped action row or an animated parent can't
+    // push it off-screen or clip it.
+    const menu = screen.getByTestId('more-actions-menu')
+    expect(menu.parentElement).toBe(document.body)
+    expect(menu).toHaveTextContent('Log Session')
+    expect(menu).toHaveTextContent('Delete book')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByTestId('more-actions-menu')).not.toBeInTheDocument()
+  })
+
   it('opens delete modal when delete button is clicked', async () => {
     const user = userEvent.setup()
     renderDetail()
