@@ -13,6 +13,10 @@ const MOCK_OVERVIEW = {
   books_read: 18,
   total_reading_time_seconds: 662400,
   total_pages_read: 12400,
+  sessions: 240,
+  reading_days: 20,
+  pages_per_hour: 38.4,
+  first_session_date: '2025-01-01',
   current_streak_days: 7,
 }
 
@@ -70,7 +74,16 @@ const MOCK_COMPLETED = [
   },
 ]
 
-const MOCK_CALENDAR: unknown[] = []
+// The calendar opens on the current month.
+const NOW = new Date()
+const MONTH_PREFIX = `${NOW.getFullYear()}-${String(NOW.getMonth() + 1).padStart(2, '0')}`
+const MOCK_CALENDAR = Array.from({ length: 28 }, (_, i) => ({
+  date: `${MONTH_PREFIX}-${String(i + 1).padStart(2, '0')}`,
+  books:
+    i === 9
+      ? [{ book_id: 'b1', title: 'The Way of Kings', duration: 5400 }]
+      : [],
+}))
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -143,11 +156,18 @@ describe('Stats', () => {
       expect(
         screen.getAllByTestId('metric-card').length
       ).toBeGreaterThanOrEqual(4)
-      // books_owned = 42
-      expect(screen.getByText('42')).toBeInTheDocument()
-      // books_read = 18
-      expect(screen.getByText('18 completed')).toBeInTheDocument()
+      // books finished in the range, with the library size underneath
+      expect(screen.getAllByTestId('metric-card')[0]).toHaveTextContent('18')
+      expect(screen.getByText('42 in your library')).toBeInTheDocument()
     })
+    // 184h over 30 days is about 43h a week, not the total divided by 52
+    expect(screen.getByText('42h 56m a week')).toBeInTheDocument()
+    expect(screen.getByText('on 20 days')).toBeInTheDocument()
+    expect(screen.getByText('38 p/h')).toBeInTheDocument()
+    const habits = screen.getByTestId('reading-habits')
+    expect(habits).toHaveTextContent('20 of 30')
+    expect(habits).toHaveTextContent('67% of days')
+    expect(habits).toHaveTextContent('240 sessions')
     const cover = screen.getByAltText('The Way of Kings')
     expect(cover.getAttribute('src')).toContain('/api/books/b1/cover')
     expect(cover.getAttribute('src')).toContain('cover=%2Fcovers%2Fb1.jpg')
@@ -263,5 +283,47 @@ describe('Stats', () => {
       ).toBeGreaterThanOrEqual(1)
       expect(screen.getAllByText('Ted Chiang').length).toBeGreaterThanOrEqual(1)
     })
+  })
+
+  it('asks for every stat over the selected range', async () => {
+    await renderStats()
+    await waitFor(() => {
+      const urls = fetchSpy.mock.calls.map((c) => String(c[0]))
+      for (const path of [
+        '/api/stats/overview',
+        '/api/stats/distribution',
+        '/api/stats/by-author',
+        '/api/stats/by-tag',
+        '/api/stats/books-completed',
+      ])
+        expect(urls.some((u) => u.includes(path) && u.includes('from='))).toBe(
+          true
+        )
+    })
+  })
+
+  it('puts y-axis ticks on round values', async () => {
+    await renderStats()
+    const chart = await screen.findByTestId('time-of-day')
+    // 30 minutes at most per hour → ticks 0, 10m, 20m, 30m
+    expect(chart).toHaveTextContent('10m')
+    expect(chart).toHaveTextContent('30m')
+    expect(chart).toHaveTextContent('Most: 20:00–21:00')
+  })
+
+  it('lists the books of a tapped calendar day', async () => {
+    const user = userEvent.setup()
+    await renderStats()
+    await user.click(screen.getByTestId('tab-calendar'))
+    const day = await screen.findByRole('button', {
+      name: / 10: 1 book$/,
+    })
+    await user.click(day)
+    const details = screen.getByTestId('calendar-day')
+    expect(details).toHaveTextContent(
+      NOW.toLocaleDateString('en-US', { month: 'long' }) + ' 10'
+    )
+    expect(details).toHaveTextContent('The Way of Kings')
+    expect(details).toHaveTextContent('1h 30m')
   })
 })

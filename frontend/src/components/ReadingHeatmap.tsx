@@ -260,7 +260,7 @@ export function ReadingHeatmap({
             {year} Activity Heatmap
           </p>
         </div>
-        <div className="bg-accent text-white text-[10px] font-bold px-2.5 py-1 tracking-widest flex items-center gap-1.5">
+        <div className="bg-accent text-white text-[10px] font-bold px-2.5 py-1 tracking-widest flex items-center gap-1.5 whitespace-nowrap">
           <Flame size={11} />
           {streak > 0 ? `${streak} Day Streak` : 'No Streak Yet'}
         </div>
@@ -341,7 +341,7 @@ export function ReadingHeatmap({
                 <p className="text-[10px] font-black tracking-widest text-white/30">
                   Days Read
                 </p>
-                <p className="text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums">
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums whitespace-nowrap">
                   {yearStats.daysRead}
                 </p>
               </div>
@@ -349,7 +349,7 @@ export function ReadingHeatmap({
                 <p className="text-[10px] font-black tracking-widest text-white/30">
                   Total Time
                 </p>
-                <p className="text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums">
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums whitespace-nowrap">
                   {fmtSec(yearStats.totalSeconds)}
                 </p>
               </div>
@@ -357,7 +357,7 @@ export function ReadingHeatmap({
                 <p className="text-[10px] font-black tracking-widest text-white/30">
                   Best Day
                 </p>
-                <p className="text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums">
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums whitespace-nowrap">
                   {fmtSec(yearStats.bestSeconds)}
                 </p>
                 <p className="text-[10px] text-white/30 normal-case mt-0.5">
@@ -368,7 +368,7 @@ export function ReadingHeatmap({
                 <p className="text-[10px] font-black tracking-widest text-white/30">
                   Avg / Active Day
                 </p>
-                <p className="text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums">
+                <p className="text-2xl sm:text-3xl font-extrabold tracking-tighter text-white leading-tight mt-0.5 tabular-nums whitespace-nowrap">
                   {fmtSec(yearStats.avgSeconds)}
                 </p>
               </div>
