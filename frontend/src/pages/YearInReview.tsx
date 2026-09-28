@@ -1,11 +1,34 @@
-import { useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Loader2, Pencil, X } from 'lucide-react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  LayoutList,
+  Loader2,
+  Pencil,
+  Play,
+  RotateCcw,
+  X,
+} from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
+import { prefersMotion, useCountUp } from '../hooks/useCountUp'
+import { usePersistedState } from '../hooks/usePersistedState'
 import { getBookCoverUrl } from '../utils/bookCover'
 import { GOAL_STATUS } from '../types/goals'
 import type { GoalProgress } from '../types/goals'
+import {
+  bookInsights,
+  fmtHours,
+  goalInsights,
+  highlightInsights,
+  monthInsights,
+  mostReadInsights,
+  plural,
+  yearInsights,
+} from './yearInsights'
 
 interface ReviewBook {
   id: string
@@ -65,20 +88,54 @@ const MONTHS = [
   'Dec',
 ]
 
-function fmtHours(s: number): string {
-  if (!s) return '0h'
-  const h = s / 3600
-  if (h < 1) return `${Math.round(s / 60)}m`
-  return h < 10 ? `${h.toFixed(1).replace(/\.0$/, '')}h` : `${Math.round(h)}h`
-}
-
 function fmtDate(iso: string, opts: Intl.DateTimeFormatOptions): string {
   const d = new Date(iso.length === 10 ? `${iso}T00:00:00` : iso)
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, opts)
 }
 
-function plural(n: number, word: string): string {
-  return `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`
+// ---------------------------------------------------------------------------
+// Motion: on in the walkthrough, off when everything is shown at once
+// ---------------------------------------------------------------------------
+
+const Motion = createContext(false)
+
+/** Stagger delay for the i-th animated item. */
+function delay(i: number, stepMs = 70, startMs = 150): React.CSSProperties {
+  return { animationDelay: `${startMs + i * stepMs}ms` }
+}
+
+function CountUp({
+  value,
+  format = (n: number) => n.toLocaleString(),
+}: {
+  value: number
+  format?: (n: number) => string
+}) {
+  const animate = useContext(Motion)
+  const shown = useCountUp(value, 1100, animate)
+  return <>{format(shown ?? value)}</>
+}
+
+/** Observations about a chapter, one per line. */
+function Insights({ lines }: { lines: string[] }) {
+  const animate = useContext(Motion)
+  if (lines.length === 0) return null
+  return (
+    <ul
+      className="mb-8 max-w-3xl space-y-2 border-l-2 border-primary pl-4"
+      data-testid="insights"
+    >
+      {lines.map((line, i) => (
+        <li
+          key={line}
+          className={`text-base leading-relaxed text-white/80 sm:text-lg ${animate ? 'animate-fade-up' : ''}`}
+          style={animate ? delay(i, 450, 350) : undefined}
+        >
+          {line}
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 function SectionTitle({
@@ -109,11 +166,13 @@ function GoalForm({
   saving,
   onSave,
   onCancel,
+  autoFocus = false,
 }: {
   initial: number | null
   saving: boolean
   onSave: (books: number) => void
   onCancel?: () => void
+  autoFocus?: boolean
 }) {
   const [value, setValue] = useState(initial ? String(initial) : '')
   const books = Number(value)
@@ -138,7 +197,7 @@ function GoalForm({
           className="w-20 border border-white/25 bg-transparent px-2 py-1.5 text-sm font-semibold tabular-nums text-white focus:border-primary focus:outline-none"
           aria-label="Books to read"
           data-testid="goal-input"
-          autoFocus
+          autoFocus={autoFocus}
         />
         books
       </label>
@@ -172,6 +231,7 @@ function GoalBlock({
   isFuture: boolean
   onChange: (goal: GoalProgress) => void
 }) {
+  const animate = useContext(Motion)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -246,7 +306,7 @@ function GoalBlock({
             READING GOAL
           </p>
           <p className="mt-1 text-5xl font-extrabold leading-none tracking-tighter tabular-nums text-white sm:text-7xl">
-            {goal.completed}
+            <CountUp value={goal.completed} />
             <span className="text-2xl font-bold text-white/40 sm:text-4xl">
               /{target}
             </span>
@@ -277,8 +337,8 @@ function GoalBlock({
 
       <div className="relative mt-5 h-2 bg-white/15" data-testid="goal-bar">
         <div
-          className="absolute inset-y-0 left-0 bg-primary"
-          style={{ width: `${pct}%` }}
+          className={`absolute inset-y-0 left-0 origin-left bg-primary ${animate ? 'animate-grow-x' : ''}`}
+          style={{ width: `${pct}%`, ...(animate ? delay(0, 0, 300) : {}) }}
         />
         {expectedPct != null && expectedPct > 0 && expectedPct < 100 && (
           <div
@@ -302,6 +362,7 @@ function GoalBlock({
             saving={saving}
             onSave={save}
             onCancel={() => setEditing(false)}
+            autoFocus
           />
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -335,6 +396,7 @@ function GoalBlock({
 // ---------------------------------------------------------------------------
 
 function MonthChart({ months }: { months: YearReview['months'] }) {
+  const animate = useContext(Motion)
   const [hovered, setHovered] = useState<number | null>(null)
   const max = Math.max(...months.map((m) => m.seconds), 1)
   const active = hovered != null ? months[hovered] : null
@@ -372,8 +434,9 @@ function MonthChart({ months }: { months: YearReview['months'] }) {
             aria-label={`${MONTHS[i]}: ${fmtHours(m.seconds)}, ${plural(m.books, 'book')}`}
           >
             <div
-              className={`w-full transition-colors ${hovered === i ? 'bg-white' : 'bg-primary'}`}
+              className={`w-full origin-bottom transition-colors ${hovered === i ? 'bg-white' : 'bg-primary'} ${animate ? 'animate-grow-y' : ''}`}
               style={{
+                ...(animate ? delay(i, 80, 200) : {}),
                 height: m.seconds
                   ? `${Math.max(2, (m.seconds / max) * 100)}%`
                   : 0,
@@ -411,13 +474,18 @@ function MonthChart({ months }: { months: YearReview['months'] }) {
 // ---------------------------------------------------------------------------
 
 function BookGrid({ books }: { books: ReviewBook[] }) {
+  const animate = useContext(Motion)
   return (
     <ol
       className="grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8"
       data-testid="year-books"
     >
       {books.map((b, i) => (
-        <li key={b.id} className="min-w-0">
+        <li
+          key={b.id}
+          className={`min-w-0 ${animate ? 'animate-fade-up' : ''}`}
+          style={animate ? delay(i, 90, 200) : undefined}
+        >
           <Link to={`/books/${b.id}`} className="group block">
             <div className="relative">
               <img
@@ -482,6 +550,7 @@ function Highlight({
 }
 
 function Highlights({ review }: { review: YearReview }) {
+  const animate = useContext(Motion)
   const h = review.highlights
   const items: React.ReactNode[] = []
   if (h.longest_book)
@@ -552,7 +621,7 @@ function Highlights({ review }: { review: YearReview }) {
   if (items.length === 0) return null
   return (
     <div
-      className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3"
+      className={`grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 ${animate ? 'stagger' : ''}`}
       data-testid="highlights"
     >
       {items}
@@ -561,6 +630,7 @@ function Highlights({ review }: { review: YearReview }) {
 }
 
 function RankedList({ title, items }: { title: string; items: Ranked[] }) {
+  const animate = useContext(Motion)
   if (items.length === 0) return null
   const max = Math.max(...items.map((i) => i.books), 1)
   return (
@@ -585,8 +655,11 @@ function RankedList({ title, items }: { title: string; items: Ranked[] }) {
               </div>
               <div className="mt-1 h-1 bg-white/10">
                 <div
-                  className="h-full bg-primary"
-                  style={{ width: `${(item.books / max) * 100}%` }}
+                  className={`h-full origin-left bg-primary ${animate ? 'animate-grow-x' : ''}`}
+                  style={{
+                    width: `${(item.books / max) * 100}%`,
+                    ...(animate ? delay(i, 120, 250) : {}),
+                  }}
                 />
               </div>
             </div>
@@ -594,6 +667,308 @@ function RankedList({ title, items }: { title: string; items: Ranked[] }) {
         ))}
       </ol>
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Totals
+// ---------------------------------------------------------------------------
+
+function Totals({ totals: t }: { totals: YearReview['totals'] }) {
+  const animate = useContext(Motion)
+  const items: [string, number, (n: number) => string][] = [
+    ['BOOKS', t.books, (n) => n.toLocaleString()],
+    ['HOURS', t.seconds, fmtHours],
+    ['PAGES', t.pages, (n) => n.toLocaleString()],
+    ['READING DAYS', t.reading_days, (n) => n.toLocaleString()],
+    ['LONGEST STREAK', t.longest_streak, (n) => plural(n, 'day')],
+    ['SESSIONS', t.sessions, (n) => n.toLocaleString()],
+  ]
+  return (
+    <dl
+      className={`grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 ${animate ? 'stagger' : ''}`}
+      data-testid="year-totals"
+    >
+      {items.map(([label, value, format]) => (
+        <div key={label} className="border-t border-white/[0.14] pt-3">
+          <dt className="text-[10px] font-semibold tracking-widest text-white/45">
+            {label}
+          </dt>
+          <dd className="mt-1 text-3xl font-extrabold tracking-tighter tabular-nums text-white sm:text-5xl">
+            <CountUp value={value} format={format} />
+          </dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Chapters: the same content, walked through one at a time or shown at once
+// ---------------------------------------------------------------------------
+
+interface Chapter {
+  key: string
+  title: string
+  insights: string[]
+  content: React.ReactNode
+}
+
+function buildChapters(
+  review: YearReview,
+  prev: YearReview | null,
+  goal: GoalProgress,
+  isFuture: boolean,
+  onGoalChange: (g: GoalProgress) => void
+): Chapter[] {
+  const withGoal = { ...review, goal }
+  const chapters: Chapter[] = [
+    {
+      key: 'year',
+      title: 'Your year',
+      insights: yearInsights(review, prev),
+      content: <Totals totals={review.totals} />,
+    },
+    {
+      key: 'goal',
+      title: 'The goal',
+      insights: goalInsights(withGoal),
+      content: (
+        <div className="max-w-2xl">
+          <GoalBlock goal={goal} isFuture={isFuture} onChange={onGoalChange} />
+        </div>
+      ),
+    },
+    {
+      key: 'months',
+      title: 'Month by month',
+      insights: monthInsights(review),
+      content: <MonthChart months={review.months} />,
+    },
+  ]
+  if (review.books.length > 0)
+    chapters.push({
+      key: 'books',
+      title: `Finished in ${review.year}`,
+      insights: bookInsights(review),
+      content: <BookGrid books={review.books} />,
+    })
+  if (review.books.length > 0 || review.totals.seconds > 0)
+    chapters.push({
+      key: 'highlights',
+      title: 'Highlights',
+      insights: highlightInsights(review),
+      content: <Highlights review={review} />,
+    })
+  if (review.top_authors.length > 0 || review.top_genres.length > 0)
+    chapters.push({
+      key: 'most-read',
+      title: 'Most read',
+      insights: mostReadInsights(review),
+      content: (
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+          <RankedList title="AUTHORS" items={review.top_authors} />
+          <RankedList title="GENRES" items={review.top_genres} />
+        </div>
+      ),
+    })
+  return chapters
+}
+
+function AllChapters({ chapters }: { chapters: Chapter[] }) {
+  return (
+    <Motion.Provider value={false}>
+      <div className="space-y-14" data-testid="all-chapters">
+        {chapters.map((c, i) => (
+          <section key={c.key}>
+            <SectionTitle index={i + 1}>{c.title}</SectionTitle>
+            <Insights lines={c.insights} />
+            {c.content}
+          </section>
+        ))}
+      </div>
+    </Motion.Provider>
+  )
+}
+
+/** One chapter at a time, animated in, with Back/Next and arrow keys. */
+function Walkthrough({
+  year,
+  totals,
+  chapters,
+  onShowAll,
+}: {
+  year: number
+  totals: YearReview['totals']
+  chapters: Chapter[]
+  onShowAll: () => void
+}) {
+  const [step, setStep] = useState(0)
+  const top = useRef<HTMLDivElement>(null)
+  const touch = useRef<{ x: number; y: number } | null>(null)
+  const n = chapters.length
+  const finished = step >= n
+  const chapter = chapters[Math.min(step, n - 1)]
+
+  const go = (to: number) => {
+    setStep(Math.max(0, Math.min(n, to)))
+    const el = top.current
+    if (el && el.getBoundingClientRect().top < 0)
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable]')) return
+      if (e.key === 'ArrowRight') setStep((s) => Math.min(n, s + 1))
+      if (e.key === 'ArrowLeft') setStep((s) => Math.max(0, s - 1))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [n])
+
+  return (
+    <Motion.Provider value={true}>
+      <div
+        ref={top}
+        className="scroll-mt-4"
+        data-testid="walkthrough"
+        // Swipe left or right on a phone to move between chapters.
+        onTouchStart={(e) => {
+          const t = e.touches[0]
+          touch.current = { x: t.clientX, y: t.clientY }
+        }}
+        onTouchEnd={(e) => {
+          const start = touch.current
+          touch.current = null
+          if (!start) return
+          const t = e.changedTouches[0]
+          const dx = t.clientX - start.x
+          const dy = t.clientY - start.y
+          if (Math.abs(dx) > 60 && Math.abs(dy) < 50)
+            go(step + (dx < 0 ? 1 : -1))
+        }}
+      >
+        {/* Progress: one segment per chapter; tap one to jump there */}
+        <div className="mb-8 flex gap-1" role="tablist" aria-label="Chapters">
+          {chapters.map((c, i) => (
+            <button
+              key={c.key}
+              role="tab"
+              aria-selected={i === step}
+              aria-label={c.title}
+              onClick={() => go(i)}
+              className="group h-5 flex-1 py-2"
+            >
+              <span className="block h-1 bg-white/15 group-hover:bg-white/30">
+                <span
+                  className={`block h-full origin-left bg-primary ${i === step ? 'animate-grow-x' : ''}`}
+                  style={{ width: i <= step ? '100%' : '0%' }}
+                />
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {finished ? (
+          <div
+            key="end"
+            className="py-10 sm:py-16"
+            data-testid="walkthrough-end"
+          >
+            <p className="animate-fade-up text-5xl font-extrabold tracking-tighter text-white sm:text-8xl">
+              {year === new Date().getFullYear()
+                ? `${year} so far.`
+                : `That was ${year}.`}
+            </p>
+            <div className="mt-8 flex flex-wrap gap-x-10 gap-y-4">
+              {(
+                [
+                  ['books', totals.books.toLocaleString()],
+                  ['hours', Math.round(totals.seconds / 3600).toLocaleString()],
+                  ['reading days', totals.reading_days.toLocaleString()],
+                ] as const
+              ).map(([label, value], i) => (
+                <div
+                  key={label}
+                  className="animate-fade-up"
+                  style={delay(i, 150, 250)}
+                >
+                  <p className="text-4xl font-extrabold tracking-tighter tabular-nums text-primary-400 sm:text-6xl">
+                    {value}
+                  </p>
+                  <p className="text-xs font-semibold tracking-widest text-white/50">
+                    {label.toUpperCase()}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p
+              className="mt-8 max-w-2xl animate-fade-up text-lg text-white/60"
+              style={delay(0, 0, 750)}
+            >
+              {chapters[0].insights[0]}
+            </p>
+            <div
+              className="mt-10 flex animate-fade-up flex-wrap gap-3"
+              style={delay(0, 0, 950)}
+            >
+              <button
+                onClick={onShowAll}
+                className="flex items-center gap-2 bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-600"
+                data-testid="walkthrough-show-all"
+              >
+                <LayoutList size={14} /> See everything
+              </button>
+              <button
+                onClick={() => go(0)}
+                className="flex items-center gap-2 border border-white/25 px-4 py-2.5 text-sm font-semibold text-white/80 hover:bg-white hover:text-black"
+              >
+                <RotateCcw size={14} /> Start again
+              </button>
+            </div>
+          </div>
+        ) : (
+          <section key={chapter.key} className="min-h-[50vh]">
+            <p className="text-xs font-semibold tabular-nums text-white/40">
+              {String(step + 1).padStart(2, '0')} / {String(n).padStart(2, '0')}
+            </p>
+            <h2
+              className="mb-5 mt-1 animate-fade-up text-4xl font-extrabold tracking-tighter text-white sm:text-6xl"
+              data-testid="walkthrough-title"
+            >
+              {chapter.title}
+            </h2>
+            <Insights lines={chapter.insights} />
+            {chapter.content}
+          </section>
+        )}
+
+        {!finished && (
+          <nav className="mt-12 flex items-center justify-between gap-3 border-t border-white/[0.14] pt-4">
+            <button
+              onClick={() => go(step - 1)}
+              disabled={step === 0}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white/60 hover:text-white disabled:opacity-25"
+            >
+              <ArrowLeft size={14} /> Back
+            </button>
+            <span className="hidden text-[11px] text-white/35 sm:inline">
+              Use ← → to move between chapters
+            </span>
+            <button
+              onClick={() => go(step + 1)}
+              className="flex items-center gap-2 bg-white px-4 py-2 text-sm font-semibold text-black hover:bg-white/85"
+              data-testid="walkthrough-next"
+            >
+              {step === n - 1 ? 'Finish' : `Next: ${chapters[step + 1].title}`}
+              <ArrowRight size={14} />
+            </button>
+          </nav>
+        )}
+      </div>
+    </Motion.Provider>
   )
 }
 
@@ -610,9 +985,24 @@ export default function YearInReview() {
       ? parsed
       : thisYear
 
+  // Walk through the year chapter by chapter with animations, or show it all
+  // at once. Starts off for people who've asked their system for less motion.
+  const [walkthrough, setWalkthrough] = usePersistedState(
+    'shelfloom:year-review-walkthrough',
+    prefersMotion()
+  )
+  // Finishing a walkthrough shows everything for that year, without turning
+  // the walkthrough off for next time.
+  const [showAllFor, setShowAllFor] = useState<number | null>(null)
+
   const { data: years } = useApi<number[]>('/api/stats/years')
   const { data, loading, error } = useApi<YearReview>(`/api/stats/year/${year}`)
+  const hasPrev = (years ?? []).includes(year - 1)
+  const { data: prevData } = useApi<YearReview>(
+    hasPrev ? `/api/stats/year/${year - 1}` : null
+  )
   const review = data && data.year === year ? data : null
+  const prevReview = prevData && prevData.year === year - 1 ? prevData : null
   // Goal edits update in place without refetching the whole review.
   const [edited, setEdited] = useState<GoalProgress | null>(null)
   const goal = edited?.year === year ? edited : (review?.goal ?? null)
@@ -627,8 +1017,11 @@ export default function YearInReview() {
 
   const t = review?.totals
   const isCurrent = year === thisYear
-  let n = 0
-  const idx = () => ++n
+  const chapters =
+    review && goal
+      ? buildChapters(review, prevReview, goal, year > thisYear, setEdited)
+      : []
+  const walking = walkthrough && showAllFor !== year
 
   return (
     <div className="mx-auto min-h-screen max-w-[1600px] px-4 pb-16 pt-6 sm:px-6 lg:px-10 lg:pt-10">
@@ -662,33 +1055,60 @@ export default function YearInReview() {
                 : ''}
           </p>
         </div>
-        <div className="flex border border-white/25">
-          {prev !== undefined ? (
-            <Link
-              to={`/stats/year/${prev}`}
-              className="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-white/70 transition-colors hover:bg-white hover:text-black"
-              data-testid="year-prev"
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              setWalkthrough(!walkthrough)
+              setShowAllFor(null)
+            }}
+            aria-pressed={walkthrough}
+            className="flex items-center gap-2.5 border border-white/25 px-3 py-2 text-xs font-semibold text-white/80 transition-colors hover:border-white"
+            data-testid="walkthrough-toggle"
+            title={
+              walkthrough
+                ? 'Show everything at once, without animations'
+                : 'Walk through the year chapter by chapter, animated'
+            }
+          >
+            {walkthrough ? <Play size={12} /> : <LayoutList size={12} />}
+            Walkthrough
+            <span
+              className={`relative h-4 w-7 transition-colors ${walkthrough ? 'bg-primary' : 'bg-white/20'}`}
+              aria-hidden
             >
-              <ChevronLeft size={13} /> {prev}
-            </Link>
-          ) : (
-            <span className="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-white/20">
-              <ChevronLeft size={13} />
+              <span
+                className={`absolute top-0.5 size-3 bg-white transition-all ${walkthrough ? 'left-3.5' : 'left-0.5'}`}
+              />
             </span>
-          )}
-          {next !== undefined ? (
-            <Link
-              to={`/stats/year/${next}`}
-              className="flex items-center gap-1 border-l border-white/25 px-3 py-2 text-xs font-semibold text-white/70 transition-colors hover:bg-white hover:text-black"
-              data-testid="year-next"
-            >
-              {next} <ChevronRight size={13} />
-            </Link>
-          ) : (
-            <span className="flex items-center gap-1 border-l border-white/25 px-3 py-2 text-xs font-semibold text-white/20">
-              <ChevronRight size={13} />
-            </span>
-          )}
+          </button>
+          <div className="flex border border-white/25">
+            {prev !== undefined ? (
+              <Link
+                to={`/stats/year/${prev}`}
+                className="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-white/70 transition-colors hover:bg-white hover:text-black"
+                data-testid="year-prev"
+              >
+                <ChevronLeft size={13} /> {prev}
+              </Link>
+            ) : (
+              <span className="flex items-center gap-1 px-3 py-2 text-xs font-semibold text-white/20">
+                <ChevronLeft size={13} />
+              </span>
+            )}
+            {next !== undefined ? (
+              <Link
+                to={`/stats/year/${next}`}
+                className="flex items-center gap-1 border-l border-white/25 px-3 py-2 text-xs font-semibold text-white/70 transition-colors hover:bg-white hover:text-black"
+                data-testid="year-next"
+              >
+                {next} <ChevronRight size={13} />
+              </Link>
+            ) : (
+              <span className="flex items-center gap-1 border-l border-white/25 px-3 py-2 text-xs font-semibold text-white/20">
+                <ChevronRight size={13} />
+              </span>
+            )}
+          </div>
         </div>
       </header>
 
@@ -701,77 +1121,18 @@ export default function YearInReview() {
         </p>
       )}
 
-      {review && t && (
-        <div className="space-y-14">
-          <section className="grid grid-cols-12 gap-6">
-            <div className="col-span-12 lg:col-span-5">
-              {goal && (
-                <GoalBlock
-                  goal={goal}
-                  isFuture={year > thisYear}
-                  onChange={setEdited}
-                />
-              )}
-            </div>
-            <dl
-              className="col-span-12 grid grid-cols-2 gap-x-6 gap-y-5 self-start sm:grid-cols-3 lg:col-span-7"
-              data-testid="year-totals"
-            >
-              {[
-                ['BOOKS', t.books.toLocaleString()],
-                ['HOURS', fmtHours(t.seconds)],
-                ['PAGES', t.pages.toLocaleString()],
-                ['READING DAYS', t.reading_days.toLocaleString()],
-                ['LONGEST STREAK', plural(t.longest_streak, 'day')],
-                ['SESSIONS', t.sessions.toLocaleString()],
-              ].map(([label, value]) => (
-                <div key={label} className="border-t border-white/[0.14] pt-3">
-                  <dt className="text-[10px] font-semibold tracking-widest text-white/45">
-                    {label}
-                  </dt>
-                  <dd className="mt-1 text-3xl font-extrabold tracking-tighter tabular-nums text-white sm:text-4xl">
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-
-          <section>
-            <SectionTitle index={idx()}>Month by month</SectionTitle>
-            <MonthChart months={review.months} />
-          </section>
-
-          {review.books.length > 0 && (
-            <section>
-              <SectionTitle index={idx()}>
-                Finished in {year}
-                <span className="ml-3 text-base font-semibold tabular-nums text-white/40">
-                  {review.books.length}
-                </span>
-              </SectionTitle>
-              <BookGrid books={review.books} />
-            </section>
-          )}
-
-          {(review.books.length > 0 || t.seconds > 0) && (
-            <section>
-              <SectionTitle index={idx()}>Highlights</SectionTitle>
-              <Highlights review={review} />
-            </section>
-          )}
-
-          {(review.top_authors.length > 0 || review.top_genres.length > 0) && (
-            <section>
-              <SectionTitle index={idx()}>Most read</SectionTitle>
-              <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
-                <RankedList title="AUTHORS" items={review.top_authors} />
-                <RankedList title="GENRES" items={review.top_genres} />
-              </div>
-            </section>
-          )}
-        </div>
-      )}
+      {chapters.length > 0 &&
+        (walking ? (
+          <Walkthrough
+            key={year}
+            year={year}
+            totals={review!.totals}
+            chapters={chapters}
+            onShowAll={() => setShowAllFor(year)}
+          />
+        ) : (
+          <AllChapters chapters={chapters} />
+        ))}
     </div>
   )
 }

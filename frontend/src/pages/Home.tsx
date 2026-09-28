@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
+import { useCountUp } from '../hooks/useCountUp'
 import { ReadingHeatmap } from '../components/ReadingHeatmap'
 import type { PaginatedResponse } from '../types'
 import type { Book, SerialDashboardEntry } from '../types'
@@ -91,45 +92,6 @@ const WEEK_START = (() => {
   d.setUTCHours(0, 0, 0, 0)
   return d.toISOString()
 })()
-
-// ---------------------------------------------------------------------------
-// Motion helpers
-// ---------------------------------------------------------------------------
-
-function prefersMotion(): boolean {
-  if (typeof window === 'undefined' || !window.matchMedia) return false
-  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
-/** Animates a number from 0 → target once it becomes known. */
-function useCountUp(target: number | null, durationMs = 900): number | null {
-  const [value, setValue] = useState<number | null>(
-    target == null || !prefersMotion() ? target : 0
-  )
-
-  useEffect(() => {
-    if (target == null) {
-      setValue(null)
-      return
-    }
-    if (!prefersMotion() || typeof requestAnimationFrame === 'undefined') {
-      setValue(target)
-      return
-    }
-    let frame = 0
-    const start = performance.now()
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / durationMs)
-      const eased = 1 - Math.pow(1 - t, 3)
-      setValue(Math.round(target * eased))
-      if (t < 1) frame = requestAnimationFrame(tick)
-    }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [target, durationMs])
-
-  return value
-}
 
 function greeting(): string {
   const h = new Date().getHours()

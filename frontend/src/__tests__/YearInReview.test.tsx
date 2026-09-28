@@ -100,6 +100,7 @@ function renderPage(year = '2025') {
 
 describe('YearInReview', () => {
   beforeEach(() => {
+    localStorage.clear()
     data = review()
     calls = []
     vi.stubGlobal('fetch', vi.fn(mockFetch))
@@ -202,5 +203,66 @@ describe('YearInReview', () => {
     ).toBeInTheDocument()
     expect(screen.queryByTestId('year-books')).not.toBeInTheDocument()
     expect(screen.queryByTestId('highlights')).not.toBeInTheDocument()
+  })
+
+  it('shows an insight under each section when everything is shown at once', async () => {
+    renderPage()
+    await screen.findByTestId('all-chapters')
+    expect(screen.getAllByTestId('insights').length).toBeGreaterThanOrEqual(4)
+    expect(
+      screen.getByText(/March was your biggest month: 2h, 67% of the year/)
+    ).toBeInTheDocument()
+    expect(screen.getByText(/An evening reader/)).toBeInTheDocument()
+  })
+
+  it('walks through the year chapter by chapter', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.click(await screen.findByTestId('walkthrough-toggle'))
+    expect(localStorage.getItem('shelfloom:year-review-walkthrough')).toBe(
+      'true'
+    )
+    expect(screen.getByTestId('walkthrough-title')).toHaveTextContent(
+      'Your year'
+    )
+    expect(screen.queryByTestId('all-chapters')).not.toBeInTheDocument()
+
+    await user.click(screen.getByTestId('walkthrough-next'))
+    expect(screen.getByTestId('walkthrough-title')).toHaveTextContent(
+      'The goal'
+    )
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByTestId('walkthrough-title')).toHaveTextContent(
+      'Month by month'
+    )
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByTestId('walkthrough-title')).toHaveTextContent(
+      'The goal'
+    )
+
+    // Jump to the last chapter from the progress bar, then finish.
+    await user.click(screen.getByRole('tab', { name: 'Most read' }))
+    await user.click(screen.getByTestId('walkthrough-next'))
+    expect(screen.getByTestId('walkthrough-end')).toHaveTextContent(
+      'That was 2025.'
+    )
+    await user.click(screen.getByTestId('walkthrough-show-all'))
+    expect(screen.getByTestId('all-chapters')).toBeInTheDocument()
+    // Seeing everything once doesn't turn the walkthrough off for next time.
+    expect(localStorage.getItem('shelfloom:year-review-walkthrough')).toBe(
+      'true'
+    )
+  })
+
+  it('remembers when the walkthrough is turned off', async () => {
+    localStorage.setItem('shelfloom:year-review-walkthrough', 'true')
+    const user = userEvent.setup()
+    renderPage()
+    expect(await screen.findByTestId('walkthrough')).toBeInTheDocument()
+    await user.click(screen.getByTestId('walkthrough-toggle'))
+    expect(screen.getByTestId('all-chapters')).toBeInTheDocument()
+    expect(localStorage.getItem('shelfloom:year-review-walkthrough')).toBe(
+      'false'
+    )
   })
 })
