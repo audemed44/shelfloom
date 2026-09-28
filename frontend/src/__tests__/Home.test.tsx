@@ -103,11 +103,22 @@ const MOCK_BATCH_STATUS = {
   error: null,
 }
 
+const MOCK_GOAL = {
+  year: new Date().getFullYear(),
+  target: 30,
+  completed: 0,
+  expected_by_now: 5,
+  status: 'behind',
+  remaining: 30,
+  per_month_needed: 3,
+}
+
 function mockFetch(url: string, init?: RequestInit): Promise<Response> {
   let data: unknown = null
   const method = init?.method?.toUpperCase() ?? 'GET'
 
   if (url.includes('/api/books')) data = MOCK_BOOKS_RESPONSE
+  else if (url.includes('/api/stats/goal/')) data = MOCK_GOAL
   else if (url.includes('/api/stats/overview')) data = MOCK_OVERVIEW
   else if (url.includes('/api/stats/heatmap')) data = MOCK_HEATMAP
   else if (url.includes('/api/stats/reading-time')) data = MOCK_TIME_SERIES
@@ -284,6 +295,17 @@ describe('Home', () => {
             (init as RequestInit | undefined)?.method === 'POST'
         )
       ).toBe(true)
+    )
+  })
+
+  it('shows this year against the reading goal', async () => {
+    await renderHome()
+    const goal = await screen.findByTestId('goal-stat')
+    await waitFor(() => expect(goal).toHaveTextContent('/30'))
+    expect(goal).toHaveTextContent('Behind pace')
+    expect(goal).toHaveAttribute(
+      'href',
+      `/stats/year/${new Date().getFullYear()}`
     )
   })
 })

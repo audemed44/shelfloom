@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_session
@@ -132,3 +133,52 @@ async def by_book(
     if result is None:
         raise HTTPException(status_code=404, detail="Book not found")
     return result
+
+
+# ── goals and year in review ──────────────────────────────────────────────────
+
+
+class GoalIn(BaseModel):
+    books: int = Field(ge=1, le=1000)
+
+
+@router.get("/years")
+async def years(session: AsyncSession = Depends(get_session)) -> list[int]:
+    """Years with reading data (and the current year), newest first."""
+    from app.services.year_review import years_with_data
+
+    return await years_with_data(session)
+
+
+@router.get("/year/{year}")
+async def year_in_review(year: int, session: AsyncSession = Depends(get_session)) -> dict:
+    """Everything read in a calendar year: totals, months, books and highlights."""
+    from app.services.year_review import year_review
+
+    if not 1900 <= year <= 2200:
+        raise HTTPException(status_code=422, detail="Year out of range")
+    return await year_review(session, year)
+
+
+@router.get("/goal/{year}")
+async def get_goal(year: int, session: AsyncSession = Depends(get_session)) -> dict:
+    """The year's reading goal and progress (target is null if none is set)."""
+    from app.services.year_review import goal_progress
+
+    return await goal_progress(session, year)
+
+
+@router.put("/goal/{year}")
+async def put_goal(year: int, body: GoalIn, session: AsyncSession = Depends(get_session)) -> dict:
+    from app.services.year_review import goal_progress, set_goal
+
+    await set_goal(session, year, body.books)
+    return await goal_progress(session, year)
+
+
+@router.delete("/goal/{year}", status_code=204)
+async def remove_goal(year: int, session: AsyncSession = Depends(get_session)) -> None:
+    from app.services.year_review import delete_goal
+
+    if not await delete_goal(session, year):
+        raise HTTPException(status_code=404, detail="No goal for that year")
