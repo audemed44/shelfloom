@@ -1,4 +1,5 @@
 import os
+import time
 
 import pytest
 import pytest_asyncio
@@ -8,6 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.database import Base, get_session, make_engine
 from app.main import create_app
+
+# Stats group reading by the server's local time zone. Pin it to UTC so results
+# don't depend on the machine running the tests (CI is UTC, a dev box may not be);
+# tests that exercise another zone set TZ themselves.
+os.environ["TZ"] = "UTC"
+time.tzset()
 
 
 def _worker_id() -> str:
