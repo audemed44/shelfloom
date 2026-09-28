@@ -253,7 +253,7 @@ function HeroBook({ book }: { book: Book & { reading_progress?: number } }) {
     book.format === 'epub' && !book.file_path?.startsWith('manual://')
   return (
     <div
-      className="group relative grid grid-cols-[auto_1fr] border border-white/[0.14] border-t-white border-t-2 bg-white/[0.02] transition-colors hover:bg-white/[0.05]"
+      className="group relative grid grid-cols-[auto_1fr] border border-white/[0.14] bg-white/[0.02] transition-colors hover:bg-white/[0.05]"
       data-testid="hero-book"
     >
       <Link
