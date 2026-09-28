@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,9 +14,9 @@ from app.services import stats_service
 
 
 def _naive(dt: datetime | None) -> datetime | None:
-    """Strip tzinfo so SQLite string comparisons work against naive stored datetimes."""
+    """Naive UTC, to compare against the naive UTC times stored in SQLite."""
     if dt is not None and dt.tzinfo is not None:
-        return dt.replace(tzinfo=None)
+        return dt.astimezone(UTC).replace(tzinfo=None)
     return dt
 
 
@@ -87,21 +87,33 @@ async def heatmap(
 
 
 @router.get("/distribution")
-async def distribution(session: AsyncSession = Depends(get_session)) -> dict:
-    """Reading time by hour-of-day and day-of-week."""
-    return await stats_service.get_distribution(session)
+async def distribution(
+    from_: datetime | None = Query(None, alias="from"),
+    to_: datetime | None = Query(None, alias="to"),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """Reading time by local hour-of-day and day-of-week."""
+    return await stats_service.get_distribution(session, _naive(from_), _naive(to_))
 
 
 @router.get("/by-author")
-async def by_author(session: AsyncSession = Depends(get_session)) -> list[dict]:
+async def by_author(
+    from_: datetime | None = Query(None, alias="from"),
+    to_: datetime | None = Query(None, alias="to"),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
     """Reading time per author, sorted descending."""
-    return await stats_service.get_by_author(session)
+    return await stats_service.get_by_author(session, _naive(from_), _naive(to_))
 
 
 @router.get("/by-tag")
-async def by_tag(session: AsyncSession = Depends(get_session)) -> list[dict]:
+async def by_tag(
+    from_: datetime | None = Query(None, alias="from"),
+    to_: datetime | None = Query(None, alias="to"),
+    session: AsyncSession = Depends(get_session),
+) -> list[dict]:
     """Reading time per tag, sorted descending."""
-    return await stats_service.get_by_tag(session)
+    return await stats_service.get_by_tag(session, _naive(from_), _naive(to_))
 
 
 @router.get("/recent-sessions")

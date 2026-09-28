@@ -238,11 +238,11 @@ async def test_reading_time_week_granularity(
     book = await _make_book(db_session, shelf.id)
     await _make_session(db_session, book.id, datetime(2024, 1, 8, tzinfo=UTC), duration=300)
 
-    resp = await client.get("/api/stats/reading-time?granularity=week")
+    resp = await client.get("/api/stats/reading-time?granularity=week&to=2024-01-21T23:59:59")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 1
-    assert data[0]["value"] == 300
+    # Weeks are keyed by their Monday, and empty weeks are included.
+    assert data == [{"date": "2024-01-08", "value": 300}, {"date": "2024-01-15", "value": 0}]
 
 
 @pytest.mark.asyncio
@@ -253,11 +253,14 @@ async def test_reading_time_date_filter(
     await _make_session(db_session, book.id, datetime(2024, 1, 1, tzinfo=UTC), duration=100)
     await _make_session(db_session, book.id, datetime(2024, 6, 1, tzinfo=UTC), duration=200)
 
-    resp = await client.get("/api/stats/reading-time?from=2024-03-01T00:00:00")
+    resp = await client.get(
+        "/api/stats/reading-time?from=2024-03-01T00:00:00&to=2024-06-30T23:59:59"
+    )
     data = resp.json()
-    assert all(r["date"] >= "2024-03" for r in data)
-    assert len(data) == 1
-    assert data[0]["value"] == 200
+    assert data[0]["date"] == "2024-03-01"
+    assert data[-1]["date"] == "2024-06-30"
+    assert len(data) == 122  # every day of the range, zeros included
+    assert [r for r in data if r["value"]] == [{"date": "2024-06-01", "value": 200}]
 
 
 # ---------------------------------------------------------------------------
