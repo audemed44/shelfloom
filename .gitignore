@@ -42,9 +42,11 @@ Thumbs.db
 
 *.log
 
-# Root-level markdown files (project notes, plans) — except README
+# Root-level markdown files (project notes, plans) — except README and agent instructions
 /*.md
 !/README.md
+!/CLAUDE.md
+!/AGENTS.md
 
 # IDE/assistant local files
 .claude/
