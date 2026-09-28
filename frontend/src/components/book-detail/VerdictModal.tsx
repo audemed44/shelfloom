@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertTriangle, RotateCcw, X } from 'lucide-react'
 import { api } from '../../api/client'
 import type { BookDetail } from '../../types'
@@ -25,7 +26,13 @@ export default function VerdictModal({
       if (event.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
+    // Keep the page behind still, so scrolling moves the dialog's content.
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = overflow
+    }
   }, [onClose])
 
   const handleSave = async () => {
@@ -47,14 +54,25 @@ export default function VerdictModal({
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+  // On <body>, so it sits above the bottom bar (the page's main area is its own
+  // stacking context). Full-screen on phones, sized to the visible viewport
+  // (dvh) so the footer with Save is never hidden behind browser toolbars.
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[60] flex items-stretch justify-center sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Your verdict on ${book.title}`}
+    >
       <div
         className="absolute inset-0 bg-black/70 animate-fade-in"
         onClick={onClose}
       />
-      <div className="rounded-2xl shadow-lift ring-1 ring-white/[0.04] animate-scale-in relative w-full max-w-2xl bg-ink-900 border border-white/10 flex max-h-[85vh] flex-col">
-        <div className="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-white/10 bg-ink-900">
+      <div
+        className="relative flex h-[100dvh] w-full max-w-2xl flex-col bg-ink-900 animate-scale-in sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl sm:border sm:border-white/10 sm:shadow-lift sm:ring-1 sm:ring-white/[0.04]"
+        data-testid="verdict-modal"
+      >
+        <div className="flex shrink-0 items-center justify-between px-5 py-4 border-b border-white/10 bg-ink-900 sm:px-6">
           <div>
             <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
               Your Verdict
@@ -72,7 +90,7 @@ export default function VerdictModal({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-6 space-y-8 sm:px-6">
           <section>
             <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-6">
               <p className="text-[10px] font-black tracking-widest uppercase text-white/40">
@@ -145,7 +163,7 @@ export default function VerdictModal({
           </section>
         </div>
 
-        <div className="sticky bottom-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-white/10 bg-ink-900">
+        <div className="flex shrink-0 items-center justify-end gap-3 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-white/10 bg-ink-900 sm:px-6 sm:pb-4">
           <button
             type="button"
             onClick={onClose}
@@ -163,6 +181,7 @@ export default function VerdictModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -427,6 +427,20 @@ describe('BookDetail', () => {
     )
   })
 
+  it('opens the verdict editor above the page and keeps the page from scrolling', async () => {
+    const user = userEvent.setup()
+    renderDetail()
+    await waitFor(() => screen.getByTestId('review-btn'))
+    await user.click(screen.getByTestId('review-btn'))
+    const modal = screen.getByTestId('verdict-modal')
+    // On <body>, so the phone's bottom bar can't cover its Save button.
+    expect(modal.closest('[role="dialog"]')?.parentElement).toBe(document.body)
+    expect(document.body.style.overflow).toBe('hidden')
+    await user.keyboard('{Escape}')
+    expect(screen.queryByTestId('verdict-modal')).not.toBeInTheDocument()
+    expect(document.body.style.overflow).toBe('')
+  })
+
   it('shows the More menu outside the page layout and closes it on Escape', async () => {
     const user = userEvent.setup()
     renderDetail()
