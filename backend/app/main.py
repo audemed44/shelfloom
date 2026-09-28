@@ -163,6 +163,7 @@ def create_app() -> FastAPI:
         import_,
         kosync,
         lenses,
+        library_health,
         organizer,
         reading,
         serials,
@@ -189,6 +190,7 @@ def create_app() -> FastAPI:
     application.include_router(fs.router, prefix="/api")
     application.include_router(stats.router, prefix="/api")
     application.include_router(data_mgmt.router, prefix="/api")
+    application.include_router(library_health.router, prefix="/api")
 
     # Serve built frontend — only when dist exists (skipped in dev / CI)
     if _FRONTEND_DIST.exists():  # pragma: no cover

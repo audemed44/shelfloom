@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   ArrowRight,
   RefreshCw,
+  Sparkles,
   Loader2,
   Upload,
   PlusCircle,
@@ -304,6 +305,7 @@ export default function BookDetailPage() {
   const [coverRefreshing, setCoverRefreshing] = useState(false)
   const [coverUploading, setCoverUploading] = useState(false)
   const [coverKey, setCoverKey] = useState(0)
+  const [coverGenerating, setCoverGenerating] = useState(false)
   const [markingRead, setMarkingRead] = useState(false)
   const [summaryKey, setSummaryKey] = useState(0)
   const [sessionsKey, setSessionsKey] = useState(0)
@@ -389,6 +391,33 @@ export default function BookDetailPage() {
       // silently ignore
     } finally {
       setCoverRefreshing(false)
+    }
+  }
+
+  const handleGenerateCover = async () => {
+    if (!id || !book) return
+    if (
+      book.cover_path &&
+      !book.cover_path.endsWith('-generated.jpg') &&
+      !window.confirm(
+        'Replace the current cover with one made by Shelfloom? It is also written into the book file.'
+      )
+    )
+      return
+    setCoverGenerating(true)
+    try {
+      const res = await api.post<{ cover_path: string }>(
+        `/api/books/${id}/generate-cover`,
+        { embed: true }
+      )
+      if (res) {
+        setBook({ ...book, cover_path: res.cover_path })
+        setCoverKey((k) => k + 1)
+      }
+    } catch {
+      // silently ignore
+    } finally {
+      setCoverGenerating(false)
     }
   }
 
@@ -610,6 +639,20 @@ export default function BookDetailPage() {
                     onChange={handleUploadCover}
                   />
                 </label>
+                <button
+                  onClick={handleGenerateCover}
+                  disabled={coverGenerating}
+                  data-testid="generate-cover-btn"
+                  title="Make a cover (title, author and series)"
+                  aria-label="Make a cover"
+                  className="grid size-8 place-items-center bg-black text-white/80 hover:bg-white hover:text-black transition-all disabled:opacity-40"
+                >
+                  {coverGenerating ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={13} />
+                  )}
+                </button>
                 <button
                   onClick={handleRefreshCover}
                   disabled={coverRefreshing}

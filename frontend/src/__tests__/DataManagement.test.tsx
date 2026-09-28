@@ -124,6 +124,8 @@ async function renderPage() {
       <DataManagement />
     </TestMemoryRouter>
   )
+  // Library Health opens first; these tests start from Duplicate Sessions.
+  await userEvent.click(screen.getByText('Duplicate Sessions'))
 
   await waitFor(() => {
     expect(
@@ -144,8 +146,9 @@ describe('DataManagement page', () => {
     expect(screen.getByText('Data Management')).toBeInTheDocument()
   })
 
-  it('shows four tabs', async () => {
+  it('shows the tabs, starting with Library Health', async () => {
     await renderPage()
+    expect(screen.getByText('Library Health')).toBeInTheDocument()
     expect(screen.getByText('Duplicate Sessions')).toBeInTheDocument()
     expect(screen.getByText('Unmatched Data')).toBeInTheDocument()
     expect(screen.getByText('Duplicate Books')).toBeInTheDocument()
