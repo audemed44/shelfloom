@@ -127,6 +127,18 @@ def safe_move_with_sdr(src: Path, dst: Path) -> None:
     src.unlink()
 
 
+def prune_empty_dirs(start: Path, root: Path) -> None:
+    """Remove start and any ancestors left empty, stopping at (never removing) root."""
+    root = root.resolve()
+    current = start.resolve()
+    while current != root and current.is_relative_to(root):
+        try:
+            current.rmdir()
+        except OSError:
+            break  # not empty (or not removable) — leave it and everything above
+        current = current.parent
+
+
 # ── DB queries ────────────────────────────────────────────────────────────────
 
 
@@ -212,6 +224,7 @@ async def organize_book(
 
     try:
         safe_move_with_sdr(src, dst)
+        prune_empty_dirs(src.parent, shelf_root)
         log = RenameLog(
             book_id=book.id,
             shelf_id=shelf.id,

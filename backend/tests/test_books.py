@@ -747,6 +747,41 @@ async def test_move_book_auto_organize_shelf_applies_template(client, db_session
     assert (dst_path / "Test Author" / "Auto Book.epub").exists()
 
 
+async def test_move_book_removes_emptied_series_folders(client, db_session, tmp_path):
+    """Moving the last book out of a series folder removes the now-empty folders."""
+    src_path = tmp_path / "sync"
+    dst_path = tmp_path / "library"
+    src_path.mkdir()
+    dst_path.mkdir()
+    shelf1 = await _create_shelf(db_session, src_path, "KOReader")
+    shelf2 = await _create_shelf(db_session, dst_path, "Library")
+
+    series_dir = src_path / "Author" / "Series"
+    series_dir.mkdir(parents=True)
+    books = []
+    for name in ("one", "two"):
+        _make_epub(series_dir / f"{name}.epub")
+        book = Book(
+            id=str(uuid.uuid4()),
+            title=name,
+            format="epub",
+            file_path=f"Author/Series/{name}.epub",
+            shelf_id=shelf1.id,
+        )
+        db_session.add(book)
+        books.append(book)
+    await db_session.commit()
+
+    resp = await client.post(f"/api/books/{books[0].id}/move", json={"shelf_id": shelf2.id})
+    assert resp.status_code == 200
+    assert series_dir.is_dir()  # still holds the second book
+
+    resp = await client.post(f"/api/books/{books[1].id}/move", json={"shelf_id": shelf2.id})
+    assert resp.status_code == 200
+    assert not (src_path / "Author").exists()
+    assert src_path.is_dir()
+
+
 # ── refresh-cover ─────────────────────────────────────────────────────────────
 
 

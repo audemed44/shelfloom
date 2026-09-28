@@ -666,6 +666,11 @@ async def move_book(
 
     src_path.unlink()
 
+    # Clean up series/author folders the move left empty on the source shelf
+    from app.services.organizer import prune_empty_dirs
+
+    prune_empty_dirs(src_path.parent, Path(src_shelf.path))
+
     # Log rename if path changed (template was applied during move)
     if (dst_shelf.auto_organize or dst_shelf.is_sync_target) and new_rel_path != book.file_path:
         from app.models.organize import RenameLog
