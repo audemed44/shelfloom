@@ -30,7 +30,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 npm run lint          # ruff + eslint
 npm run test          # pytest (90% coverage floor) + vitest
 cd backend && uv run ruff format --check .
-cd frontend && npx prettier --check "src/**/*.{ts,tsx}" && npx tsc --noEmit -p . && npm run build
+cd frontend && npx prettier --check "src/**/*.{ts,tsx}" && npx tsc -b && npm run build
 ```
 
 ## Conventions
