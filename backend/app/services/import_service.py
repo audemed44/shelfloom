@@ -185,6 +185,11 @@ async def _process_file(
         if book.file_hash == pre_sha:
             return "skipped"
         # Content changed — refresh file-derived state without overwriting UI-edited metadata.
+        # The digest being replaced may be one KOReader learned from a .sdr
+        # rather than one computed from a file version, so keep it explicitly.
+        from app.services.kosync_service import remember_digest
+
+        await remember_digest(session, book, book.file_hash_md5_ko)
         await _record_hash(session, book, pre_sha, pre_md5, book.page_count, pre_ko_md5)
         (
             _title,

@@ -531,3 +531,77 @@ async def test_import_progress_has_sdr_fields(tmp_path, db_session):
     assert hasattr(p, "sdr_errors")
     assert p.sdr_imported == 0
     assert p.sdr_errors == []
+
+
+async def test_rescan_keeps_the_old_koreader_fingerprint(tmp_path, db_session):
+    """KOReader caches a file's digest from when it first opened it and keeps
+    sending it after the file changes, so a changed file's previous digest has
+    to stay matchable, not be replaced by the new one."""
+    from app.services.import_service import import_shelf
+    from app.services.kosync_service import resolve_book_id
+
+    shelf_path = tmp_path / "shelf"
+    shelf_path.mkdir()
+    covers = tmp_path / "covers"
+    book_path = shelf_path / "book.epub"
+    _make_epub(book_path, "Original Title")
+    shelf = await _make_shelf_in_db(db_session, str(shelf_path))
+    await import_shelf(db_session, shelf, covers)
+    book = await db_session.scalar(select(Book))
+    book_id, old_digest, old_sha = book.id, book.file_hash_md5_ko, book.file_hash
+
+    _make_epub(book_path, "Edited elsewhere")  # e.g. Calibre, or a serial rebuild
+    await import_shelf(db_session, shelf, covers)
+    db_session.expire_all()
+    book = await db_session.get(Book, book_id)
+    assert book.file_hash_md5_ko != old_digest
+
+    assert await resolve_book_id(db_session, old_digest) == book_id
+    assert await resolve_book_id(db_session, book.file_hash_md5_ko) == book_id
+    shas = set(
+        (
+            await db_session.execute(select(BookHash.hash_sha).where(BookHash.book_id == book_id))
+        ).scalars()
+    )
+    assert old_sha in shas
+
+
+async def test_rescan_keeps_a_digest_learned_from_a_sdr(tmp_path, db_session):
+    """A digest KOReader reported in a .sdr isn't the hash of any file version
+    Shelfloom read, so replacing it on a rescan must not lose it."""
+    from app.koreader.sdr_importer import import_sdr
+    from app.koreader.sdr_reader import SdrReadingData
+    from app.services.import_service import import_shelf
+    from app.services.kosync_service import resolve_book_id
+
+    shelf_path = tmp_path / "shelf"
+    shelf_path.mkdir()
+    covers = tmp_path / "covers"
+    book_path = shelf_path / "book.epub"
+    _make_epub(book_path, "Original Title")
+    shelf = await _make_shelf_in_db(db_session, str(shelf_path))
+    await import_shelf(db_session, shelf, covers)
+    book = await db_session.scalar(select(Book))
+    book_id = book.id
+
+    sdr = SdrReadingData(
+        partial_md5="f" * 32,
+        doc_path=None,
+        title=None,
+        authors=None,
+        percent_finished=None,
+        last_xpointer=None,
+        doc_pages=None,
+        status=None,
+        performance_in_pages={},
+        total_time_in_sec=None,
+        annotations=[],
+        raw={},
+    )
+    await import_sdr(db_session, book, sdr)
+    await db_session.commit()
+
+    _make_epub(book_path, "Edited elsewhere")
+    await import_shelf(db_session, shelf, covers)
+    db_session.expire_all()
+    assert await resolve_book_id(db_session, "f" * 32) == book_id
