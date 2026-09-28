@@ -14,11 +14,13 @@ from app.models.book import Book
 from app.models.genre import BookGenre, Genre
 from app.models.goal import ReadingGoal
 from app.models.reading import ReadingSession
+from app.services.local_time import local_day_bounds, local_sql, to_local
 from app.services.stats_service import get_books_completed
 
 
 def _year_bounds(year: int) -> tuple[datetime, datetime]:
-    return datetime(year, 1, 1), datetime(year, 12, 31, 23, 59, 59, 999999)
+    """UTC bounds of the local calendar year."""
+    return local_day_bounds(date(year, 1, 1), date(year, 12, 31))
 
 
 def _year_fraction(year: int, today: date) -> float:
@@ -100,7 +102,7 @@ async def years_with_data(session: AsyncSession) -> list[int]:
     """Years that have reading sessions, finished books or a goal, newest first."""
     years = {date.today().year}
     rows = await session.execute(
-        select(func.strftime("%Y", ReadingSession.start_time))
+        select(func.strftime("%Y", local_sql(ReadingSession.start_time)))
         .where(ReadingSession.start_time.is_not(None), ReadingSession.dismissed == False)  # noqa: E712
         .distinct()
     )
@@ -164,6 +166,7 @@ async def year_review(session: AsyncSession, year: int) -> dict:
     time_of_day: Counter[str] = Counter()
     first_session: dict[str, datetime] = {}
     for book_id, started, duration, pages in sessions:
+        started = to_local(started)
         seconds = duration or 0
         months[started.month - 1]["seconds"] += seconds
         months[started.month - 1]["pages"] += pages or 0
@@ -184,9 +187,7 @@ async def year_review(session: AsyncSession, year: int) -> dict:
             )
             .group_by(ReadingSession.book_id)
         ):
-            if isinstance(first, str):
-                first = datetime.fromisoformat(first)
-            first_session[book_id] = first
+            first_session[book_id] = to_local(first)
 
     genres: Counter[str] = Counter()
     if ids:
