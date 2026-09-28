@@ -157,6 +157,7 @@ def create_app() -> FastAPI:
         authors,
         books,
         data_mgmt,
+        foyer,
         fs,
         genres,
         health,
@@ -191,6 +192,7 @@ def create_app() -> FastAPI:
     application.include_router(stats.router, prefix="/api")
     application.include_router(data_mgmt.router, prefix="/api")
     application.include_router(library_health.router, prefix="/api")
+    application.include_router(foyer.router, prefix="/api")
 
     # Serve built frontend — only when dist exists (skipped in dev / CI)
     if _FRONTEND_DIST.exists():  # pragma: no cover
