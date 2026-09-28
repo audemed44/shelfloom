@@ -155,41 +155,99 @@ def _save_as_jpeg(data: bytes, output_path: str | Path, max_size: int | None = N
         raise CoverExtractionError(f"Failed to save cover image: {e}") from e
 
 
+_COVER_ID = "shelfloom-cover"
+_COVER_NAME = "shelfloom-cover.jpg"
+
+
+def _opf_path(z: zipfile.ZipFile) -> str:
+    container = ET.fromstring(z.read("META-INF/container.xml"))
+    for el in container.iter():
+        if el.tag.endswith("rootfile") and el.get("full-path"):
+            return el.get("full-path")  # type: ignore[return-value]
+    raise CoverExtractionError("No OPF file listed in META-INF/container.xml")
+
+
+def _set_cover_in_opf(opf: str, href: str) -> str:
+    """Point the OPF's cover at our image, leaving everything else as it was.
+
+    Adds (or reuses) a manifest item with EPUB 3's ``cover-image`` property,
+    removes that property from any other item, and sets EPUB 2's
+    ``<meta name="cover">`` to it, so every reader finds the same cover.
+    """
+    import re
+
+    # Drop cover-image from other items (keep their other properties).
+    def strip_prop(m: re.Match) -> str:
+        tag = m.group(0)
+        if f'id="{_COVER_ID}"' in tag:
+            return tag
+        tag = re.sub(r"\s*\bcover-image\b", "", tag)
+        return re.sub(r'\sproperties="\s*"', "", tag)
+
+    opf = re.sub(r"<(?:\w+:)?item\b[^>]*\bproperties=\"[^\"]*\"[^>]*>", strip_prop, opf)
+
+    if f'id="{_COVER_ID}"' not in opf:
+        item = (
+            f'<item id="{_COVER_ID}" href="{href}" media-type="image/jpeg" '
+            'properties="cover-image"/>'
+        )
+        opf, n = re.subn(r"(</(?:\w+:)?manifest>)", item + r"\1", opf, count=1)
+        if not n:
+            raise CoverExtractionError("OPF has no manifest")
+
+    meta = f'<meta name="cover" content="{_COVER_ID}"/>'
+    opf, n = re.subn(
+        r'<(?:\w+:)?meta\b[^>]*\bname="cover"[^>]*/?>(?:\s*</(?:\w+:)?meta>)?', meta, opf
+    )
+    if not n:
+        opf, n = re.subn(r"(</(?:\w+:)?metadata>)", meta + r"\1", opf, count=1)
+        if not n:
+            raise CoverExtractionError("OPF has no metadata")
+    return opf
+
+
 def embed_epub_cover(epub_path: str | Path, cover_image_path: str | Path) -> None:
-    """Embed a cover image into an EPUB file in-place, replacing any existing cover."""
+    """Make an image the EPUB's cover, changing as little of the file as possible.
+
+    The image is added next to the OPF and only the OPF's cover entries are
+    edited; every other file in the archive is copied byte for byte. The new
+    EPUB is written to a temporary file and swapped in only once complete, so
+    a failure never leaves a half-written book (which Syncthing would then
+    copy to the e-reader).
+    """
+    import os
+    import posixpath
+    import tempfile
+
+    epub_path = Path(epub_path)
+    cover_data = Path(cover_image_path).read_bytes()
     try:
-        from ebooklib import ITEM_COVER, ITEM_IMAGE, epub
-    except ImportError:  # pragma: no cover
-        raise CoverExtractionError("ebooklib is required")
+        with zipfile.ZipFile(epub_path) as src:
+            opf_path = _opf_path(src)
+            opf_dir = posixpath.dirname(opf_path)
+            image_path = posixpath.join(opf_dir, _COVER_NAME) if opf_dir else _COVER_NAME
+            opf = _set_cover_in_opf(src.read(opf_path).decode("utf-8"), _COVER_NAME)
 
-    try:
-        book = epub.read_epub(str(epub_path), options={"ignore_ncx": True})
-    except Exception as e:
-        raise CoverExtractionError(f"Failed to open EPUB: {e}") from e
-
-    with open(str(cover_image_path), "rb") as f:
-        cover_data = f.read()
-
-    # Replace content of existing cover item if found
-    updated = False
-    for item in book.get_items():
-        if item.get_type() == ITEM_COVER:
-            item.content = cover_data
-            item.media_type = "image/jpeg"
-            updated = True
-            break
-    if not updated:
-        for item in book.get_items():
-            if item.get_type() == ITEM_IMAGE and "cover" in (item.file_name or "").lower():
-                item.content = cover_data
-                item.media_type = "image/jpeg"
-                updated = True
-                break
-
-    if not updated:
-        book.set_cover("images/cover.jpg", cover_data, create_page=False)
-
-    try:
-        epub.write_epub(str(epub_path), book)
-    except Exception as e:
-        raise CoverExtractionError(f"Failed to write EPUB: {e}") from e
+            fd, tmp = tempfile.mkstemp(dir=epub_path.parent, suffix=".epub.tmp")
+            os.close(fd)
+            try:
+                with zipfile.ZipFile(tmp, "w") as dst:
+                    # mimetype must stay first and uncompressed.
+                    if "mimetype" in src.namelist():
+                        dst.writestr(
+                            "mimetype", src.read("mimetype"), compress_type=zipfile.ZIP_STORED
+                        )
+                    for info in src.infolist():
+                        if info.filename in ("mimetype", image_path):
+                            continue
+                        data = opf.encode("utf-8") if info.filename == opf_path else src.read(info)
+                        dst.writestr(info, data, compress_type=info.compress_type)
+                    dst.writestr(image_path, cover_data, compress_type=zipfile.ZIP_STORED)
+                os.replace(tmp, epub_path)
+            except BaseException:
+                Path(tmp).unlink(missing_ok=True)
+                raise
+    except CoverExtractionError:
+        raise
+    except (OSError, KeyError, ET.ParseError, zipfile.BadZipFile, UnicodeDecodeError) as e:
+        raise CoverExtractionError(f"Failed to write the cover into the EPUB: {e}") from e
