@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { Flame, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Flame, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { ReadingHeatmap } from '../components/ReadingHeatmap'
 import type { HeatmapEntry } from '../components/ReadingHeatmap'
@@ -2445,7 +2445,14 @@ export default function Stats() {
               : 'Loading…'}
           </p>
         </div>
-        <div className="col-span-12 flex items-end lg:col-span-4 lg:justify-end">
+        <div className="col-span-12 flex flex-wrap items-end gap-3 lg:col-span-4 lg:justify-end">
+          <Link
+            to={`/stats/year/${new Date().getFullYear()}`}
+            className="flex items-center gap-2 border border-white/25 px-4 py-2 text-xs font-semibold text-white/80 transition-colors hover:bg-white hover:text-black"
+            data-testid="year-in-review-link"
+          >
+            Year in review <ArrowRight size={12} />
+          </Link>
           <div
             className="flex w-full border border-white/25 sm:w-auto"
             role="group"

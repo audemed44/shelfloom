@@ -24,6 +24,8 @@ import type {
   PendingChapterFetchResponse,
 } from '../types/api'
 import { getBookCoverUrl } from '../utils/bookCover'
+import { GOAL_STATUS } from '../types/goals'
+import type { GoalProgress } from '../types/goals'
 import { useQuickSearch } from '../components/search/QuickSearch'
 
 // ---------------------------------------------------------------------------
@@ -382,6 +384,67 @@ function StatCard({
 }
 
 // ---------------------------------------------------------------------------
+// This year's books, against the reading goal
+// ---------------------------------------------------------------------------
+
+function GoalStat({
+  goal,
+  completed,
+}: {
+  goal: GoalProgress | null
+  completed: number | null
+}) {
+  const animated = useCountUp(completed)
+  const year = new Date().getFullYear()
+  const target = goal?.target ?? null
+  const pct =
+    target && completed != null ? Math.min(100, (completed / target) * 100) : 0
+  return (
+    <Link
+      to={`/stats/year/${year}`}
+      className="group flex min-w-0 flex-col justify-between gap-4 border-t border-white/[0.14] pt-3 xl:flex-row xl:items-end"
+      data-testid="goal-stat"
+    >
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-[10px] font-semibold tracking-widest text-white/45">
+          <Flame size={12} className="shrink-0" />
+          <span className="truncate">This Year</span>
+        </p>
+        <p className="mt-0.5 text-[11px] leading-tight text-white/40 sm:text-xs">
+          {target ? (
+            <>
+              {(goal?.status && GOAL_STATUS[goal.status]) ?? 'books completed'}
+            </>
+          ) : (
+            <>
+              books completed ·{' '}
+              <span className="text-primary-400 group-hover:underline">
+                set a goal
+              </span>
+            </>
+          )}
+        </p>
+        {target != null && (
+          <div className="mt-2 h-1 w-full max-w-[10rem] bg-white/15">
+            <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+          </div>
+        )}
+      </div>
+      <h5
+        className={`text-2xl font-extrabold leading-none tracking-tighter tabular-nums min-[420px]:text-3xl sm:text-5xl ${completed == null ? 'text-white/20' : 'text-white'}`}
+      >
+        {animated == null ? '—' : animated}
+        {target != null && (
+          <span className="text-base font-bold text-white/40 sm:text-2xl">
+            /{target}
+          </span>
+        )}
+      </h5>
+    </Link>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Currently reading card
 // ---------------------------------------------------------------------------
 
@@ -607,6 +670,9 @@ export default function Home() {
     '/api/stats/recent-sessions?limit=10'
   )
 
+  const { data: goal } = useApi<GoalProgress>(
+    `/api/stats/goal/${new Date().getFullYear()}`
+  )
   const { data: completedBooks } = useApi<{ completed_at: string }[]>(
     '/api/stats/books-completed'
   )
@@ -766,11 +832,11 @@ export default function Home() {
             value={thisWeekPages > 0 ? thisWeekPages : null}
             sub="pages read"
           />
-          <StatCard
-            icon={Flame}
-            label="This Year"
-            value={completedBooks !== undefined ? booksCompletedThisYear : null}
-            sub="books completed"
+          <GoalStat
+            goal={goal ?? null}
+            completed={
+              completedBooks !== undefined ? booksCompletedThisYear : null
+            }
           />
         </section>
 

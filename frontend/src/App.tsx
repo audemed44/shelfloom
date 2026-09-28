@@ -8,6 +8,7 @@ import Home from './pages/Home'
 const Library = lazy(() => import('./pages/Library'))
 const BookDetail = lazy(() => import('./pages/BookDetail'))
 const Stats = lazy(() => import('./pages/Stats'))
+const YearInReview = lazy(() => import('./pages/YearInReview'))
 const Serials = lazy(() => import('./pages/Serials'))
 const SerialDetail = lazy(() => import('./pages/SerialDetail'))
 const SeriesList = lazy(() => import('./pages/SeriesList'))
@@ -54,6 +55,7 @@ export default function App() {
           <Route path="library" element={<Library />} />
           <Route path="books/:id" element={<BookDetail />} />
           <Route path="stats" element={<Stats />} />
+          <Route path="stats/year/:year" element={<YearInReview />} />
           <Route path="serials" element={<Serials />} />
           <Route path="serials/:id" element={<SerialDetail />} />
           <Route path="series" element={<SeriesList />} />
