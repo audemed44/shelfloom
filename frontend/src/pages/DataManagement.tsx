@@ -11,10 +11,12 @@ import {
   Copy,
   History,
   BookOpen,
+  HeartPulse,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { useDebounce } from '../hooks/useDebounce'
 import { api } from '../api/client'
+import LibraryHealth from '../components/health/LibraryHealth'
 import type {
   PaginatedResponse,
   DuplicateSessionGroup,
@@ -980,6 +982,7 @@ function SessionsLogTab() {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 type Tab =
+  | 'health'
   | 'duplicate-sessions'
   | 'unmatched'
   | 'duplicate-books'
@@ -987,6 +990,7 @@ type Tab =
   | 'sessions-log'
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: 'health', label: 'Library Health', icon: <HeartPulse size={12} /> },
   {
     id: 'duplicate-sessions',
     label: 'Duplicate Sessions',
@@ -1008,7 +1012,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 export default function DataManagement() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<Tab>('duplicate-sessions')
+  const [activeTab, setActiveTab] = useState<Tab>('health')
 
   const { data: dupSessions } = useApi<DuplicateSessionGroup[]>(
     '/api/data-mgmt/duplicate-sessions'
@@ -1021,6 +1025,7 @@ export default function DataManagement() {
   )
 
   const counts: Record<Tab, number | undefined> = {
+    health: undefined,
     'duplicate-sessions': dupSessions?.reduce(
       (acc, g) => acc + g.pairs.length,
       0
@@ -1045,8 +1050,8 @@ export default function DataManagement() {
           Data Management
         </h2>
         <p className="text-white/40 text-base font-medium mt-2 normal-case">
-          Review duplicates, link unmatched KOReader data, and inspect import
-          history.
+          Check the library for problems, review duplicates, link unmatched
+          KOReader data, and inspect import history.
         </p>
       </header>
 
@@ -1070,6 +1075,9 @@ export default function DataManagement() {
 
       {/* Tab content */}
       <div data-testid="tab-content">
+        {activeTab === 'health' && (
+          <LibraryHealth onOpenTab={(tab) => setActiveTab(tab as Tab)} />
+        )}
         {activeTab === 'duplicate-sessions' && <DuplicateSessionsTab />}
         {activeTab === 'unmatched' && <UnmatchedDataTab />}
         {activeTab === 'duplicate-books' && <DuplicateBooksTab />}
