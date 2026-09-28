@@ -11,6 +11,7 @@ import {
   Loader2,
   ArrowRight,
   Search,
+  Star,
 } from 'lucide-react'
 import { api } from '../api/client'
 import { useApi } from '../hooks/useApi'
@@ -632,6 +633,9 @@ export default function Home() {
     '/api/stats/recent-sessions?limit=10'
   )
 
+  const { data: pendingVerdicts } = useApi<
+    { id: string; title: string; cover_path: string | null }[]
+  >('/api/stats/pending-verdicts')
   const { data: goal } = useApi<GoalProgress>(
     `/api/stats/goal/${new Date().getFullYear()}`
   )
@@ -801,6 +805,43 @@ export default function Home() {
             }
           />
         </section>
+
+        {/* Finished books still waiting for a rating */}
+        {pendingVerdicts && pendingVerdicts.length > 0 && (
+          <section className="col-span-12">
+            <Link
+              to="/verdicts"
+              className="group flex items-center gap-4 border border-white/[0.14] px-4 py-3 transition-colors hover:border-white sm:px-5"
+              data-testid="pending-verdicts"
+            >
+              <div className="hidden shrink-0 -space-x-3 sm:flex" aria-hidden>
+                {pendingVerdicts.slice(0, 4).map((b) => (
+                  <img
+                    key={b.id}
+                    src={getBookCoverUrl(b.id, b.cover_path)}
+                    alt=""
+                    loading="lazy"
+                    className="h-12 w-8 border border-black bg-white/5 object-cover"
+                  />
+                ))}
+              </div>
+              <Star size={16} className="shrink-0 text-primary-400 sm:hidden" />
+              <p className="min-w-0 flex-1 text-sm text-white/70">
+                <span className="font-semibold text-white">
+                  {pendingVerdicts.length} finished{' '}
+                  {pendingVerdicts.length === 1 ? 'book needs' : 'books need'}{' '}
+                  your verdict.
+                </span>{' '}
+                <span className="hidden sm:inline">
+                  Rate them one after another.
+                </span>
+              </p>
+              <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-primary-400 group-hover:text-white">
+                Rate <ArrowRight size={13} />
+              </span>
+            </Link>
+          </section>
+        )}
 
         {/* Currently Reading */}
         {currentlyReading.length > 0 && (

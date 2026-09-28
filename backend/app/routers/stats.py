@@ -71,6 +71,12 @@ async def books_completed(
     )
 
 
+@router.get("/pending-verdicts")
+async def pending_verdicts(session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """Finished books still waiting for a rating or review, most recent first."""
+    return await stats_service.get_pending_verdicts(session)
+
+
 @router.get("/streaks")
 async def streaks(session: AsyncSession = Depends(get_session)) -> dict:
     """Current and longest reading streaks with full history."""

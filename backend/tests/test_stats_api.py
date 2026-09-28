@@ -731,3 +731,36 @@ async def test_recent_sessions_sorted_newest_first(
     data = resp.json()
     assert data[0]["title"] == "New Book"
     assert data[1]["title"] == "Old Book"
+
+
+# ---------------------------------------------------------------------------
+# /api/stats/pending-verdicts
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_pending_verdicts_lists_finished_books_without_a_verdict(
+    client: AsyncClient, db_session: AsyncSession, shelf: Shelf
+) -> None:
+    done = await _make_book(db_session, shelf.id, title="Done, no verdict")
+    rated = await _make_book(db_session, shelf.id, title="Rated")
+    reviewed = await _make_book(db_session, shelf.id, title="Reviewed")
+    reading = await _make_book(db_session, shelf.id, title="Still reading")
+    dnf = await _make_book(db_session, shelf.id, title="Dropped")
+    for b in (done, rated, reviewed, dnf):
+        await _make_progress(db_session, b.id, 100.0)
+    await _make_progress(db_session, reading.id, 40.0)
+    rated.rating = 4.0
+    reviewed.review = "Loved the ending."
+    dnf.reading_state = "dnf"
+    await db_session.commit()
+
+    data = (await client.get("/api/stats/pending-verdicts")).json()
+    assert [b["title"] for b in data] == ["Done, no verdict"]
+    assert data[0]["id"] == done.id
+    assert data[0]["completed_at"]
+
+    # Rating it takes it off the list.
+    resp = await client.patch(f"/api/books/{done.id}", json={"rating": 3.5})
+    assert resp.status_code == 200
+    assert (await client.get("/api/stats/pending-verdicts")).json() == []

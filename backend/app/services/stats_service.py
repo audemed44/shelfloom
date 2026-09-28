@@ -291,6 +291,37 @@ async def get_books_completed(
     return out
 
 
+async def get_pending_verdicts(session: AsyncSession) -> list[dict]:
+    """Finished books with neither a rating nor a review, most recent first.
+
+    Uses the same "finished" rule as the rest of the stats (and so leaves out
+    books marked DNF).
+    """
+    completed = await get_books_completed(session)
+    if not completed:
+        return []
+    ids = [c["book_id"] for c in completed]
+    books = {
+        b.id: b for b in (await session.execute(select(Book).where(Book.id.in_(ids)))).scalars()
+    }
+    out = []
+    for c in completed:
+        book = books.get(c["book_id"])
+        if book is None or book.rating is not None or (book.review or "").strip():
+            continue
+        out.append(
+            {
+                "id": book.id,
+                "title": book.title,
+                "author": book.author,
+                "cover_path": book.cover_path,
+                "page_count": book.page_count,
+                "completed_at": c["completed_at"],
+            }
+        )
+    return out
+
+
 async def get_streaks(session: AsyncSession) -> dict:
     """Current and longest reading streaks with full history."""
     dates = await _get_reading_dates(session)
