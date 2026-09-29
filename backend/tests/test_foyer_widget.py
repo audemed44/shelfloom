@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.book import Book
@@ -70,6 +72,11 @@ async def test_widget_empty_library(client: AsyncClient) -> None:
     assert data["items"] == []
     assert data["progress"] == []
     assert data["items_layout"] == "covers"
+    assert data["accepts"] == {
+        "url": "/api/foyer/upload",
+        "types": [".epub", ".pdf"],
+        "label": "Add to library",
+    }
     assert data["stats"] == [
         {"label": f"Read in {year}", "value": "0"},
         {"label": "Streak", "value": "0", "unit": "days", "caption": "best 0"},
@@ -159,3 +166,38 @@ def test_hours() -> None:
     assert _hours(0) == "0.0"
     assert _hours(5400) == "1.5"
     assert _hours(36000 * 1.26) == "13"
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+@pytest.mark.asyncio
+async def test_upload_from_foyer(client: AsyncClient, db_session: AsyncSession, tmp_path) -> None:
+    db_session.add(Shelf(name="Main", path=str(tmp_path), is_default=True))
+    await db_session.commit()
+
+    resp = await client.post(
+        "/api/foyer/upload",
+        files={
+            "file": ("test.epub", (FIXTURES / "test.epub").read_bytes(), "application/epub+zip")
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    book = (await db_session.execute(select(Book))).scalar_one()
+    assert data["url"] == f"/books/{book.id}"
+    assert data["message"].startswith(f"Added “{book.title}”")
+    assert (tmp_path / "test.epub").exists()
+
+
+@pytest.mark.asyncio
+async def test_upload_from_foyer_rejects_other_files(
+    client: AsyncClient, db_session: AsyncSession, tmp_path
+) -> None:
+    db_session.add(Shelf(name="Main", path=str(tmp_path), is_default=True))
+    await db_session.commit()
+    resp = await client.post(
+        "/api/foyer/upload", files={"file": ("notes.txt", b"hello", "text/plain")}
+    )
+    assert resp.status_code == 400
+    assert "epub" in resp.json()["detail"]
