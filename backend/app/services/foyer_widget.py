@@ -8,11 +8,14 @@ renders any app serving this shape. Version 1:
       "stats":    [{"label", "value", "unit"?, "caption"?, "tone"?}],
       "progress": [{"label", "value", "max", "caption"?}],
       "items_title": str?, "items_layout": "covers" | "list",
-      "items":    [{"title", "subtitle"?, "image"?, "url"?, "progress"?, "caption"?}]
+      "items":    [{"title", "subtitle"?, "image"?, "url"?, "progress"?, "caption"?}],
+      "accepts":  {"url", "types", "label"?, "field"?}
     }
 
 ``image`` paths are relative to this API's origin (Foyer fetches them
 server-side); ``url`` paths are relative to the app's public address.
+``accepts`` offers Shelfloom as a destination for books in Foyer's Drop
+inbox: Foyer uploads them to ``/api/foyer/upload``.
 """
 
 from __future__ import annotations
@@ -28,6 +31,8 @@ from app.services.stats_service import get_overview, get_streaks
 from app.services.year_review import goal_progress
 
 MAX_ITEMS = 8
+
+ACCEPTS = {"url": "/api/foyer/upload", "types": [".epub", ".pdf"], "label": "Add to library"}
 
 _GOAL_CAPTIONS = {
     "done": "Goal reached",
@@ -136,4 +141,5 @@ async def build_widget(session: AsyncSession, now: datetime | None = None) -> di
         "items_title": "Currently reading",
         "items_layout": "covers",
         "items": items,
+        "accepts": ACCEPTS,
     }
