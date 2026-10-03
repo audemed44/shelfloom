@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Search } from 'lucide-react'
+import { House, Search } from 'lucide-react'
 import { useQuickSearch } from '../search/QuickSearch'
 import { MORE_ITEMS } from './navItems'
+import { useFoyerUrl } from './useFoyerUrl'
 
 interface MoreMenuProps {
   open: boolean
@@ -11,6 +12,7 @@ interface MoreMenuProps {
 
 export default function MoreMenu({ open, onClose }: MoreMenuProps) {
   const { open: openSearch } = useQuickSearch()
+  const foyerUrl = useFoyerUrl()
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
@@ -71,6 +73,16 @@ export default function MoreMenu({ open, onClose }: MoreMenuProps) {
                 <span>{label}</span>
               </NavLink>
             ))}
+            {foyerUrl && (
+              <a
+                href={foyerUrl}
+                className="col-span-2 flex items-center gap-3 bg-black px-3 py-4 text-sm font-semibold text-white/75 transition-colors hover:bg-white/[0.06] hover:text-white"
+                data-testid="more-menu-item-foyer"
+              >
+                <House size={22} strokeWidth={1.75} />
+                <span>Back to Foyer</span>
+              </a>
+            )}
           </nav>
         </div>
       </div>

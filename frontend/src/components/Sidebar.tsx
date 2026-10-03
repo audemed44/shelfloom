@@ -1,8 +1,9 @@
 import { NavLink } from 'react-router-dom'
-import { Search, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, Search, type LucideIcon } from 'lucide-react'
 import { NAV_ITEMS, MORE_ITEMS } from './nav/navItems'
 import Logo from './nav/Logo'
 import { useQuickSearch } from './search/QuickSearch'
+import { useFoyerUrl } from './nav/useFoyerUrl'
 
 interface NavItemProps {
   to: string
@@ -49,11 +50,25 @@ function NavItem({ to, icon: Icon, label, end, index }: NavItemProps) {
 
 export default function Sidebar() {
   const { open: openSearch } = useQuickSearch()
+  const foyerUrl = useFoyerUrl()
   return (
     <aside
       className="hidden sm:flex w-20 lg:w-64 fixed top-0 left-0 h-full flex-col border-r border-white/[0.14] bg-black z-40"
       data-testid="sidebar"
     >
+      {/* Back to Foyer, the homelab's start page */}
+      {foyerUrl && (
+        <a
+          href={foyerUrl}
+          title="Back to Foyer"
+          data-testid="sidebar-foyer"
+          className="flex items-center justify-center gap-2 border-b border-white/[0.14] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40 transition-colors hover:text-white lg:justify-start lg:px-6"
+        >
+          <ArrowLeft size={14} className="shrink-0" />
+          <span className="hidden lg:block">Foyer</span>
+        </a>
+      )}
+
       {/* Branding — icon-only on sm/md, full logo on lg+ */}
       <div className="flex items-center justify-center lg:justify-start gap-3 px-4 py-6 lg:px-6">
         <Logo />
