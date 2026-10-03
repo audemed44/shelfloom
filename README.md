@@ -141,6 +141,12 @@ volumes:
 
 Then follow the import instructions below.
 
+### Link back to Foyer
+
+Set `HOMEPAGE_URL` to your [Foyer](https://github.com/audemed44/foyer)
+address (e.g. `https://home.example.com`) to get a link back to it at the top
+of the sidebar, and in the **More** menu on phones.
+
 ### KOReader Sync and the web reader
 
 Shelfloom runs a sync server for KOReader's built-in **Progress sync** plugin, and has a web reader for EPUBs (the **Read** button on a book). Both share one reading position per book, so you can read a chapter in the browser and pick up on your e-reader, or the other way round. No KOReader plugin is needed.

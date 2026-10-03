@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,9 @@ class Settings(BaseSettings):
     serial_check_interval: int = 86400  # seconds (default 24h)
     debug: bool = False
     log_level: str = "INFO"
+    # Foyer, the homelab's start page, linked from the sidebar. HOMEPAGE_URL,
+    # without the prefix, so every homelab app can share it.
+    foyer_url: str = Field("", validation_alias="HOMEPAGE_URL")
 
 
 def get_settings() -> Settings:
