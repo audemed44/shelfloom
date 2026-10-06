@@ -772,7 +772,7 @@ export default function BookDetailPage() {
             </div>
 
             {/* Action buttons — primary actions stay visible, the rest live
-                in the More menu so the row never wraps on a phone. */}
+                in the More menu so the row stays on one line. */}
             <div className="flex flex-wrap gap-2">
               {canRead && (
                 <Link
@@ -799,7 +799,7 @@ export default function BookDetailPage() {
                   title="Download"
                 >
                   <Download size={14} />
-                  <span className={canRead ? 'hidden sm:inline' : ''}>
+                  <span className={canRead ? 'hidden 2xl:inline' : ''}>
                     Download
                   </span>
                 </a>
@@ -819,15 +819,6 @@ export default function BookDetailPage() {
                 {percent != null && percent >= 100 && !isDnf
                   ? 'Unmark'
                   : 'Mark Read'}
-              </button>
-
-              <button
-                onClick={() => setShowLogSession(true)}
-                data-testid="log-session-btn"
-                className={`${secondaryBtn} hidden sm:flex`}
-              >
-                <PlusCircle size={14} />
-                Log Session
               </button>
 
               <button
@@ -905,7 +896,7 @@ export default function BookDetailPage() {
                             setActionsOpen(false)
                             setShowLogSession(true)
                           }}
-                          className={`${menuItem} sm:hidden`}
+                          className={menuItem}
                         >
                           <PlusCircle size={14} />
                           Log Session
