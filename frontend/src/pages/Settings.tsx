@@ -671,7 +671,10 @@ export default function Settings() {
                       <Clock size={11} />
                       <span className="normal-case">
                         Last scan{' '}
-                        {new Date(scanStatus.last_scan_at).toLocaleString()}
+                        {new Date(scanStatus.last_scan_at).toLocaleString(
+                          undefined,
+                          { dateStyle: 'medium', timeStyle: 'short' }
+                        )}
                       </span>
                     </div>
                   )}
