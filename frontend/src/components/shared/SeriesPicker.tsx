@@ -3,6 +3,7 @@ import { Search, Plus } from 'lucide-react'
 import { api } from '../../api/client'
 import type { SeriesWithCount } from '../../types/api'
 import CreateSeriesModal from './CreateSeriesModal'
+import { plural } from '../../utils/plural'
 
 interface SeriesPickerProps {
   value: number | null
@@ -99,7 +100,7 @@ export default function SeriesPicker({ value, onChange }: SeriesPickerProps) {
                 >
                   <span>{s.name}</span>
                   <span className="text-[10px] text-white/30">
-                    {s.book_count} books
+                    {plural(s.book_count, 'book')}
                   </span>
                 </button>
               ))}

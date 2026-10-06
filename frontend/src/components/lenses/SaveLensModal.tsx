@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import { api } from '../../api/client'
 import type { LensFilterState, Lens } from '../../types/api'
 import { normalizeLensFilterState } from '../../utils/filterState'
+import { plural } from '../../utils/plural'
 
 interface SaveLensModalProps {
   /** When provided, the modal is in edit mode. */
@@ -17,12 +18,13 @@ function summarize(fs: LensFilterState): string {
   const normalized = normalizeLensFilterState(fs)
   const parts: string[] = []
   if (normalized.genres.length > 0)
-    parts.push(`${normalized.genres.length} genre(s)`)
-  if (normalized.tags.length > 0) parts.push(`${normalized.tags.length} tag(s)`)
+    parts.push(plural(normalized.genres.length, 'genre'))
+  if (normalized.tags.length > 0)
+    parts.push(plural(normalized.tags.length, 'tag'))
   if (normalized.series_ids.length > 0)
     parts.push(`${normalized.series_ids.length} series`)
   if (normalized.authors.length > 0)
-    parts.push(`${normalized.authors.length} author(s)`)
+    parts.push(plural(normalized.authors.length, 'author'))
   if (normalized.formats.length > 0)
     parts.push(normalized.formats.map((f) => f.toUpperCase()).join(', '))
   if (normalized.has_genre === false) parts.push('no genre')

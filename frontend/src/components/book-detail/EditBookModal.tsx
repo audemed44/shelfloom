@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import type { BookDetail } from '../../types'
 import type { Genre, SeriesWithCount, Tag } from '../../types/api'
 import CreateSeriesModal from '../shared/CreateSeriesModal'
+import { plural } from '../../utils/plural'
 
 // ── types ──────────────────────────────────────────────────────────────────────
 
@@ -865,7 +866,7 @@ export default function EditBookModal({
                             >
                               <span>{s.name}</span>
                               <span className="text-[10px] text-white/30">
-                                {s.book_count} books
+                                {plural(s.book_count, 'book')}
                               </span>
                             </button>
                           ))}
