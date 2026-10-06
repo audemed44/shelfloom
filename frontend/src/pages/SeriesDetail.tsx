@@ -511,7 +511,7 @@ export default function SeriesDetail() {
                       }}
                       onDragLeave={() => setDragOver(null)}
                       onDrop={(e) => handleDrop(e, b.book_id)}
-                      className={`border border-white/10 p-4 rounded-xl flex items-center gap-4 group transition-all shadow-sm ${
+                      className={`border border-white/10 p-3 sm:p-4 rounded-xl flex items-center gap-3 sm:gap-4 group transition-all shadow-sm ${
                         novellaStyle
                           ? 'border-l-4 border-l-white/30 opacity-90'
                           : ''
@@ -541,7 +541,7 @@ export default function SeriesDetail() {
 
                       {/* Book info */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                           <span
                             className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${
                               novellaStyle
@@ -553,7 +553,7 @@ export default function SeriesDetail() {
                           </span>
                           <Link
                             to={`/books/${b.book_id}`}
-                            className="text-sm font-bold text-white/90 normal-case hover:text-white transition-colors truncate"
+                            className="text-sm font-bold text-white/90 normal-case hover:text-white transition-colors line-clamp-2 break-words"
                           >
                             {b.title}
                           </Link>
@@ -566,9 +566,9 @@ export default function SeriesDetail() {
                       </div>
 
                       {/* Position */}
-                      <div className="flex items-center gap-6 pr-2">
+                      <div className="flex items-center gap-3 sm:gap-6 sm:pr-2">
                         <div className="text-right">
-                          <span className="block text-[10px] uppercase text-white/40 font-bold">
+                          <span className="hidden sm:block text-[10px] uppercase text-white/40 font-bold">
                             Position
                           </span>
                           <span className="text-sm font-mono font-bold">
@@ -638,7 +638,7 @@ export default function SeriesDetail() {
                         }}
                         onDragLeave={() => setEntryDragOver(null)}
                         onDrop={(e) => handleEntryDrop(e, entry.id)}
-                        className={`border border-white/10 p-4 rounded-xl flex items-center gap-4 group transition-all shadow-sm ${
+                        className={`border border-white/10 p-3 sm:p-4 rounded-xl flex items-center gap-3 sm:gap-4 group transition-all shadow-sm ${
                           entryDragOver === entry.id
                             ? 'bg-primary/10 border-primary/50'
                             : 'hover:border-white/20'
@@ -667,7 +667,7 @@ export default function SeriesDetail() {
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                             {entry.format && (
                               <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded uppercase">
                                 {entry.format}
@@ -675,7 +675,7 @@ export default function SeriesDetail() {
                             )}
                             <Link
                               to={`/books/${entry.book_id}`}
-                              className="text-sm font-bold text-white/90 normal-case hover:text-white transition-colors truncate"
+                              className="text-sm font-bold text-white/90 normal-case hover:text-white transition-colors line-clamp-2 break-words"
                             >
                               {entry.title ?? entry.book_id}
                             </Link>
@@ -693,9 +693,9 @@ export default function SeriesDetail() {
                         </div>
 
                         {/* Position */}
-                        <div className="flex items-center gap-6 pr-2">
+                        <div className="flex items-center gap-3 sm:gap-6 sm:pr-2">
                           <div className="text-right">
-                            <span className="block text-[10px] uppercase text-white/40 font-bold">
+                            <span className="hidden sm:block text-[10px] uppercase text-white/40 font-bold">
                               Position
                             </span>
                             <span className="text-sm font-mono font-bold">
@@ -728,7 +728,7 @@ export default function SeriesDetail() {
                   <Link
                     key={s.id}
                     to={`/series/${s.id}`}
-                    className="border border-white/10 p-4 rounded-xl flex items-center gap-4 group hover:border-white/20 transition-all"
+                    className="border border-white/10 p-3 sm:p-4 rounded-xl flex items-center gap-3 sm:gap-4 group hover:border-white/20 transition-all"
                   >
                     <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
                       <BookOpen size={18} className="text-primary" />
