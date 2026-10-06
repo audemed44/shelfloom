@@ -15,7 +15,7 @@ import SaveLensModal from '../components/lenses/SaveLensModal'
 import type { Lens, Book, PaginatedResponse } from '../types/api'
 import { usePersistedState } from '../hooks/usePersistedState'
 
-const PER_PAGE = 25
+const PER_PAGE = 60 // a full last row at 2–6 columns
 
 export default function LensDetail() {
   const { id } = useParams<{ id: string }>()

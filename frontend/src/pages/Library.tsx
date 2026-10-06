@@ -36,7 +36,7 @@ import type {
   FilterLabels,
 } from '../types'
 
-const PER_PAGE = 25
+const PER_PAGE = 60 // a full last row at 2–6 columns
 
 const SORT_OPTIONS = [
   { value: 'last_read', label: 'Last Read' },
