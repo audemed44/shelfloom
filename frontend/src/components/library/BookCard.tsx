@@ -5,6 +5,7 @@ import { api } from '../../api/client'
 import type { Book } from '../../types'
 import { getBookCoverUrl } from '../../utils/bookCover'
 import StarRating from '../shared/StarRating'
+import { CoverImage } from '../shared/CoverFallback'
 
 function fmtFormat(format: string | null | undefined): string {
   if (!format) return ''
@@ -77,14 +78,13 @@ export default function BookCard({
         isSelected ? 'outline outline-2 outline-offset-2 outline-primary' : ''
       }`}
     >
-      <img
+      <CoverImage
         src={coverSrc}
+        title={book.title}
+        author={book.author}
         alt={book.title}
         loading="lazy"
         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-        onError={(e) => {
-          e.currentTarget.style.display = 'none'
-        }}
       />
       {/* Format badge */}
       <div className="absolute top-2 right-2">
