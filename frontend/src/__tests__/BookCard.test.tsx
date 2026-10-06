@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import BookCard from '../components/library/BookCard'
@@ -139,5 +139,15 @@ describe('BookCard', () => {
     )
 
     fetchSpy.mockRestore()
+  })
+
+  it('shows the title and author when the cover fails to load', () => {
+    renderCard()
+    expect(screen.queryByTestId('cover-fallback')).not.toBeInTheDocument()
+    fireEvent.error(screen.getByAltText('The Way of Kings'))
+    const fallback = screen.getByTestId('cover-fallback')
+    expect(fallback).toHaveTextContent('The Way of Kings')
+    expect(fallback).toHaveTextContent('Brandon Sanderson')
+    expect(screen.queryByAltText('The Way of Kings')).not.toBeInTheDocument()
   })
 })

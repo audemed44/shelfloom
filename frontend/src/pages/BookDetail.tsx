@@ -31,6 +31,7 @@ import type { BookDetail, Shelf, ReadingSession, Highlight } from '../types'
 import type { SeriesBook } from '../types/api'
 import { getBookCoverUrl } from '../utils/bookCover'
 import StarRating from '../components/shared/StarRating'
+import { CoverImage } from '../components/shared/CoverFallback'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -635,14 +636,14 @@ export default function BookDetailPage() {
           {/* ── Cover ── */}
           <div className="order-1 lg:col-span-4 lg:row-start-1 lg:row-span-2 animate-fade-up">
             <div className="book-cover relative aspect-[2/3] w-40 overflow-hidden bg-white/5 sm:w-56 lg:w-full">
-              <img
+              <CoverImage
                 key={coverKey}
                 src={coverUrl}
+                title={book.title}
+                author={book.author}
+                large
                 alt={book.title}
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none'
-                }}
               />
 
               <div className="absolute bottom-2 right-2 flex gap-1.5">

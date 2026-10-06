@@ -29,6 +29,7 @@ import { getBookCoverUrl } from '../utils/bookCover'
 import { GOAL_STATUS } from '../types/goals'
 import type { GoalProgress } from '../types/goals'
 import { useQuickSearch } from '../components/search/QuickSearch'
+import { CoverImage } from '../components/shared/CoverFallback'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -228,13 +229,12 @@ function HeroBook({ book }: { book: Book & { reading_progress?: number } }) {
         tabIndex={-1}
       >
         <div className="book-cover aspect-[2/3] overflow-hidden bg-white/5">
-          <img
+          <CoverImage
             src={cover}
+            title={book.title}
+            author={book.author}
             alt=""
             className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none'
-            }}
           />
         </div>
       </Link>
@@ -424,14 +424,13 @@ function CurrentlyReadingCard({
       data-testid="currently-reading-card"
     >
       <div className="book-cover aspect-[2/3] overflow-hidden bg-white/5 transition-transform duration-300 group-hover:-translate-y-1">
-        <img
+        <CoverImage
           src={getBookCoverUrl(book.id, book.cover_path)}
+          title={book.title}
+          author={book.author}
           alt={book.title}
           loading="lazy"
           className="h-full w-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none'
-          }}
         />
         <div className="absolute inset-x-0 bottom-0 h-1 bg-black/60">
           <div
