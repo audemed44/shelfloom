@@ -5,6 +5,7 @@
  */
 
 import type { YearReview } from './YearInReview'
+import { plural } from '../utils/plural'
 
 const MONTHS = [
   'January',
@@ -28,9 +29,7 @@ export function fmtHours(s: number): string {
   return h < 10 ? `${h.toFixed(1).replace(/\.0$/, '')}h` : `${Math.round(h)}h`
 }
 
-export function plural(n: number, word: string): string {
-  return `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`
-}
+export { plural }
 
 function isLeap(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0

@@ -25,6 +25,7 @@ import type {
   ScanStatus,
   BackfillCoversResponse,
 } from '../types/api'
+import { plural } from '../utils/plural'
 
 // ── Section header ─────────────────────────────────────────────────────────────
 
@@ -129,7 +130,7 @@ function ShelfCard({ shelf, onEdit, onDelete }: ShelfCardProps) {
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <span className="text-[10px] font-black tracking-widest uppercase text-white/30 mr-2">
-          {shelf.book_count} books
+          {plural(shelf.book_count, 'book')}
         </span>
         <button
           onClick={onEdit}

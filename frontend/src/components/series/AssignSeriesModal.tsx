@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { api } from '../../api/client'
 import type { SeriesWithCount } from '../../types/api'
+import { plural } from '../../utils/plural'
 
 interface BookSeries {
   series_id: number
@@ -160,7 +161,7 @@ export default function AssignSeriesModal({
                 >
                   {s.name}
                   <span className="ml-2 text-[10px] text-white/30">
-                    {s.book_count} books
+                    {plural(s.book_count, 'book')}
                   </span>
                 </button>
               ))}

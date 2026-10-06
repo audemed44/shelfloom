@@ -21,6 +21,7 @@ import type {
   ReadingOrderEntry,
 } from '../types/api'
 import { getBookCoverUrl } from '../utils/bookCover'
+import { plural } from '../utils/plural'
 
 interface SeriesDetailData {
   id: number
@@ -739,7 +740,7 @@ export default function SeriesDetail() {
                       </span>
                     </div>
                     <span className="text-[10px] text-white/30 tracking-widest uppercase">
-                      {s.book_count} books
+                      {plural(s.book_count, 'book')}
                     </span>
                     <ChevronRight size={16} className="text-white/20" />
                   </Link>

@@ -14,6 +14,7 @@ import GroupedBookContent from '../components/shared/GroupedBookContent'
 import SaveLensModal from '../components/lenses/SaveLensModal'
 import type { Lens, Book, PaginatedResponse } from '../types/api'
 import { usePersistedState } from '../hooks/usePersistedState'
+import { plural } from '../utils/plural'
 
 const PER_PAGE = 60 // a full last row at 2–6 columns
 
@@ -95,11 +96,12 @@ export default function LensDetail() {
     ? (() => {
         const fs = lens.filter_state
         const parts: string[] = []
-        if (fs.genres.length > 0) parts.push(`${fs.genres.length} genre(s)`)
-        if (fs.tags.length > 0) parts.push(`${fs.tags.length} tag(s)`)
+        if (fs.genres.length > 0) parts.push(plural(fs.genres.length, 'genre'))
+        if (fs.tags.length > 0) parts.push(plural(fs.tags.length, 'tag'))
         if (fs.series_ids.length > 0)
           parts.push(`${fs.series_ids.length} series`)
-        if (fs.authors.length > 0) parts.push(`${fs.authors.length} author(s)`)
+        if (fs.authors.length > 0)
+          parts.push(plural(fs.authors.length, 'author'))
         if (fs.formats.length > 0)
           parts.push(fs.formats.map((f) => f.toUpperCase()).join(', '))
         if (fs.has_rating === true) parts.push('rated')
