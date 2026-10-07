@@ -130,17 +130,6 @@ The default `docker-compose.example.yml` uses a `.data/` directory in the repo r
 | `./.data`       | `/data`        | Database and cover images |
 | `./.data/books` | `/books`       | Book files (your shelf)   |
 
-To mount an external source directory for importing (e.g. from Booklore), add it as an extra read-only volume:
-
-```yaml
-volumes:
-  - ./.data:/data
-  - ./.data/books:/books
-  - /path/to/your/source/books:/source:ro
-```
-
-Then follow the import instructions below.
-
 ### Link back to Foyer
 
 Set `HOMEPAGE_URL` to your [Foyer](https://github.com/audemed44/foyer)
@@ -163,93 +152,36 @@ Place `.sdr` folders alongside their book files in your books directory. Shelflo
 
 If you have a KOReader `statistics.sqlite3` file, mount it into the container and provide the path when triggering a scan via the API.
 
-## Importing from Booklore
-
-Shelfloom includes a migration script for Booklore libraries.
-
-**1. Add your source directory to `docker-compose.yml`** (if not already):
-
-```yaml
-volumes:
-  - ./.data:/data
-  - ./.data/books:/books
-  - /path/to/booklore/books:/source:ro
-```
-
-**2. Restart the container** to pick up the new volume:
-
-```bash
-docker compose up -d
-```
-
-**3. Run the import script:**
-
-```bash
-docker compose exec -T shelfloom python scripts/import_booklore.py \
-    --source /source \
-    --shelf-path /books \
-    --shelf-name "Library" \
-    --db-path /data/shelfloom.db \
-    --covers-dir /data/covers \
-    -v
-```
-
-To also import reading sessions from a KOReader `statistics.sqlite3`, mount it and add `--stats-db`:
-
-```yaml
-# in docker-compose.yml volumes:
-- /path/to/koreader/statistics.sqlite3:/koreader/statistics.sqlite3:ro
-```
-
-```bash
-docker compose exec -T shelfloom python scripts/import_booklore.py \
-    --source /source \
-    --shelf-path /books \
-    --shelf-name "Library" \
-    --db-path /data/shelfloom.db \
-    --covers-dir /data/covers \
-    --stats-db /koreader/statistics.sqlite3 \
-    -v
-```
-
-Options:
-
-- `--source` — path to the Booklore books directory (inside the container)
-- `--shelf-path` — destination shelf directory where files will be copied
-- `--stats-db` — path to a KOReader `statistics.sqlite3` to import reading sessions
-- `--dry-run` — preview metadata enrichment without writing changes
-- `-v` — verbose logging
-
 ## Development
 
+Shelfloom is a Go server (`cmd/shelfloom`, `internal/`) that serves the API
+and the built React frontend (`frontend/`), with SQLite for storage.
+Requirements: Go (see `go.mod`), Node 20+, and `poppler-utils` for PDFs.
+
 ```bash
-# Install root dev tools
-npm install
-
-# Backend
-cd backend
-uv venv .venv
-uv pip install -e ".[dev]"
-source .venv/Scripts/activate   # Windows Git Bash
-# source .venv/bin/activate     # Linux/macOS
-
-# Frontend
-cd frontend
-npm install
-
-# Run both dev servers
-npm run dev   # from repo root
+npm install            # root dev tools and the frontend
+npm run dev            # Go server on :8000 (data in .data/) and Vite on :5173
 ```
 
 ### Tests
 
 ```bash
-# All tests
-npm test
-
-# Backend only
-cd backend && python -m pytest --cov=app --cov-fail-under=90
-
-# Frontend only
-cd frontend && npm test
+npm test               # go test + vitest
+npm run lint           # gofmt + go vet, eslint
 ```
+
+### Configuration
+
+| Variable | Default | |
+| --- | --- | --- |
+| `SHELFLOOM_DB_PATH` | `/data/shelfloom.db` | Database file |
+| `SHELFLOOM_COVERS_DIR` | `/data/covers` | Cover images |
+| `SHELFLOOM_LISTEN` | `:8000` | Listen address |
+| `SHELFLOOM_SCAN_INTERVAL` | `300` | Seconds between library scans |
+| `SHELFLOOM_SERIAL_CHECK_INTERVAL` | `86400` | Seconds between web serial update checks |
+| `SHELFLOOM_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
+| `HOMEPAGE_URL` | | Foyer address for the sidebar link |
+| `TZ` | | Time zone stats are grouped in |
+
+Databases from the earlier Python-based releases open as they are, as long as
+that release had upgraded them to its last migration (it does so on start).
