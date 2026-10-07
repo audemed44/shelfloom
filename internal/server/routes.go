@@ -1,0 +1,191 @@
+package server
+
+// routes lists every API route.
+func (s *Server) routes() []route {
+	return []route{
+		{"GET /api/health", s.healthHandler},
+		{"GET /api/app", s.appHandler},
+
+		// books
+		{"GET /api/books", s.listBooksHandler},
+		{"POST /api/books", s.uploadBookHandler},
+		{"POST /api/books/manual", s.createManualBookHandler},
+		{"POST /api/books/bulk-metadata", s.bulkMetadataHandler},
+		{"POST /api/books/bulk-move", s.bulkMoveHandler},
+		{"GET /api/books/{book_id}", s.getBookHandler},
+		{"PATCH /api/books/{book_id}", s.updateBookHandler},
+		{"DELETE /api/books/{book_id}", s.deleteBookHandler},
+		{"GET /api/books/{book_id}/series", s.bookSeriesHandler},
+		{"GET /api/books/{book_id}/cover", s.bookCoverHandler},
+		{"GET /api/books/{book_id}/download", s.downloadBookHandler},
+		{"POST /api/books/{book_id}/refresh-cover", s.refreshCoverHandler},
+		{"POST /api/books/{book_id}/upload-cover", s.uploadCoverHandler},
+		{"POST /api/books/{book_id}/move", s.moveBookHandler},
+		{"POST /api/books/{book_id}/tags/{tag_id}", s.assignLinkHandler("tag")},
+		{"DELETE /api/books/{book_id}/tags/{tag_id}", s.removeLinkHandler("tag")},
+		{"POST /api/books/{book_id}/genres/{genre_id}", s.assignLinkHandler("genre")},
+		{"DELETE /api/books/{book_id}/genres/{genre_id}", s.removeLinkHandler("genre")},
+		{"GET /api/books/{book_id}/generated-cover", s.generatedCoverPreviewHandler},
+		{"POST /api/books/{book_id}/generate-cover", s.generateCoverHandler},
+
+		// reading
+		{"POST /api/books/{book_id}/mark-read", s.markReadHandler},
+		{"DELETE /api/books/{book_id}/mark-read", s.unmarkReadHandler},
+		{"POST /api/books/{book_id}/dnf", s.markDNFHandler},
+		{"DELETE /api/books/{book_id}/dnf", s.clearDNFHandler},
+		{"POST /api/books/{book_id}/sessions", s.createManualSessionHandler},
+		{"GET /api/books/{book_id}/sessions", s.sessionsHandler},
+		{"GET /api/books/{book_id}/highlights", s.highlightsHandler},
+		{"GET /api/books/{book_id}/progress", s.progressHandler},
+		{"GET /api/books/{book_id}/reading-summary", s.readingSummaryHandler},
+		{"GET /api/books/{book_id}/position", s.getPositionHandler},
+		{"PUT /api/books/{book_id}/position", s.putPositionHandler},
+		{"PUT /api/books/{book_id}/web-session", s.putWebSessionHandler},
+
+		// authors, tags, genres
+		{"GET /api/authors", s.listAuthorsHandler},
+		{"GET /api/tags", s.listLinksHandler("tag")},
+		{"POST /api/tags", s.createTagHandler},
+		{"DELETE /api/tags/{tag_id}", s.deleteLinkHandler("tag")},
+		{"GET /api/genres", s.listLinksHandler("genre")},
+		{"POST /api/genres", s.createGenreHandler},
+		{"DELETE /api/genres/{genre_id}", s.deleteLinkHandler("genre")},
+
+		// shelves
+		{"GET /api/shelves", s.listShelvesHandler},
+		{"POST /api/shelves", s.createShelfHandler},
+		{"GET /api/shelves/{shelf_id}", s.getShelfHandler},
+		{"PATCH /api/shelves/{shelf_id}", s.updateShelfHandler},
+		{"DELETE /api/shelves/{shelf_id}", s.deleteShelfHandler},
+
+		// lenses
+		{"GET /api/lenses", s.listLensesHandler},
+		{"POST /api/lenses", s.createLensHandler},
+		{"GET /api/lenses/{lens_id}", s.getLensHandler},
+		{"PATCH /api/lenses/{lens_id}", s.updateLensHandler},
+		{"DELETE /api/lenses/{lens_id}", s.deleteLensHandler},
+		{"GET /api/lenses/{lens_id}/books", s.lensBooksHandler},
+
+		// series and reading orders
+		{"GET /api/series", s.listSeriesHandler},
+		{"POST /api/series", s.createSeriesHandler},
+		{"GET /api/series/tree", s.seriesTreeHandler},
+		{"DELETE /api/series/empty", s.purgeEmptySeriesHandler},
+		{"GET /api/series/{series_id}", s.getSeriesHandler},
+		{"PATCH /api/series/{series_id}", s.updateSeriesHandler},
+		{"DELETE /api/series/{series_id}", s.deleteSeriesHandler},
+		{"POST /api/series/{series_id}/merge", s.mergeSeriesHandler},
+		{"POST /api/series/{series_id}/books/{book_id}", s.addBookToSeriesHandler},
+		{"DELETE /api/series/{series_id}/books/{book_id}", s.removeBookFromSeriesHandler},
+		{"GET /api/series/{series_id}/reading-orders", s.seriesReadingOrdersHandler},
+		{"GET /api/series/{series_id}/books", s.seriesBooksHandler},
+		{"POST /api/reading-orders", s.createReadingOrderHandler},
+		{"GET /api/reading-orders/{order_id}", s.getReadingOrderHandler},
+		{"DELETE /api/reading-orders/{order_id}", s.deleteReadingOrderHandler},
+		{"POST /api/reading-orders/{order_id}/entries", s.addReadingOrderEntryHandler},
+		{"PATCH /api/reading-orders/{order_id}/entries/reorder", s.reorderEntriesHandler},
+
+		// serials
+		{"GET /api/serials/adapters", s.serialAdaptersHandler},
+		{"GET /api/serials/detect-adapter", s.detectAdapterHandler},
+		{"POST /api/serials", s.addSerialHandler},
+		{"GET /api/serials", s.listSerialsHandler},
+		{"GET /api/serials/dashboard", s.serialsDashboardHandler},
+		{"GET /api/serials/fetch-pending-status", s.fetchPendingStatusHandler},
+		{"POST /api/serials/fetch-pending", s.fetchAllPendingHandler},
+		{"POST /api/serials/check-updates", s.checkUpdatesHandler},
+		{"GET /api/serials/{serial_id}", s.getSerialHandler},
+		{"PATCH /api/serials/{serial_id}", s.updateSerialHandler},
+		{"DELETE /api/serials/{serial_id}", s.deleteSerialHandler},
+		{"GET /api/serials/{serial_id}/cover", s.serialCoverHandler},
+		{"POST /api/serials/{serial_id}/upload-cover", s.uploadSerialCoverHandler},
+		{"POST /api/serials/{serial_id}/refresh-cover", s.refreshSerialCoverHandler},
+		{"POST /api/serials/{serial_id}/acknowledge", s.acknowledgeSerialHandler},
+		{"GET /api/serials/{serial_id}/chapters", s.listChaptersHandler},
+		{"POST /api/serials/{serial_id}/chapters/fetch", s.fetchChaptersHandler},
+		{"POST /api/serials/{serial_id}/chapters/fetch-pending", s.fetchPendingHandler},
+		{"GET /api/serials/{serial_id}/chapters/fetch-status", s.fetchStatusHandler},
+		{"POST /api/serials/{serial_id}/update", s.updateFromSourceHandler},
+		{"POST /api/serials/{serial_id}/volumes/preview", s.previewVolumesHandler},
+		{"POST /api/serials/{serial_id}/volumes/suggest", s.suggestVolumesHandler},
+		{"POST /api/serials/{serial_id}/volumes", s.configureVolumesHandler},
+		{"GET /api/serials/{serial_id}/volumes", s.listVolumesHandler},
+		{"POST /api/serials/{serial_id}/volumes/auto", s.autoSplitHandler},
+		{"POST /api/serials/{serial_id}/volumes/add", s.addVolumeHandler},
+		{"POST /api/serials/{serial_id}/volumes/link-ebook", s.linkEbookHandler},
+		{"POST /api/serials/{serial_id}/volumes/generate-all", s.generateAllHandler},
+		{"PATCH /api/serials/{serial_id}/volumes/{volume_id}", s.updateVolumeHandler},
+		{"DELETE /api/serials/{serial_id}/volumes/{volume_id}", s.deleteVolumeHandler},
+		{"POST /api/serials/{serial_id}/volumes/{volume_id}/upload-cover", s.uploadVolumeCoverHandler},
+		{"POST /api/serials/{serial_id}/volumes/{volume_id}/generate", s.generateVolumeHandler},
+		{"POST /api/serials/{serial_id}/volumes/{volume_id}/rebuild", s.rebuildVolumeHandler},
+		{"GET /api/serials/{serial_id}/series-merge-candidates", s.mergeCandidatesHandler},
+		{"POST /api/serials/{serial_id}/merge-series", s.mergeIntoSerialHandler},
+
+		// organizer
+		{"GET /api/organize/preview", s.organizePreviewHandler},
+		{"POST /api/organize/apply", s.organizeApplyHandler},
+		{"GET /api/organize/log", s.renameLogHandler},
+
+		// import
+		{"POST /api/import/scan", s.triggerScanHandler},
+		{"POST /api/import/backfill-covers", s.backfillCoversHandler},
+		{"GET /api/import/status", s.scanStatusHandler},
+
+		// KOReader sync
+		{"POST /api/kosync/users/create", s.kosyncCreateUserHandler},
+		{"PUT /api/kosync/users/create", s.kosyncCreateUserHandler},
+		{"GET /api/kosync/users/auth", s.kosyncAuthHandler},
+		{"PUT /api/kosync/syncs/progress", s.kosyncPutProgressHandler},
+		{"GET /api/kosync/syncs/progress/{document}", s.kosyncGetProgressHandler},
+		{"GET /api/kosync/syncs/progress", s.kosyncGetProgressQueryHandler},
+		{"GET /api/sync-accounts", s.listSyncAccountsHandler},
+		{"POST /api/sync-accounts", s.createSyncAccountHandler},
+		{"DELETE /api/sync-accounts/{username}", s.deleteSyncAccountHandler},
+
+		// files
+		{"GET /api/fs/dirs", s.listDirsHandler},
+
+		// stats
+		{"GET /api/stats/overview", s.overviewHandler},
+		{"GET /api/stats/reading-time", s.timeSeriesHandler("duration")},
+		{"GET /api/stats/pages", s.timeSeriesHandler("pages")},
+		{"GET /api/stats/books-completed", s.booksCompletedHandler},
+		{"GET /api/stats/pending-verdicts", s.pendingVerdictsHandler},
+		{"GET /api/stats/streaks", s.streaksHandler},
+		{"GET /api/stats/heatmap", s.heatmapHandler},
+		{"GET /api/stats/distribution", s.distributionHandler},
+		{"GET /api/stats/by-author", s.byGroupHandler("author")},
+		{"GET /api/stats/by-tag", s.byGroupHandler("tag")},
+		{"GET /api/stats/recent-sessions", s.recentSessionsHandler},
+		{"GET /api/stats/calendar", s.calendarHandler},
+		{"GET /api/stats/by-book/{book_id}", s.bookStatsHandler},
+		{"GET /api/stats/years", s.yearsHandler},
+		{"GET /api/stats/year/{year}", s.yearReviewHandler},
+		{"GET /api/stats/goal/{year}", s.getGoalHandler},
+		{"PUT /api/stats/goal/{year}", s.putGoalHandler},
+		{"DELETE /api/stats/goal/{year}", s.deleteGoalHandler},
+
+		// data management
+		{"GET /api/data-mgmt/duplicate-sessions", s.duplicateSessionsHandler},
+		{"PATCH /api/data-mgmt/sessions/{session_id}/dismissed", s.setSessionDismissedHandler},
+		{"POST /api/data-mgmt/duplicate-sessions/bulk-resolve", s.bulkResolveHandler},
+		{"GET /api/data-mgmt/unmatched", s.unmatchedHandler},
+		{"POST /api/data-mgmt/unmatched/{entry_id}/link", s.linkUnmatchedHandler},
+		{"POST /api/data-mgmt/unmatched/{entry_id}/dismiss", s.dismissUnmatchedHandler},
+		{"GET /api/data-mgmt/duplicate-books", s.duplicateBooksHandler},
+		{"POST /api/data-mgmt/books/merge", s.mergeBooksHandler},
+		{"GET /api/data-mgmt/sessions-log", s.sessionLogHandler},
+		{"GET /api/data-mgmt/import-log", s.importLogHandler},
+
+		// library health
+		{"GET /api/library-health", s.libraryHealthHandler},
+		{"POST /api/library-health/remove-missing", s.removeMissingHandler},
+		{"POST /api/library-health/fingerprints", s.fingerprintsHandler},
+		{"POST /api/library-health/generate-covers", s.generateCoversHandler},
+
+		// Foyer
+		{"GET /api/foyer/widget", s.foyerWidgetHandler},
+		{"POST /api/foyer/upload", s.foyerUploadHandler},
+	}
+}
