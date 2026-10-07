@@ -1,13 +1,4 @@
 **/.git
-**/__pycache__
-**/*.pyc
-**/.venv
-**/venv
-**/.pytest_cache
-**/.mypy_cache
-**/.ruff_cache
-**/.coverage
-**/htmlcov
 **/node_modules
 **/dist
 **/.vite
@@ -22,7 +13,7 @@
 *.md
 !frontend/README.md
 dev.sh
-dev.ps1
 .npmrc
 package.json
 package-lock.json
+devcheck/

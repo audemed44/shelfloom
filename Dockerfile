@@ -7,44 +7,39 @@ RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
-# ── Stage 2: Python runtime ─────────────────────────────────────────────────
-FROM python:3.12-slim
+# ── Stage 2: Server ─────────────────────────────────────────────────────────
+FROM golang:1.27-alpine AS server-build
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libmupdf-dev \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/ cmd/
+COPY internal/ internal/
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /shelfloom ./cmd/shelfloom
 
-# uv installs the exact versions pinned in backend/uv.lock, so the image runs
-# the same dependencies the tests ran against (a plain `pip install .` would
-# pick up whatever is newest on PyPI at build time).
-COPY --from=ghcr.io/astral-sh/uv:0.8.17 /uv /bin/uv
+# ── Stage 3: Runtime ────────────────────────────────────────────────────────
+# poppler-utils reads PDF metadata and renders PDF covers.
+FROM alpine:3.23
+
+RUN apk add --no-cache ca-certificates poppler-utils tzdata
+
+COPY --from=server-build /shelfloom /usr/local/bin/shelfloom
+COPY --from=frontend-build /build/dist /app/frontend/dist
 
 WORKDIR /app
 
-ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=never
-
-# Dependencies first (cached layer), then the app itself.
-# --locked fails the build if uv.lock is out of date with pyproject.toml.
-COPY backend/pyproject.toml backend/uv.lock ./
-RUN uv sync --locked --no-dev --no-install-project --no-cache
-COPY backend/ .
-RUN uv sync --locked --no-dev --no-editable --no-cache
-
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Copy built frontend next to backend at /app/frontend/dist
-COPY --from=frontend-build /build/dist /app/frontend/dist
-
-# Default data/config paths — the setup wizard handles everything else
-ENV SHELFLOOM_DB_PATH=/data/shelfloom.db
-ENV SHELFLOOM_COVERS_DIR=/data/covers
-ENV PYTHONUNBUFFERED=1
+# Default data/config paths — the setup wizard handles everything else.
+# The image runs as root unless the compose file sets a user, as before.
+ENV SHELFLOOM_DB_PATH=/data/shelfloom.db \
+    SHELFLOOM_COVERS_DIR=/data/covers \
+    SHELFLOOM_LISTEN=:8000 \
+    SHELFLOOM_FRONTEND_DIR=/app/frontend/dist \
+    GOMEMLIMIT=64MiB
 
 VOLUME ["/data", "/books"]
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level $(echo ${SHELFLOOM_LOG_LEVEL:-info} | tr '[:upper:]' '[:lower:]')"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s CMD ["shelfloom", "healthcheck"]
+
+CMD ["shelfloom"]
