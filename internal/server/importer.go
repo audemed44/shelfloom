@@ -228,6 +228,19 @@ func (s *Server) saveFileCover(p, format, out string) (bool, error) {
 	return true, nil
 }
 
+// bookFile is the full path of a book's file, or "" for manual books and
+// books whose shelf is gone.
+func (s *Server) bookFile(ctx context.Context, b *Book) (string, error) {
+	if b.isManual() {
+		return "", nil
+	}
+	shelf, err := getShelf(ctx, s.DB, b.ShelfID)
+	if err != nil || shelf == nil {
+		return "", err
+	}
+	return filepath.Join(shelf.Path, b.FilePath), nil
+}
+
 // processFile imports or updates one book file: "created", "updated" or
 // "skipped" (import_service._process_file).
 func (s *Server) processFile(ctx context.Context, shelf *Shelf, p string) (string, error) {
@@ -270,6 +283,15 @@ func (s *Server) processFile(ctx context.Context, shelf *Shelf, p string) (strin
 		if book.FileHash != nil && *book.FileHash == preSHA {
 			return "skipped", nil
 		}
+		// A second copy of a book whose own file is still there (same
+		// embedded ID or an older version's hash) is left alone: moving the
+		// book onto it would flip it between the two files on every scan.
+		if current, err := s.bookFile(ctx, book); err != nil {
+			return "", err
+		} else if current != "" && current != p && fileExists(current) {
+			slog.Warn(fmt.Sprintf("Skipping %s: it is another copy of %s", p, current))
+			return "skipped", nil
+		}
 		// The file changed: refresh what comes from it, keep UI edits.
 		md := extractMetadataWith(p, format, parsed, parseErr)
 		coverPath := s.extractCover(p, format, book.ID)
@@ -291,8 +313,8 @@ func (s *Server) processFile(ctx context.Context, shelf *Shelf, p string) (strin
 			if err := recordHash(ctx, tx, book.ID, preSHA, preMD5, book.PageCount, preKO); err != nil {
 				return err
 			}
-			_, err := tx.ExecContext(ctx, "UPDATE books SET file_hash = ?, file_hash_md5 = ?, file_hash_md5_ko = ?, file_path = ?, file_size = ?, epub_uid = ?, metadata_raw = ?, cover_path = ? WHERE id = ?",
-				preSHA, preMD5, preKO, rel, st.Size(), md.epubUID, md.raw, strOrNil(coverPath), book.ID)
+			_, err := tx.ExecContext(ctx, "UPDATE books SET file_hash = ?, file_hash_md5 = ?, file_hash_md5_ko = ?, file_path = ?, shelf_id = ?, file_size = ?, epub_uid = ?, metadata_raw = ?, cover_path = ? WHERE id = ?",
+				preSHA, preMD5, preKO, rel, shelf.ID, st.Size(), md.epubUID, md.raw, strOrNil(coverPath), book.ID)
 			return err
 		})
 		if err != nil {
