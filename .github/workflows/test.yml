@@ -5,26 +5,27 @@ on:
     branches: [main]
 
 jobs:
-  backend:
+  server:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
 
-      - name: Create venv and install dependencies
-        working-directory: backend
-        run: |
-          uv venv --python 3.12
-          uv pip install -e ".[dev]"
+      - name: Format
+        run: test -z "$(gofmt -l cmd internal)" || (gofmt -l cmd internal && exit 1)
 
-      - name: Lint
-        run: uv run --directory backend python -m ruff check .
+      - name: PDF tools
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+
+      - name: Vet
+        run: go vet ./cmd/... ./internal/...
 
       - name: Test
-        run: uv run --directory backend python -m pytest -n auto --dist loadfile --cov=app --cov-fail-under=90 -q
+        run: go test -race -cover ./cmd/... ./internal/...
 
   frontend:
     runs-on: ubuntu-latest
