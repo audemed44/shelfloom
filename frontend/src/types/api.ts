@@ -545,3 +545,17 @@ export interface ZLibraryAddResponse {
   series: string | null
   series_sequence: string | null
 }
+
+export interface ZLibraryDomains {
+  selected: string
+  default: string
+  enabled: boolean
+  domains: { domain: string; built_in: boolean }[]
+}
+
+export interface ZLibraryDomainCheck {
+  domain: string
+  ok: boolean
+  ms: number
+  error: string | null
+}

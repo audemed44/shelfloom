@@ -137,6 +137,11 @@ func (s *Server) routes() []route {
 		{"GET /api/zlibrary/search", s.zlibSearchHandler},
 		{"GET /api/zlibrary/books/{zlib_id}/cover", s.zlibCoverHandler},
 		{"POST /api/zlibrary/books", s.zlibAddHandler},
+		{"GET /api/zlibrary/domains", s.zlibDomainsHandler},
+		{"POST /api/zlibrary/domains", s.zlibAddDomainHandler},
+		{"PUT /api/zlibrary/domain", s.zlibSelectDomainHandler},
+		{"DELETE /api/zlibrary/domains/{domain}", s.zlibRemoveDomainHandler},
+		{"GET /api/zlibrary/domains/check", s.zlibCheckDomainHandler},
 
 		// KOReader sync
 		{"POST /api/kosync/users/create", s.kosyncCreateUserHandler},

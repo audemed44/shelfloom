@@ -19,6 +19,7 @@ import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
 import ShelfModal from '../components/settings/ShelfModal'
 import KoreaderSync from '../components/settings/KoreaderSync'
+import ZLibrarySettings from '../components/settings/ZLibrarySettings'
 import type {
   Shelf,
   OrganizerResult,
@@ -791,10 +792,22 @@ export default function Settings() {
         </div>
       </section>
 
-      {/* ── 05 Data Management ── */}
+      {/* ── 05 Z-Library ── */}
       <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
         <SectionHeader
           num="05"
+          title="Z-Library"
+          description="The domain the Library page's Z-Library search and downloads go through."
+        />
+        <div className="min-w-0 lg:col-span-8">
+          <ZLibrarySettings />
+        </div>
+      </section>
+
+      {/* ── 06 Data Management ── */}
+      <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
+        <SectionHeader
+          num="06"
           title="Data Management"
           description="Review duplicate sessions, link unmatched KOReader data, and merge duplicate books."
         />

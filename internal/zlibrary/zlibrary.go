@@ -60,11 +60,29 @@ func New(domain, email, password string) *Client {
 
 // Base is the API's base URL.
 func (c *Client) Base() string {
-	d := strings.TrimRight(strings.TrimSpace(c.Domain), "/")
+	c.mu.Lock()
+	d := c.Domain
+	c.mu.Unlock()
+	return BaseURL(d)
+}
+
+// BaseURL turns a domain ("z-library.hn") or base URL into a base URL.
+func BaseURL(domain string) string {
+	d := strings.TrimRight(strings.TrimSpace(domain), "/")
 	if strings.Contains(d, "://") {
 		return d
 	}
 	return "https://" + d
+}
+
+// SetDomain switches the client to another domain, logging in afresh there.
+func (c *Client) SetDomain(domain string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.Domain != domain {
+		c.Domain = domain
+		c.userID, c.userKey = "", ""
+	}
 }
 
 // Book is one search result.
@@ -366,6 +384,10 @@ func (c *Client) call(ctx context.Context, method, p string, form url.Values, ou
 	c.decorate(req)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
+		if strings.Contains(err.Error(), "stopped after") {
+			// A bot check that redirects to itself until it gets a cookie.
+			return fmt.Errorf("%s is behind a bot check; try another domain", c.Base())
+		}
 		return fmt.Errorf("could not reach Z-Library at %s: %w", c.Base(), err)
 	}
 	defer resp.Body.Close()
@@ -378,7 +400,7 @@ func (c *Client) call(ctx context.Context, method, p string, form url.Values, ou
 		Error   string          `json:"error"`
 	}
 	if err := json.Unmarshal(raw, &head); err != nil {
-		return fmt.Errorf("Z-Library at %s sent an unexpected reply (HTTP %d); the domain may have moved", c.Base(), resp.StatusCode)
+		return fmt.Errorf("Z-Library at %s sent an unexpected reply (HTTP %d); try another domain", c.Base(), resp.StatusCode)
 	}
 	if ok := strings.Trim(string(head.Success), `"`); ok != "1" && ok != "true" {
 		msg := head.Error
