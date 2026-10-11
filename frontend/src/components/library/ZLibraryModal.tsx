@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Check, Download, Loader2, Search, X } from 'lucide-react'
 import { api } from '../../api/client'
+import { usePersistedState } from '../../hooks/usePersistedState'
 import type {
   BookDetail,
   ZLibraryAddResponse,
@@ -26,9 +27,9 @@ const FORMATS = [
 ]
 
 const LANGUAGES = [
-  { value: 'any', label: 'Any language' },
   { value: 'english', label: 'English' },
   { value: 'hindi', label: 'Hindi' },
+  { value: 'any', label: 'Any language' },
 ]
 
 function errorText(err: unknown, fallback: string) {
@@ -57,8 +58,12 @@ function ResultCover({ result }: { result: ZLibraryResult }) {
 export default function ZLibraryModal({ onClose, onAdded }: Props) {
   const [status, setStatus] = useState<ZLibraryStatus | null>(null)
   const [text, setText] = useState('')
-  const [format, setFormat] = useState('epub')
-  const [language, setLanguage] = useState('any')
+  // Filters are remembered; English unless changed.
+  const [format, setFormat] = usePersistedState('shelfloom:zlib-format', 'epub')
+  const [language, setLanguage] = usePersistedState(
+    'shelfloom:zlib-language',
+    'english'
+  )
   const [results, setResults] = useState<ZLibraryResult[] | null>(null)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)

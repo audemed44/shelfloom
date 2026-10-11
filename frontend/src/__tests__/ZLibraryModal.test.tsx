@@ -39,6 +39,7 @@ describe('ZLibraryModal', () => {
 
   beforeEach(() => {
     alreadyInLibrary = false
+    localStorage.clear()
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url, opts) => {
       const u = url.toString()
       const method = (opts?.method ?? 'GET').toUpperCase()
@@ -116,7 +117,19 @@ describe('ZLibraryModal', () => {
     )
     expect(searchCall?.[0].toString()).toContain('q=fake+book')
     expect(searchCall?.[0].toString()).toContain('format=epub')
+    expect(searchCall?.[0].toString()).toContain('language=english')
     expect(screen.getByText('Series: Saga')).toBeInTheDocument()
+  })
+
+  it('remembers the filters', async () => {
+    const first = renderModal()
+    fireEvent.change(screen.getByLabelText('Language'), {
+      target: { value: 'any' },
+    })
+    first.unmount()
+    renderModal()
+    expect(screen.getByLabelText('Language')).toHaveValue('any')
+    expect(screen.getByLabelText('Format')).toHaveValue('epub')
   })
 
   it('adds a book and opens the editor with its series picked', async () => {
