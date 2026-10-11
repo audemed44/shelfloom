@@ -62,6 +62,11 @@ describe('ZLibraryModal', () => {
           series: 'Saga',
           series_sequence: '2',
         }
+      } else if (u === '/api/books/b1') {
+        body = BOOK
+      } else if (u.startsWith('/api/series/4/books/b1') && method === 'POST') {
+        status = 201
+        body = {}
       } else if (u === '/api/series/tree') {
         body = [
           {
@@ -138,6 +143,24 @@ describe('ZLibraryModal', () => {
     expect(screen.getByTestId('zlibrary-notice')).toHaveTextContent(
       'Added “Fake Book”.'
     )
+  })
+
+  it('saves the picked series with the book, without a separate ✓', async () => {
+    renderModal()
+    await searchFor('fake')
+    fireEvent.click(screen.getByTestId('zlibrary-add'))
+    expect(await screen.findByText('✓ Saga selected')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+    await waitFor(() =>
+      expect(screen.queryByTestId('edit-book-modal')).not.toBeInTheDocument()
+    )
+    const calls = fetchSpy.mock.calls.map(
+      ([u, o]) => `${(o?.method ?? 'GET').toUpperCase()} ${u}`
+    )
+    const add = calls.indexOf('POST /api/series/4/books/b1?sequence=2')
+    expect(add).toBeGreaterThan(-1)
+    expect(add).toBeLessThan(calls.indexOf('PATCH /api/books/b1'))
   })
 
   it('says when the book is already in the library', async () => {
