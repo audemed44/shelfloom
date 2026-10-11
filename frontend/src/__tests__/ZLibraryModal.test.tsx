@@ -47,7 +47,7 @@ describe('ZLibraryModal', () => {
       if (u === '/api/zlibrary/status') {
         body = {
           enabled: true,
-          domain: 'z-library.ec',
+          domain: 'z-library.hn',
           downloads_today: 3,
           downloads_limit: 10,
           error: null,
