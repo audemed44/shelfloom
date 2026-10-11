@@ -20,6 +20,12 @@ interface EditBookModalProps {
   onClose: () => void
   onSaved: (book: BookDetail) => void
   onSeriesChange: () => void
+  /** Header line above the title; "Edit Book" by default. */
+  heading?: string
+  /** Label of the button that closes without saving. */
+  cancelLabel?: string
+  /** A series to offer in the add row (e.g. from Z-Library). */
+  suggestedSeries?: { name: string; sequence: string | null } | null
 }
 
 interface EditForm {
@@ -437,6 +443,9 @@ export default function EditBookModal({
   onClose,
   onSaved,
   onSeriesChange,
+  heading = 'Edit Book',
+  cancelLabel = 'Cancel',
+  suggestedSeries = null,
 }: EditBookModalProps) {
   const [form, setForm] = useState<EditForm>({
     title: book.title ?? '',
@@ -457,7 +466,15 @@ export default function EditBookModal({
     search: string
     selectedId: number | null
     sequence: string
-  } | null>(null)
+  } | null>(() =>
+    suggestedSeries && currentSeries.length === 0
+      ? {
+          search: suggestedSeries.name,
+          selectedId: null,
+          sequence: suggestedSeries.sequence ?? '',
+        }
+      : null
+  )
   const [showCreateSeries, setShowCreateSeries] = useState(false)
   const [seriesError, setSeriesError] = useState<string | null>(null)
   const [seriesBusy, setSeriesBusy] = useState(false)
@@ -471,7 +488,17 @@ export default function EditBookModal({
 
   useEffect(() => {
     api.get<SeriesWithCount[]>('/api/series/tree').then((data) => {
-      if (Array.isArray(data)) setAllSeries(data)
+      if (!Array.isArray(data)) return
+      setAllSeries(data)
+      // Pick the suggested series when the library already has it.
+      setAddRow((row) => {
+        if (!row || row.selectedId !== null || !row.search) return row
+        const name = row.search.trim().toLowerCase()
+        const match = data.find((s) => s.name.trim().toLowerCase() === name)
+        return match
+          ? { ...row, search: match.name, selectedId: match.id }
+          : row
+      })
     })
   }, [])
 
@@ -484,10 +511,12 @@ export default function EditBookModal({
     return () => window.removeEventListener('keydown', handler)
   }, [onClose, showCreateSeries])
 
-  // Focus search input when add row appears
+  // Focus search input when add row appears (not for a suggested series,
+  // which would pop the phone keyboard over the form)
+  const addRowOpen = addRow !== null
   useEffect(() => {
-    if (addRow !== null) searchRef.current?.focus()
-  }, [addRow])
+    if (addRowOpen && !suggestedSeries) searchRef.current?.focus()
+  }, [addRowOpen, suggestedSeries])
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -630,7 +659,7 @@ export default function EditBookModal({
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 sticky top-0 bg-ink-900 z-10">
             <div>
               <h2 className="text-sm font-black tracking-widest uppercase text-white">
-                Edit Book
+                {heading}
               </h2>
               <p className="text-xs text-primary/80 normal-case mt-0.5">
                 {book.title}
@@ -872,6 +901,15 @@ export default function EditBookModal({
                           ))}
                         </div>
                       )}
+                    {suggestedSeries &&
+                      !addRow.selectedId &&
+                      addRow.search === suggestedSeries.name &&
+                      filteredSeries.length === 0 && (
+                        <p className="text-xs text-white/40 normal-case">
+                          “{suggestedSeries.name}” isn’t in your library yet:
+                          use + to create it.
+                        </p>
+                      )}
                     {addRow.selectedId && (
                       <p className="text-[10px] text-primary tracking-widest uppercase font-black">
                         ✓ {addRow.search} selected
@@ -912,7 +950,7 @@ export default function EditBookModal({
               onClick={onClose}
               className="px-5 py-2.5 text-xs font-black tracking-widest uppercase border border-white/20 text-white/50 hover:text-white hover:border-white/40 transition-colors"
             >
-              Cancel
+              {cancelLabel}
             </button>
             <button
               type="submit"
@@ -930,6 +968,7 @@ export default function EditBookModal({
       {showCreateSeries && (
         <CreateSeriesModal
           allSeries={allSeries}
+          initialName={addRow && !addRow.selectedId ? addRow.search.trim() : ''}
           onClose={() => setShowCreateSeries(false)}
           onCreated={handleSeriesCreated}
         />

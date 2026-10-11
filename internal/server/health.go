@@ -32,7 +32,7 @@ func (s *Server) appHandler(w http.ResponseWriter, r *http.Request) error {
 	if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "http://") {
 		out = &url
 	}
-	return ok(w, map[string]any{"foyer_url": out})
+	return ok(w, map[string]any{"foyer_url": out, "zlibrary": s.zlib() != nil})
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) error {
