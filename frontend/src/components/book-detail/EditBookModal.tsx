@@ -528,6 +528,11 @@ export default function EditBookModal({
     e.preventDefault()
     setSaving(true)
     setError(null)
+    // A series picked in the add row but not confirmed with ✓ is saved too.
+    if (addRow?.selectedId && !(await handleAddSeries())) {
+      setSaving(false)
+      return
+    }
     try {
       const payload: Record<string, string | null> = {}
       for (const [k, v] of Object.entries(form)) {
@@ -591,8 +596,9 @@ export default function EditBookModal({
     }
   }
 
-  const handleAddSeries = async () => {
-    if (!addRow?.selectedId) return
+  /** Adds the book to the series picked in the add row; false on failure. */
+  const handleAddSeries = async (): Promise<boolean> => {
+    if (!addRow?.selectedId) return false
     setSeriesBusy(true)
     setSeriesError(null)
     try {
@@ -618,9 +624,11 @@ export default function EditBookModal({
       }
       setAddRow(null)
       onSeriesChange()
+      return true
     } catch (err) {
       const apiErr = err as { data?: { detail?: string } }
       setSeriesError(apiErr.data?.detail ?? 'Failed to assign series.')
+      return false
     } finally {
       setSeriesBusy(false)
     }
