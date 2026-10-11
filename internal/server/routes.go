@@ -139,6 +139,7 @@ func (s *Server) routes() []route {
 		{"POST /api/zlibrary/books", s.zlibAddHandler},
 		{"GET /api/zlibrary/domains", s.zlibDomainsHandler},
 		{"POST /api/zlibrary/domains", s.zlibAddDomainHandler},
+		{"POST /api/zlibrary/domains/refresh", s.zlibRefreshDomainsHandler},
 		{"PUT /api/zlibrary/domain", s.zlibSelectDomainHandler},
 		{"DELETE /api/zlibrary/domains/{domain}", s.zlibRemoveDomainHandler},
 		{"GET /api/zlibrary/domains/check", s.zlibCheckDomainHandler},

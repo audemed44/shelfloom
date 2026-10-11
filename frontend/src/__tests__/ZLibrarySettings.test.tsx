@@ -11,7 +11,9 @@ describe('ZLibrarySettings', () => {
     selected: string
     default: string
     enabled: boolean
-    domains: { domain: string; built_in: boolean }[]
+    domains: { domain: string; source: 'official' | 'zlibrary' | 'custom' }[]
+    fetched_from: string | null
+    fetched_at: number | null
   }
 
   beforeEach(() => {
@@ -20,9 +22,11 @@ describe('ZLibrarySettings', () => {
       default: 'z-library.hn',
       enabled: true,
       domains: [
-        { domain: 'z-library.sk', built_in: true },
-        { domain: 'z-library.hn', built_in: true },
+        { domain: 'z-library.sk', source: 'official' },
+        { domain: 'z-library.hn', source: 'official' },
       ],
+      fetched_from: null,
+      fetched_at: null,
     }
     fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((url, opts) => {
       const u = url.toString()
@@ -36,6 +40,17 @@ describe('ZLibrarySettings', () => {
           d === 'z-library.sk'
             ? { domain: d, ok: false, ms: 0, error: 'behind a bot check' }
             : { domain: d, ok: true, ms: 420, error: null }
+      } else if (u === '/api/zlibrary/domains/refresh') {
+        state = {
+          ...state,
+          domains: [
+            ...state.domains,
+            { domain: 'articles.sk', source: 'zlibrary' },
+          ],
+          fetched_from: 'z-library.hn',
+          fetched_at: 1791700000,
+        }
+        body = state
       } else if (u === '/api/zlibrary/domain' && method === 'PUT') {
         state = { ...state, selected: sent.domain }
         body = state
@@ -43,7 +58,10 @@ describe('ZLibrarySettings', () => {
         status = 201
         state = {
           ...state,
-          domains: [...state.domains, { domain: sent.domain, built_in: false }],
+          domains: [
+            ...state.domains,
+            { domain: sent.domain, source: 'custom' },
+          ],
         }
         body = state
       } else if (
@@ -52,7 +70,7 @@ describe('ZLibrarySettings', () => {
       ) {
         state = {
           ...state,
-          domains: state.domains.filter((d) => d.built_in),
+          domains: state.domains.filter((d) => d.source !== 'custom'),
         }
         body = state
       }
@@ -70,11 +88,29 @@ describe('ZLibrarySettings', () => {
 
   it('checks every domain and shows which one is in use', async () => {
     render(<ZLibrarySettings />)
-    expect(await screen.findByText('Works · 420 ms')).toBeInTheDocument()
+    expect(
+      (await screen.findAllByText('Works · 420 ms')).length
+    ).toBeGreaterThan(0)
     expect(screen.getByText('behind a bot check')).toBeInTheDocument()
     expect(
       screen.getByRole('radio', { name: 'Use z-library.hn' })
     ).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('adds Z-Library’s own domain list and checks the new ones', async () => {
+    render(<ZLibrarySettings />)
+    expect(await screen.findByText('articles.sk')).toBeInTheDocument()
+    expect(screen.getByText('FROM Z-LIBRARY')).toBeInTheDocument()
+    expect(screen.getByTestId('zlibrary-fetched')).toHaveTextContent(
+      'from z-library.hn'
+    )
+    await waitFor(() =>
+      expect(
+        fetchSpy.mock.calls.some(([u]) =>
+          u.toString().includes('check?domain=articles.sk')
+        )
+      ).toBe(true)
+    )
   })
 
   it('switches, adds and removes domains', async () => {

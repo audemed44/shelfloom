@@ -49,9 +49,23 @@ export default function ZLibrarySettings() {
         if (!d || !Array.isArray(d.domains)) return
         setData(d)
         checkAll(d)
+        // Then bring in Z-Library's current list, checking what's new.
+        const known = new Set(d.domains.map((x) => x.domain))
+        api
+          .post<ZLibraryDomains>('/api/zlibrary/domains/refresh')
+          .then((fresh) => {
+            if (!fresh || !Array.isArray(fresh.domains)) return
+            setData(fresh)
+            fresh.domains
+              .filter((x) => !known.has(x.domain))
+              .forEach((x) => check(x.domain))
+          })
+          .catch(() => {
+            // No domain answered: the stored list stays.
+          })
       })
       .catch(() => setError('Could not load the Z-Library domains'))
-  }, [checkAll])
+  }, [check, checkAll])
 
   const run = async (fn: () => Promise<ZLibraryDomains | null>) => {
     setBusy(true)
@@ -176,9 +190,9 @@ export default function ZLibrarySettings() {
                         : state.error}
                   </p>
                 </div>
-                {d.built_in ? (
-                  <span className="text-[10px] font-semibold tracking-widest text-white/30">
-                    BUILT-IN
+                {d.source !== 'custom' ? (
+                  <span className="shrink-0 text-[10px] font-semibold tracking-widest text-white/30">
+                    {d.source === 'official' ? 'OFFICIAL' : 'FROM Z-LIBRARY'}
                   </span>
                 ) : (
                   <button
@@ -195,6 +209,13 @@ export default function ZLibrarySettings() {
           })}
         </ul>
       </div>
+
+      {data.fetched_from && data.fetched_at && (
+        <p className="text-xs text-white/45" data-testid="zlibrary-fetched">
+          Z-Library’s own domain list, from {data.fetched_from},{' '}
+          {new Date(data.fetched_at * 1000).toLocaleString()}.
+        </p>
+      )}
 
       <form onSubmit={add} className="grid grid-cols-[1fr_auto] gap-2">
         <input

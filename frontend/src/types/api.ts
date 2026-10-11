@@ -550,7 +550,9 @@ export interface ZLibraryDomains {
   selected: string
   default: string
   enabled: boolean
-  domains: { domain: string; built_in: boolean }[]
+  domains: { domain: string; source: 'official' | 'zlibrary' | 'custom' }[]
+  fetched_from: string | null
+  fetched_at: number | null
 }
 
 export interface ZLibraryDomainCheck {

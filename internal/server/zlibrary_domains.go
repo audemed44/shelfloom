@@ -27,9 +27,30 @@ var zlibBuiltinDomains = []string{
 }
 
 const (
-	settingZLibDomain  = "zlibrary_domain"
-	settingZLibDomains = "zlibrary_custom_domains"
+	settingZLibDomain     = "zlibrary_domain"
+	settingZLibDomains    = "zlibrary_custom_domains"
+	settingZLibAPIDomains = "zlibrary_api_domains"
 )
+
+// Where a domain in the list comes from.
+const (
+	domainOfficial = "official" // built in
+	domainZLibrary = "zlibrary" // from Z-Library's own domain list
+	domainCustom   = "custom"   // added in Settings
+)
+
+// zlibAPIDomains is the last domain list fetched from Z-Library.
+type zlibAPIDomains struct {
+	Domains   []string  `json:"domains"`
+	From      string    `json:"from"`
+	FetchedAt time.Time `json:"fetched_at"`
+}
+
+func (s *Server) apiZLibDomains(ctx context.Context) (zlibAPIDomains, error) {
+	var out zlibAPIDomains
+	_, err := s.getSetting(ctx, settingZLibAPIDomains, &out)
+	return out, err
+}
 
 // getSetting decodes a setting into out; false when it isn't set.
 func (s *Server) getSetting(ctx context.Context, key string, out any) (bool, error) {
@@ -112,36 +133,97 @@ func normalizeDomain(in string) (string, error) {
 }
 
 type zlibDomainOut struct {
-	Domain  string `json:"domain"`
-	BuiltIn bool   `json:"built_in"`
+	Domain string `json:"domain"`
+	Source string `json:"source"`
 }
 
-func (s *Server) zlibDomainsResponse(ctx context.Context) (map[string]any, error) {
+// zlibDomainList is every domain on offer: official ones, then Z-Library's
+// own list, then the user's.
+func (s *Server) zlibDomainList(ctx context.Context) ([]zlibDomainOut, zlibAPIDomains, error) {
 	custom, err := s.customZLibDomains(ctx)
 	if err != nil {
-		return nil, err
+		return nil, zlibAPIDomains{}, err
+	}
+	fetched, err := s.apiZLibDomains(ctx)
+	if err != nil {
+		return nil, zlibAPIDomains{}, err
 	}
 	domains := []zlibDomainOut{}
 	seen := map[string]bool{}
-	add := func(d string, builtIn bool) {
+	add := func(d, source string) {
 		if !seen[d] {
 			seen[d] = true
-			domains = append(domains, zlibDomainOut{Domain: d, BuiltIn: builtIn})
+			domains = append(domains, zlibDomainOut{Domain: d, Source: source})
 		}
 	}
 	for _, d := range zlibBuiltinDomains {
-		add(d, true)
+		add(d, domainOfficial)
 	}
-	add(s.defaultZLibDomain(), true)
+	add(s.defaultZLibDomain(), domainOfficial)
+	for _, d := range fetched.Domains {
+		add(d, domainZLibrary)
+	}
 	for _, d := range custom {
-		add(d, false)
+		add(d, domainCustom)
 	}
-	return map[string]any{
-		"selected": s.zlibDomain(ctx),
-		"default":  s.defaultZLibDomain(),
-		"enabled":  s.zlib() != nil,
-		"domains":  domains,
-	}, nil
+	return domains, fetched, nil
+}
+
+func (s *Server) zlibDomainsResponse(ctx context.Context) (map[string]any, error) {
+	domains, fetched, err := s.zlibDomainList(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{
+		"selected":     s.zlibDomain(ctx),
+		"default":      s.defaultZLibDomain(),
+		"enabled":      s.zlib() != nil,
+		"domains":      domains,
+		"fetched_from": nil,
+		"fetched_at":   nil,
+	}
+	if fetched.From != "" {
+		out["fetched_from"] = fetched.From
+		out["fetched_at"] = fetched.FetchedAt.Unix()
+	}
+	return out, nil
+}
+
+// zlibRefreshDomainsHandler fetches Z-Library's current domain list, asking
+// the domain in use first and then the others until one answers.
+func (s *Server) zlibRefreshDomainsHandler(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+	domains, _, err := s.zlibDomainList(ctx)
+	if err != nil {
+		return err
+	}
+	order := []string{s.zlibDomain(ctx)}
+	for _, d := range domains {
+		if d.Domain != order[0] {
+			order = append(order, d.Domain)
+		}
+	}
+	var lastErr error
+	for _, from := range order {
+		tctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		list, err := zlibrary.New(from, "", "").Domains(tctx)
+		cancel()
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		var clean []string
+		for _, d := range list {
+			if n, err := normalizeDomain(d); err == nil && !slices.Contains(clean, n) {
+				clean = append(clean, n)
+			}
+		}
+		if err := s.putSetting(ctx, settingZLibAPIDomains, zlibAPIDomains{Domains: clean, From: from, FetchedAt: time.Now().UTC()}); err != nil {
+			return err
+		}
+		return s.zlibDomainsHandler(w, r)
+	}
+	return errStatus(http.StatusBadGateway, "No Z-Library domain answered: "+lastErr.Error())
 }
 
 func (s *Server) zlibDomainsHandler(w http.ResponseWriter, r *http.Request) error {
@@ -154,11 +236,11 @@ func (s *Server) zlibDomainsHandler(w http.ResponseWriter, r *http.Request) erro
 
 // zlibKnownDomain reports whether d is in the list.
 func (s *Server) zlibKnownDomain(ctx context.Context, d string) (bool, error) {
-	if slices.Contains(zlibBuiltinDomains, d) || d == s.defaultZLibDomain() {
-		return true, nil
+	domains, _, err := s.zlibDomainList(ctx)
+	if err != nil {
+		return false, err
 	}
-	custom, err := s.customZLibDomains(ctx)
-	return slices.Contains(custom, d), err
+	return slices.ContainsFunc(domains, func(x zlibDomainOut) bool { return x.Domain == d }), nil
 }
 
 func (s *Server) selectZLibDomain(ctx context.Context, d string) error {
