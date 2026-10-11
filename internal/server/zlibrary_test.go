@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -196,4 +197,80 @@ func TestBookFileName(t *testing.T) {
 			t.Errorf("bookFileName(%q, %q) = %q, want %q", c.author, c.title, got, c.want)
 		}
 	}
+}
+
+func TestNormalizeDomain(t *testing.T) {
+	for in, want := range map[string]string{
+		"z-library.hn":            "z-library.hn",
+		" https://Z-Library.HN/ ": "z-library.hn",
+		"libb.la/some/page":       "libb.la",
+		"http://127.0.0.1:8399":   "http://127.0.0.1:8399",
+		"https://z-lib.sk/?a=b#c": "z-lib.sk",
+		"localhost:9000":          "localhost:9000",
+	} {
+		if got, err := normalizeDomain(in); err != nil || got != want {
+			t.Errorf("normalizeDomain(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"", "nodot", "ftp://x.org", "bad domain.com", "-x.com"} {
+		if got, err := normalizeDomain(in); err == nil {
+			t.Errorf("normalizeDomain(%q) = %q, want an error", in, got)
+		}
+	}
+}
+
+func TestZLibraryDomains(t *testing.T) {
+	file, _ := os.ReadFile("testdata/test.epub")
+	zl, _ := fakeZLib(t, file)
+	s := newTestServer(t)
+	s.app.Config.ZLibraryDomain = "z-library.hn"
+	s.app.Config.ZLibraryEmail = "me@example.com"
+	s.app.Config.ZLibraryPassword = "secret"
+
+	type list struct {
+		Selected string          `json:"selected"`
+		Domains  []zlibDomainOut `json:"domains"`
+	}
+	var l list
+	expect(t, "list", s.do("GET", "/api/zlibrary/domains", nil, &l), 200)
+	if l.Selected != "z-library.hn" || len(l.Domains) != len(zlibBuiltinDomains) || !l.Domains[0].BuiltIn {
+		t.Fatalf("list = %+v", l)
+	}
+	expect(t, "select unknown", s.do("PUT", "/api/zlibrary/domain", map[string]string{"domain": "example.org"}, nil), 404)
+	expect(t, "add bad", s.do("POST", "/api/zlibrary/domains", map[string]string{"domain": "not a domain"}, nil), 400)
+	expect(t, "add built-in", s.do("POST", "/api/zlibrary/domains", map[string]string{"domain": "https://libb.la/"}, nil), 409)
+	expect(t, "add", s.do("POST", "/api/zlibrary/domains", map[string]string{"domain": zl.URL + "/"}, &l), 201)
+	if last := l.Domains[len(l.Domains)-1]; last.Domain != zl.URL || last.BuiltIn {
+		t.Fatalf("added = %+v", last)
+	}
+
+	// Picking the fake makes search go there (the default domain would fail).
+	expect(t, "select", s.do("PUT", "/api/zlibrary/domain", map[string]string{"domain": zl.URL}, &l), 200)
+	if l.Selected != zl.URL {
+		t.Fatalf("selected = %q", l.Selected)
+	}
+	var found struct {
+		Results []zlibResult `json:"results"`
+	}
+	expect(t, "search", s.do("GET", "/api/zlibrary/search?q=fake", nil, &found), 200)
+	if len(found.Results) != 1 {
+		t.Fatalf("results = %+v", found.Results)
+	}
+
+	var check map[string]any
+	expect(t, "check", s.do("GET", "/api/zlibrary/domains/check?domain="+url.QueryEscape(zl.URL), nil, &check), 200)
+	if check["ok"] != true {
+		t.Fatalf("check = %v", check)
+	}
+	expect(t, "check down", s.do("GET", "/api/zlibrary/domains/check?domain=http://127.0.0.1:1", nil, &check), 200)
+	if check["ok"] != false || check["error"] == nil {
+		t.Fatalf("check down = %v", check)
+	}
+
+	// Removing the selected domain goes back to the default.
+	expect(t, "remove", s.do("DELETE", "/api/zlibrary/domains/"+url.PathEscape(zl.URL), nil, &l), 200)
+	if l.Selected != "z-library.hn" || len(l.Domains) != len(zlibBuiltinDomains) {
+		t.Fatalf("after remove = %+v", l)
+	}
+	expect(t, "remove built-in", s.do("DELETE", "/api/zlibrary/domains/libb.la", nil, nil), 404)
 }

@@ -148,8 +148,10 @@ daily downloads; a book whose file is already in the library is not downloaded
 again.
 
 Z-Library has no official API: Shelfloom uses the one its apps use, which can
-change. Its domain moves too; set `SHELFLOOM_ZLIBRARY_DOMAIN` to one that
-works from your server (`HTTPS_PROXY` is honoured if it needs a proxy).
+change. Its domain moves too: **Settings → Z-Library** lists its published
+domains, checks which ones answer from your server, and lets you switch
+domain or add a new one. `SHELFLOOM_ZLIBRARY_DOMAIN` is only the starting
+choice (`HTTPS_PROXY` is honoured if the server needs a proxy).
 
 ### KOReader Sync and the web reader
 
@@ -198,7 +200,7 @@ npm run lint           # gofmt + go vet, eslint
 | `HOMEPAGE_URL` | | Foyer address for the sidebar link |
 | `SHELFLOOM_ZLIBRARY_EMAIL` | | Z-Library account email |
 | `SHELFLOOM_ZLIBRARY_PASSWORD` | | Z-Library account password |
-| `SHELFLOOM_ZLIBRARY_DOMAIN` | `z-library.ec` | Z-Library domain (or base URL) |
+| `SHELFLOOM_ZLIBRARY_DOMAIN` | `z-library.hn` | Z-Library domain until one is picked in Settings |
 | `TZ` | | Time zone stats are grouped in |
 
 Databases from the earlier Python-based releases open as they are, as long as

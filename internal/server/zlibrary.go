@@ -35,7 +35,7 @@ func (s *Server) zlib() *zlibrary.Client {
 	s.zl.once.Do(func() {
 		c := s.Config
 		if c.ZLibraryEmail != "" && c.ZLibraryPassword != "" {
-			s.zl.client = zlibrary.New(c.ZLibraryDomain, c.ZLibraryEmail, c.ZLibraryPassword)
+			s.zl.client = zlibrary.New(s.zlibDomain(context.Background()), c.ZLibraryEmail, c.ZLibraryPassword)
 		}
 	})
 	return s.zl.client
@@ -82,7 +82,7 @@ func zlibError(err error) error {
 }
 
 func (s *Server) zlibStatusHandler(w http.ResponseWriter, r *http.Request) error {
-	out := map[string]any{"enabled": false, "domain": s.Config.ZLibraryDomain, "downloads_today": nil, "downloads_limit": nil, "error": nil}
+	out := map[string]any{"enabled": false, "domain": s.zlibDomain(r.Context()), "downloads_today": nil, "downloads_limit": nil, "error": nil}
 	c := s.zlib()
 	if c == nil {
 		return ok(w, out)
