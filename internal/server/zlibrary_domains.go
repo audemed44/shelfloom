@@ -15,15 +15,15 @@ import (
 	"github.com/audemed44/shelfloom/internal/zlibrary"
 )
 
-// zlibBuiltinDomains are Z-Library's published domains and mirror
-// (October 2026), plus z-library.ec, which still served the app API then.
+// zlibBuiltinDomains are Z-Library's published main domains and mirror
+// (October 2026). Lookalike domains phish for accounts: only official
+// ones belong here.
 var zlibBuiltinDomains = []string{
 	"z-lib.sk",
 	"z-library.im",
 	"z-library.sk",
 	"z-library.hn",
 	"libb.la",
-	"z-library.ec",
 }
 
 const (

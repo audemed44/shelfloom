@@ -36,7 +36,7 @@ func (e *APIError) Error() string { return "Z-Library: " + e.Message }
 // Client talks to one Z-Library domain with one account. It logs in on first
 // use and again when the session expires.
 type Client struct {
-	// Domain is a host ("z-library.ec") or a base URL ("http://127.0.0.1:1").
+	// Domain is a host ("z-library.hn") or a base URL ("http://127.0.0.1:1").
 	Domain   string
 	Email    string
 	Password string
