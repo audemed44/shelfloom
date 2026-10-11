@@ -149,8 +149,9 @@ again.
 
 Z-Library has no official API: Shelfloom uses the one its apps use, which can
 change. Its domain moves too: **Settings → Z-Library** lists its published
-domains, checks which ones answer from your server, and lets you switch
-domain or add a new one. Take new domains only from Z-Library's own
+domains together with the current list Z-Library's own API gives out, checks
+which ones answer from your server, and lets you switch domain or add a new
+one. Take new domains only from Z-Library's own
 channels: lookalike domains exist to steal account passwords.
 `SHELFLOOM_ZLIBRARY_DOMAIN` is only the starting choice (`HTTPS_PROXY` is
 honoured if the server needs a proxy).

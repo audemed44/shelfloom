@@ -208,6 +208,26 @@ func (c *Client) Search(ctx context.Context, q Query) ([]Book, error) {
 	return out.Books, nil
 }
 
+// Domains asks Z-Library for its current domains (those with content).
+func (c *Client) Domains(ctx context.Context) ([]string, error) {
+	var out struct {
+		Domains []struct {
+			Domain           string `json:"domain"`
+			ContentAvailable *bool  `json:"contentAvailable"`
+		} `json:"domains"`
+	}
+	if err := c.call(ctx, http.MethodGet, "/eapi/info/domains", nil, &out); err != nil {
+		return nil, err
+	}
+	var domains []string
+	for _, d := range out.Domains {
+		if d.Domain != "" && (d.ContentAvailable == nil || *d.ContentAvailable) {
+			domains = append(domains, d.Domain)
+		}
+	}
+	return domains, nil
+}
+
 // Limits is the account's download allowance.
 type Limits struct {
 	DownloadsToday int `json:"downloads_today"`

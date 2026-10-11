@@ -34,6 +34,12 @@ func fakeZLib(t *testing.T, file []byte) (*httptest.Server, *int) {
 				return
 			}
 			reply(map[string]any{"success": 1, "user": map[string]any{"id": 7, "remix_userkey": "key"}})
+		case "/eapi/info/domains":
+			reply(map[string]any{"success": 1, "domains": []map[string]any{
+				{"domain": "mirror.example", "contentAvailable": true},
+				{"domain": "dead.example", "contentAvailable": false},
+				{"domain": "z-library.sk", "contentAvailable": true},
+			}})
 		case "/eapi/user/profile":
 			if !loggedIn {
 				reply(map[string]any{"success": 0, "error": "Please login"})
@@ -233,14 +239,14 @@ func TestZLibraryDomains(t *testing.T) {
 	}
 	var l list
 	expect(t, "list", s.do("GET", "/api/zlibrary/domains", nil, &l), 200)
-	if l.Selected != "z-library.hn" || len(l.Domains) != len(zlibBuiltinDomains) || !l.Domains[0].BuiltIn {
+	if l.Selected != "z-library.hn" || len(l.Domains) != len(zlibBuiltinDomains) || l.Domains[0].Source != domainOfficial {
 		t.Fatalf("list = %+v", l)
 	}
 	expect(t, "select unknown", s.do("PUT", "/api/zlibrary/domain", map[string]string{"domain": "example.org"}, nil), 404)
 	expect(t, "add bad", s.do("POST", "/api/zlibrary/domains", map[string]string{"domain": "not a domain"}, nil), 400)
 	expect(t, "add built-in", s.do("POST", "/api/zlibrary/domains", map[string]string{"domain": "https://libb.la/"}, nil), 409)
 	expect(t, "add", s.do("POST", "/api/zlibrary/domains", map[string]string{"domain": zl.URL + "/"}, &l), 201)
-	if last := l.Domains[len(l.Domains)-1]; last.Domain != zl.URL || last.BuiltIn {
+	if last := l.Domains[len(l.Domains)-1]; last.Domain != zl.URL || last.Source != domainCustom {
 		t.Fatalf("added = %+v", last)
 	}
 
@@ -253,6 +259,26 @@ func TestZLibraryDomains(t *testing.T) {
 		Results []zlibResult `json:"results"`
 	}
 	expect(t, "search", s.do("GET", "/api/zlibrary/search?q=fake", nil, &found), 200)
+
+	// Z-Library's own list joins the official one (asked of the domain in
+	// use), skipping domains without content and ones already listed.
+	var refreshed struct {
+		Domains     []zlibDomainOut `json:"domains"`
+		FetchedFrom string          `json:"fetched_from"`
+	}
+	expect(t, "refresh", s.do("POST", "/api/zlibrary/domains/refresh", nil, &refreshed), 200)
+	var fromZLib []string
+	for _, d := range refreshed.Domains {
+		if d.Source == domainZLibrary {
+			fromZLib = append(fromZLib, d.Domain)
+		}
+	}
+	if refreshed.FetchedFrom != zl.URL || len(fromZLib) != 1 || fromZLib[0] != "mirror.example" {
+		t.Fatalf("refreshed = %+v", refreshed)
+	}
+	expect(t, "select fetched", s.do("PUT", "/api/zlibrary/domain", map[string]string{"domain": "mirror.example"}, nil), 200)
+	expect(t, "add fetched", s.do("POST", "/api/zlibrary/domains", map[string]string{"domain": "mirror.example"}, nil), 409)
+	expect(t, "select fake again", s.do("PUT", "/api/zlibrary/domain", map[string]string{"domain": zl.URL}, nil), 200)
 	if len(found.Results) != 1 {
 		t.Fatalf("results = %+v", found.Results)
 	}
@@ -269,7 +295,7 @@ func TestZLibraryDomains(t *testing.T) {
 
 	// Removing the selected domain goes back to the default.
 	expect(t, "remove", s.do("DELETE", "/api/zlibrary/domains/"+url.PathEscape(zl.URL), nil, &l), 200)
-	if l.Selected != "z-library.hn" || len(l.Domains) != len(zlibBuiltinDomains) {
+	if l.Selected != "z-library.hn" || len(l.Domains) != len(zlibBuiltinDomains)+1 {
 		t.Fatalf("after remove = %+v", l)
 	}
 	expect(t, "remove built-in", s.do("DELETE", "/api/zlibrary/domains/libb.la", nil, nil), 404)
