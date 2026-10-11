@@ -66,6 +66,9 @@ func main() {
 			ScanInterval:        seconds("SHELFLOOM_SCAN_INTERVAL", 300),
 			SerialCheckInterval: seconds("SHELFLOOM_SERIAL_CHECK_INTERVAL", 86400),
 			FoyerURL:            os.Getenv("HOMEPAGE_URL"),
+			ZLibraryDomain:      env("SHELFLOOM_ZLIBRARY_DOMAIN", "z-library.ec"),
+			ZLibraryEmail:       os.Getenv("SHELFLOOM_ZLIBRARY_EMAIL"),
+			ZLibraryPassword:    os.Getenv("SHELFLOOM_ZLIBRARY_PASSWORD"),
 		},
 	}
 	if dir := env("SHELFLOOM_FRONTEND_DIR", "frontend/dist"); isDir(dir) {

@@ -352,38 +352,64 @@ func (s *Server) uploadBook(r *http.Request) (*Book, error) {
 	if err != nil {
 		return nil, err
 	}
+	b, _, err := s.addToDefaultShelf(r.Context(), name, data, false)
+	return b, err
+}
+
+// addToDefaultShelf writes a book file into the default shelf and imports
+// it. An upload replaces a file of the same name; with keepExisting the new
+// file gets a numbered name instead, and a file that is already in the
+// library is dropped in favour of that book (dup is true).
+func (s *Server) addToDefaultShelf(ctx context.Context, name string, data []byte, keepExisting bool) (b *Book, dup bool, err error) {
 	suffix := strings.ToLower(filepath.Ext(name))
 	if suffix != ".epub" && suffix != ".pdf" {
-		return nil, badRequest("Only .epub and .pdf files are supported")
+		return nil, false, badRequest("Only .epub and .pdf files are supported")
 	}
-	ctx := r.Context()
 	shelf, err := scanShelf(s.DB.QueryRowContext(ctx, "SELECT "+shelfColumns+" FROM shelves WHERE is_default = 1"))
 	if err != nil {
-		return nil, conflict("No default shelf configured")
+		return nil, false, conflict("No default shelf configured")
 	}
 	if name == "" {
 		name = "upload" + suffix
 	}
 	dest := filepath.Join(shelf.Path, name)
+	if keepExisting {
+		stem := strings.TrimSuffix(name, filepath.Ext(name))
+		for i := 2; fileExists(dest); i++ {
+			dest = filepath.Join(shelf.Path, fmt.Sprintf("%s (%d)%s", stem, i, suffix))
+		}
+	}
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if err := os.WriteFile(dest, data, 0o644); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if _, err := s.processFile(ctx, shelf, dest); err != nil {
 		os.Remove(dest)
-		return nil, unprocessable("Failed to import file: %v", err)
+		return nil, false, unprocessable("Failed to import file: %v", err)
 	}
 	rel, _ := relPath(shelf.Path, dest)
-	b, err := oneBook(ctx, s.DB, "SELECT "+bookColumns("books")+" FROM books WHERE books.shelf_id = ? AND books.file_path = ?", shelf.ID, rel)
+	b, err = oneBook(ctx, s.DB, "SELECT "+bookColumns("books")+" FROM books WHERE books.shelf_id = ? AND books.file_path = ?", shelf.ID, rel)
 	if err != nil {
-		return nil, err
+		return nil, false, err
+	}
+	if b == nil && keepExisting {
+		// processFile skips a file whose hash is already in the library.
+		if sha, _, herr := hashing.Files(dest); herr == nil {
+			if b, err = findByHash(ctx, s.DB, sha); err != nil {
+				return nil, false, err
+			}
+			if b != nil {
+				os.Remove(dest)
+				return b, true, nil
+			}
+		}
 	}
 	if b == nil {
-		return nil, errStatus(http.StatusInternalServerError, "Book was imported but could not be found")
+		return nil, false, errStatus(http.StatusInternalServerError, "Book was imported but could not be found")
 	}
-	return b, nil
+	return b, false, nil
 }
 
 func (s *Server) uploadBookHandler(w http.ResponseWriter, r *http.Request) error {

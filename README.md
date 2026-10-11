@@ -136,6 +136,21 @@ Set `HOMEPAGE_URL` to your [Foyer](https://github.com/audemed44/foyer)
 address (e.g. `https://home.example.com`) to get a link back to it at the top
 of the sidebar, and in the **More** menu on phones.
 
+### Add books from Z-Library
+
+With a Z-Library account set (`SHELFLOOM_ZLIBRARY_EMAIL` and
+`SHELFLOOM_ZLIBRARY_PASSWORD`), the Library page gets a **Z-Library** button:
+search by title, author or ISBN, and **Add to library** downloads the EPUB or
+PDF into the default shelf. Details the file lacks (author, ISBN, year,
+description, cover) are filled in from Z-Library, then the book opens in the
+editor to set its series, genres and tags. Each add uses one of the account's
+daily downloads; a book whose file is already in the library is not downloaded
+again.
+
+Z-Library has no official API: Shelfloom uses the one its apps use, which can
+change. Its domain moves too; set `SHELFLOOM_ZLIBRARY_DOMAIN` to one that
+works from your server (`HTTPS_PROXY` is honoured if it needs a proxy).
+
 ### KOReader Sync and the web reader
 
 Shelfloom runs a sync server for KOReader's built-in **Progress sync** plugin, and has a web reader for EPUBs (the **Read** button on a book). Both share one reading position per book, so you can read a chapter in the browser and pick up on your e-reader, or the other way round. No KOReader plugin is needed.
@@ -181,6 +196,9 @@ npm run lint           # gofmt + go vet, eslint
 | `SHELFLOOM_SERIAL_CHECK_INTERVAL` | `86400` | Seconds between web serial update checks |
 | `SHELFLOOM_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 | `HOMEPAGE_URL` | | Foyer address for the sidebar link |
+| `SHELFLOOM_ZLIBRARY_EMAIL` | | Z-Library account email |
+| `SHELFLOOM_ZLIBRARY_PASSWORD` | | Z-Library account password |
+| `SHELFLOOM_ZLIBRARY_DOMAIN` | `z-library.ec` | Z-Library domain (or base URL) |
 | `TZ` | | Time zone stats are grouped in |
 
 Databases from the earlier Python-based releases open as they are, as long as

@@ -132,6 +132,12 @@ func (s *Server) routes() []route {
 		{"POST /api/import/backfill-covers", s.backfillCoversHandler},
 		{"GET /api/import/status", s.scanStatusHandler},
 
+		// Z-Library
+		{"GET /api/zlibrary/status", s.zlibStatusHandler},
+		{"GET /api/zlibrary/search", s.zlibSearchHandler},
+		{"GET /api/zlibrary/books/{zlib_id}/cover", s.zlibCoverHandler},
+		{"POST /api/zlibrary/books", s.zlibAddHandler},
+
 		// KOReader sync
 		{"POST /api/kosync/users/create", s.kosyncCreateUserHandler},
 		{"PUT /api/kosync/users/create", s.kosyncCreateUserHandler},

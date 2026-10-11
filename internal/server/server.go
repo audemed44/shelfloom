@@ -21,6 +21,11 @@ type Config struct {
 	SerialCheckInterval time.Duration
 	// FoyerURL links the sidebar back to the homelab's start page.
 	FoyerURL string
+	// Z-Library account for searching and adding books; off without an
+	// email and password.
+	ZLibraryDomain   string
+	ZLibraryEmail    string
+	ZLibraryPassword string
 }
 
 // Server holds what the handlers need.
@@ -34,6 +39,7 @@ type Server struct {
 
 	scan    scanState
 	fetches fetchJobs
+	zl      zlibState
 
 	// bg tracks background work (scans, chapter fetches) so shutdown can
 	// wait for it.

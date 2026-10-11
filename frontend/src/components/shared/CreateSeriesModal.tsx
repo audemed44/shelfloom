@@ -7,14 +7,16 @@ interface CreateSeriesModalProps {
   allSeries: SeriesWithCount[]
   onClose: () => void
   onCreated: (newSeries: SeriesWithCount) => void
+  initialName?: string
 }
 
 export default function CreateSeriesModal({
   allSeries,
   onClose,
   onCreated,
+  initialName = '',
 }: CreateSeriesModalProps) {
-  const [name, setName] = useState('')
+  const [name, setName] = useState(initialName)
   const [description, setDescription] = useState('')
   const [parentId, setParentId] = useState('')
   const [parentSearch, setParentSearch] = useState('')

@@ -506,3 +506,42 @@ export interface SerialVolumePreview {
   is_partial: boolean
   stubbed_missing_count: number
 }
+
+export interface ZLibraryStatus {
+  enabled: boolean
+  domain: string
+  downloads_today: number | null
+  downloads_limit: number | null
+  error: string | null
+}
+
+export interface ZLibraryResult {
+  id: string
+  hash: string
+  title: string
+  author: string | null
+  publisher: string | null
+  year: number | null
+  language: string | null
+  pages: number | null
+  series: string | null
+  extension: string
+  size: string | null
+  isbns: string[]
+  cover_url: string | null
+  description: string | null
+  in_library_book_id: string | null
+}
+
+export interface ZLibrarySearchResponse {
+  results: ZLibraryResult[]
+  page: number
+  has_more: boolean
+}
+
+export interface ZLibraryAddResponse {
+  book: BookDetail
+  already_in_library: boolean
+  series: string | null
+  series_sequence: string | null
+}

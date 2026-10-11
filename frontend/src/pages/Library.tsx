@@ -12,6 +12,7 @@ import {
   Plus,
   SlidersHorizontal,
   Star,
+  Download,
 } from 'lucide-react'
 import { useApi } from '../hooks/useApi'
 import { api } from '../api/client'
@@ -21,6 +22,7 @@ import BulkUploadZone from '../components/library/BulkUploadZone'
 import BulkActionToolbar from '../components/library/BulkActionToolbar'
 import BulkEditModal from '../components/library/BulkEditModal'
 import CreateManualBookModal from '../components/library/CreateManualBookModal'
+import ZLibraryModal from '../components/library/ZLibraryModal'
 import FilterDrawer from '../components/library/FilterDrawer'
 import ActiveFilterChips from '../components/library/ActiveFilterChips'
 import GroupedBookContent from '../components/shared/GroupedBookContent'
@@ -389,6 +391,8 @@ export default function Library() {
   const [page, setPage] = useState(1)
   const [rev, setRev] = useState(0)
   const [showManualModal, setShowManualModal] = useState(false)
+  const [showZLibrary, setShowZLibrary] = useState(false)
+  const { data: appInfo } = useApi<{ zlibrary?: boolean }>('/api/app')
   const [expandedSeriesIds, setExpandedSeriesIds] = useState<Set<number>>(
     new Set()
   )
@@ -739,6 +743,16 @@ export default function Library() {
           <Plus size={14} />
           Manual Book
         </button>
+        {appInfo?.zlibrary && (
+          <button
+            onClick={() => setShowZLibrary(true)}
+            className="flex items-center justify-center gap-2 rounded-2xl px-6 py-4 text-xs font-medium border border-white/10 bg-white/[0.03] text-white/60 hover:text-white hover:border-white/30 transition-colors sm:self-stretch"
+            data-testid="zlibrary-btn"
+          >
+            <Download size={14} />
+            Z-Library
+          </button>
+        )}
       </div>
 
       {/* Shelf tabs */}
@@ -857,6 +871,13 @@ export default function Library() {
 
       {showManualModal && (
         <CreateManualBookModal onClose={() => setShowManualModal(false)} />
+      )}
+
+      {showZLibrary && (
+        <ZLibraryModal
+          onClose={() => setShowZLibrary(false)}
+          onAdded={handleUploadSuccess}
+        />
       )}
 
       {/* Bulk action toolbar */}
