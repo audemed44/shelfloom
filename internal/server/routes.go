@@ -144,6 +144,15 @@ func (s *Server) routes() []route {
 		{"DELETE /api/zlibrary/domains/{domain}", s.zlibRemoveDomainHandler},
 		{"GET /api/zlibrary/domains/check", s.zlibCheckDomainHandler},
 
+		// AI recommendations
+		{"GET /api/recommendations", s.recommendationsHandler},
+		{"POST /api/recommendations/refresh", s.refreshRecommendationsHandler},
+		{"POST /api/recommendations/{rec_id}/feedback", s.recFeedbackHandler},
+		{"DELETE /api/recommendations/feedback/{feedback_id}", s.deleteRecFeedbackHandler},
+		{"GET /api/recommendations/settings", s.recSettingsHandler},
+		{"PUT /api/recommendations/settings", s.putRecSettingsHandler},
+		{"GET /api/recommendations/models", s.recModelsHandler},
+
 		// KOReader sync
 		{"POST /api/kosync/users/create", s.kosyncCreateUserHandler},
 		{"PUT /api/kosync/users/create", s.kosyncCreateUserHandler},
