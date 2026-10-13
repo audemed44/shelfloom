@@ -50,7 +50,6 @@ type handlerFunc func(w http.ResponseWriter, r *http.Request) error
 
 func (s *Server) wrap(h handlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		err := h(rec, r)
 		if err != nil {
@@ -61,11 +60,10 @@ func (s *Server) wrap(h handlerFunc) http.HandlerFunc {
 				}
 				writeJSON(rec, he.status, map[string]any{"detail": he.detail})
 			} else {
-				slog.Error("request failed", "method", r.Method, "path", r.URL.Path, "err", err)
+				slog.ErrorContext(r.Context(), "request failed", "err", err)
 				writeJSON(rec, http.StatusInternalServerError, map[string]any{"detail": "Internal Server Error"})
 			}
 		}
-		slog.Info(fmt.Sprintf("%s %s %d %.0fms", r.Method, r.URL.Path, rec.status, float64(time.Since(start).Microseconds())/1000))
 	}
 }
 

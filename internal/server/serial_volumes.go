@@ -143,7 +143,7 @@ func (s *Server) configureVolumesHandler(w http.ResponseWriter, r *http.Request)
 	}
 	vols, err := configureVolumes(ctx, s.DB, id, splits)
 	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to configure volumes for serial %d: %v", id, err))
+		slog.Error("could not configure a serial's volumes", "serial", id, "err", err)
 		return errStatus(http.StatusInternalServerError, err.Error())
 	}
 	out, err := s.volumeResponses(ctx, id, vols)
@@ -832,7 +832,7 @@ func (s *Server) generateVolume(ctx context.Context, serialID, volumeID int64, s
 		CoverPath: cover, Chapters: chapters, Images: images,
 	}, shelf.Path)
 	if err != nil {
-		slog.Error(fmt.Sprintf("EPUB generation failed for volume %d: %v", v.VolumeNumber, err))
+		slog.Error("EPUB generation failed", "volume", v.VolumeNumber, "err", err)
 		return nil, errVolumeGeneration("EPUB generation failed: %v", err)
 	}
 	slog.Info("EPUB written: " + epubPath)
@@ -883,11 +883,11 @@ func (s *Server) generateVolumeHandler(w http.ResponseWriter, r *http.Request) e
 		var he *httpError
 		if errors.As(err, &he) {
 			if he.status == http.StatusUnprocessableEntity {
-				slog.Error(fmt.Sprintf("Volume generation error: %v", he.detail))
+				slog.Error("volume generation failed", "err", he.detail)
 			}
 			return err
 		}
-		slog.Error(fmt.Sprintf("Unexpected error generating volume %d for serial %d: %v", vid, id, err))
+		slog.Error("volume generation failed", "volume", vid, "serial", id, "err", err)
 		return errStatus(http.StatusInternalServerError, err.Error())
 	}
 	return s.writeVolume(w, ctx, id, vid, http.StatusOK)
@@ -920,7 +920,7 @@ func (s *Server) generateAllHandler(w http.ResponseWriter, r *http.Request) erro
 		if err != nil {
 			var he *httpError
 			if errors.As(err, &he) && he.status == http.StatusUnprocessableEntity {
-				slog.Warn(fmt.Sprintf("Volume %d generation failed: %v", v.VolumeNumber, he.detail))
+				slog.Warn("volume generation failed", "volume", v.VolumeNumber, "err", he.detail)
 				continue
 			}
 			return err

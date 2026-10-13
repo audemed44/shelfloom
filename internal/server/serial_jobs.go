@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/audemed44/shelfloom/internal/logging"
 	"github.com/audemed44/shelfloom/internal/scrapers"
 	"github.com/audemed44/shelfloom/internal/store"
 )
@@ -167,7 +168,7 @@ func (s *Server) scheduleFetch(id, start, end, total int64, numbers []int64) (*f
 		job.FinishedAt = store.UTCNow()
 		job.CurrentNum, job.CurrentTitle = nil, nil
 		if err != nil {
-			slog.Error(fmt.Sprintf("Chapter fetch job failed for serial %d: %v", id, err))
+			slog.Error("chapter fetch job failed", "serial", id, "err", err)
 			msg := err.Error()
 			job.State, job.Error = "error", &msg
 			job.log("error", msg, nil)
@@ -268,7 +269,7 @@ func (s *Server) fetchChapterContents(ctx context.Context, id, start, end int64,
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		slog.Warn(fmt.Sprintf("Failed to fetch chapter %d: %v", num, err))
+		slog.Warn("could not fetch a chapter", "chapter", num, "err", err)
 		if _, dbErr := s.DB.ExecContext(ctx, "UPDATE web_serials SET last_error = ?, status = 'error' WHERE id = ?", err.Error(), id); dbErr != nil {
 			return dbErr
 		}
@@ -425,7 +426,7 @@ func (s *Server) checkSerial(ctx context.Context, sr *Serial) int64 {
 	remote, err := adapter.FetchChapterList(ctx, sr.URL)
 	if err != nil {
 		s.DB.ExecContext(ctx, "UPDATE web_serials SET status = 'error', last_error = ?, last_checked_at = ? WHERE id = ?", err.Error(), store.Now(), sr.ID)
-		slog.Warn(fmt.Sprintf("Failed to fetch chapter list for serial %d: %v", sr.ID, err))
+		slog.WarnContext(ctx, "could not fetch a serial's chapter list", "serial", sr.ID, "err", err)
 		return 0
 	}
 	var newCount int64
@@ -441,11 +442,11 @@ func (s *Server) checkSerial(ctx context.Context, sr *Serial) int64 {
 		return markVolumesStale(ctx, tx, sr.ID, changed)
 	})
 	if err != nil {
-		slog.Error("serial check failed", "serial", sr.ID, "err", err)
+		slog.ErrorContext(ctx, "serial check failed", "serial", sr.ID, "err", err)
 		return 0
 	}
 	if newCount > 0 {
-		slog.Info(fmt.Sprintf("Serial %d (%s): found %d new chapters", sr.ID, deref(sr.Title), newCount))
+		slog.InfoContext(ctx, "new chapters", "serial", sr.ID, "title", deref(sr.Title), "count", newCount)
 	}
 	return newCount
 }
@@ -684,7 +685,7 @@ func (s *Server) runBatch(ctx context.Context, job *batchJob, ids []int64) {
 				set(func() { job.AlreadyRunning++; job.ProcessedSerial++ })
 				continue
 			}
-			slog.Error(fmt.Sprintf("Pending chapter batch failed for serial %d: %v", id, err))
+			slog.Error("pending chapter batch failed", "serial", id, "err", err)
 			set(func() { job.Failed++; job.ProcessedSerial++ })
 			continue
 		}
@@ -736,7 +737,7 @@ func downloadCover(ctx context.Context, url, dest string) bool {
 		}
 	}
 	if err != nil {
-		slog.Warn(fmt.Sprintf("Failed to download cover from %s: %v", url, err))
+		slog.Warn("could not download a cover", "url", logging.ScrubURLs(url), "err", err)
 		return false
 	}
 	return true

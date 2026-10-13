@@ -155,7 +155,7 @@ func extractMetadataWith(p, format string, m *epub.Metadata, err error) fileMeta
 			return fileMetadata{title: m.Title, author: m.Author, publisher: m.Publisher, language: m.Language,
 				description: m.Description, pageCount: m.PageCount, epubUID: m.EpubUID, raw: m.Raw}
 		}
-		slog.Warn(fmt.Sprintf("Metadata extraction failed for %s: %v", filepath.Base(p), err))
+		slog.Warn("metadata extraction failed", "file", filepath.Base(p), "err", err)
 	} else {
 		info, err := pdf.ReadInfo(p)
 		if err == nil {
@@ -183,7 +183,7 @@ func extractMetadataWith(p, format string, m *epub.Metadata, err error) fileMeta
 			}
 			return md
 		}
-		slog.Warn(fmt.Sprintf("Metadata extraction failed for %s: %v", filepath.Base(p), err))
+		slog.Warn("metadata extraction failed", "file", filepath.Base(p), "err", err)
 	}
 	title, author := parseFilename(p)
 	return fileMetadata{title: title, author: author, raw: "{}"}
@@ -195,7 +195,7 @@ func (s *Server) extractCover(p, format, id string) string {
 	out := filepath.Join(s.Config.CoversDir, id+".jpg")
 	ok, err := s.saveFileCover(p, format, out)
 	if err != nil {
-		slog.Warn(fmt.Sprintf("Cover extraction failed for %s: %v", filepath.Base(p), err))
+		slog.Warn("cover extraction failed", "file", filepath.Base(p), "err", err)
 		return ""
 	}
 	if !ok {
@@ -333,7 +333,7 @@ func (s *Server) processFile(ctx context.Context, shelf *Shelf, p string) (strin
 	if format == "epub" {
 		res, err := epub.EmbedShelfloomID(p, id)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("Could not embed Shelfloom ID into %s: %v", filepath.Base(p), err))
+			slog.Warn("could not embed the Shelfloom ID", "file", filepath.Base(p), "err", err)
 		} else {
 			id, preSHA, preMD5, postSHA, postMD5 = res.ID, res.PreSHA, res.PreMD5, res.PostSHA, res.PostMD5
 		}
@@ -422,7 +422,7 @@ func (s *Server) importShelf(ctx context.Context, shelf *Shelf, mtimes map[strin
 			return nil
 		}()
 		if err != nil && err != errSkip {
-			slog.Error(fmt.Sprintf("Failed to import %s: %v", p, err))
+			slog.Error("import failed", "file", p, "err", err)
 			prog.Errors = append(prog.Errors, fmt.Sprintf("%s: %v", filepath.Base(p), err))
 		}
 		prog.Processed++
@@ -468,7 +468,7 @@ func (s *Server) ingestSDR(ctx context.Context, shelf *Shelf, bookPath, sdrDir s
 		return err
 	}()
 	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to import .sdr %s: %v", sdrDir, err))
+		slog.Error("sdr import failed", "dir", sdrDir, "err", err)
 		prog.SDRErrors = append(prog.SDRErrors, fmt.Sprintf("%s: %v", filepath.Base(sdrDir), err))
 	}
 }
@@ -611,7 +611,7 @@ func (s *Server) ingestStatsDB(ctx context.Context, path string, prog *importPro
 	n, err := importStatsDB(ctx, s.DB, path)
 	prog.SDRImported += n
 	if err != nil {
-		slog.Error(fmt.Sprintf("Failed to import stats DB %s: %v", path, err))
+		slog.Error("stats DB import failed", "file", path, "err", err)
 		prog.SDRErrors = append(prog.SDRErrors, fmt.Sprintf("stats_db: %v", err))
 	}
 }

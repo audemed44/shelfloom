@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"time"
 	_ "time/tzdata" // the runtime image may have no zoneinfo; TZ needs this
 
+	"github.com/audemed44/shelfloom/internal/logging"
 	"github.com/audemed44/shelfloom/internal/server"
 	"github.com/audemed44/shelfloom/internal/store"
 )
@@ -43,11 +43,11 @@ func main() {
 			os.Exit(healthcheck())
 		}
 	}
-	var level slog.Level
-	if err := level.UnmarshalText([]byte(strings.ToLower(env("SHELFLOOM_LOG_LEVEL", "info")))); err != nil {
-		level = slog.LevelInfo
+	// SHELFLOOM_LOG_LEVEL still works, as LOG_LEVEL.
+	if v := os.Getenv("SHELFLOOM_LOG_LEVEL"); v != "" && os.Getenv("LOG_LEVEL") == "" {
+		os.Setenv("LOG_LEVEL", v)
 	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+	logging.Setup("shelfloom", os.Stderr)
 
 	dbPath := env("SHELFLOOM_DB_PATH", "/data/shelfloom.db")
 	db, err := store.Open(dbPath)
@@ -91,6 +91,7 @@ func main() {
 		Addr:              env("SHELFLOOM_LISTEN", ":8000"),
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
+		ErrorLog:          logging.ServerErrorLog(),
 		IdleTimeout:       2 * time.Minute,
 		// No read or write timeout: uploads and volume builds can take minutes.
 	}
@@ -100,7 +101,7 @@ func main() {
 		defer cancel()
 		_ = srv.Shutdown(shutdown)
 	}()
-	slog.Info(fmt.Sprintf("Shelfloom started (log_level=%s)", strings.ToUpper(level.String())), "addr", srv.Addr, "db", dbPath)
+	slog.Info("shelfloom listening", "addr", srv.Addr, "db", dbPath, "log_level", logging.ParseLevel(os.Getenv("LOG_LEVEL")).String())
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server stopped", "err", err)
 		stop()

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/audemed44/shelfloom/internal/logging"
 	"github.com/audemed44/shelfloom/internal/openrouter"
 	"github.com/audemed44/shelfloom/internal/recommend"
 	"github.com/audemed44/shelfloom/internal/store"
@@ -636,7 +637,7 @@ func (s *Server) recRunning(kind string) bool {
 }
 
 func (s *Server) runRec(ctx context.Context, c *openrouter.Client, runID int64, kind string, settings recSettings, webSearch bool) {
-	start := time.Now()
+	ctx, run := logging.Job(ctx, "recommendations", "kind", kind, "run", runID, "model", settings.Model)
 	n, usage, err := s.generateRec(ctx, c, runID, kind, settings, webSearch)
 	finish := func(ctx context.Context) error {
 		status, msg := "done", (*string)(nil)
@@ -650,14 +651,10 @@ func (s *Server) runRec(ctx context.Context, c *openrouter.Client, runID int64, 
 	}
 	// Record the outcome even when shutting down.
 	if dbErr := finish(context.WithoutCancel(ctx)); dbErr != nil {
-		slog.Error(fmt.Sprintf("Could not save recommendation run %d: %v", runID, dbErr))
+		slog.ErrorContext(ctx, "could not save a recommendation run", "run", runID, "err", dbErr)
 	}
-	if err != nil {
-		slog.Warn(fmt.Sprintf("Recommendations (%s) failed: %v", kind, err))
-		return
-	}
-	slog.Info(fmt.Sprintf("Recommendations (%s): %d picks from %s in %s, %d+%d tokens, %d searches, $%.4f",
-		kind, n, settings.Model, time.Since(start).Round(time.Second), usage.InputTokens, usage.OutputTokens, usage.WebSearches, usage.Cost))
+	run.End(err, "picks", n, "input_tokens", usage.InputTokens, "output_tokens", usage.OutputTokens,
+		"web_searches", usage.WebSearches, "cost_usd", usage.Cost)
 }
 
 // recPrompt is a request ready to send, with what is needed to read the
