@@ -9,3 +9,9 @@ services:
       - ./.data:/data
       - ./.data/books:/books
     restart: unless-stopped
+    # Cap Docker's copy of the logs: 3 files of 10 MB, oldest dropped.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/audemed44/shelfloom/internal/logging"
 	"github.com/audemed44/shelfloom/internal/store"
 )
 
@@ -62,7 +63,8 @@ func (s *Server) Handler() http.Handler {
 	for _, r := range s.routes() {
 		s.mux.HandleFunc(r.pattern, s.wrap(r.handler))
 	}
-	return http.HandlerFunc(s.serve)
+	// One log line per request (logging.Requests), named by route.
+	return logging.Requests(http.HandlerFunc(s.serve))
 }
 
 func (s *Server) serve(w http.ResponseWriter, r *http.Request) {

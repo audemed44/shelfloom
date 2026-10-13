@@ -193,6 +193,18 @@ Place `.sdr` folders alongside their book files in your books directory. Shelflo
 
 If you have a KOReader `statistics.sqlite3` file, mount it into the container and provide the path when triggering a scan via the API.
 
+## Logs
+
+Shelfloom writes one JSON object per line on stderr, for
+[Logbook](https://github.com/audemed44/logbook) to collect: every request
+(failures as errors, changes at info, plain reads at debug) and its
+background jobs with how long they took: library scans (logged when they
+change something or fail), serial checks and recommendation runs. A
+message repeated more than 20 times a minute is held back and counted, at
+most 600 lines a minute get out, and long values are cut at 4 KB, so a
+failing Shelfloom can't flood the disk. Docker's own copy is capped in
+compose (`logging:`, 3 × 10 MB).
+
 ## Development
 
 Shelfloom is a Go server (`cmd/shelfloom`, `internal/`) that serves the API
@@ -220,7 +232,8 @@ npm run lint           # gofmt + go vet, eslint
 | `SHELFLOOM_LISTEN` | `:8000` | Listen address |
 | `SHELFLOOM_SCAN_INTERVAL` | `300` | Seconds between library scans |
 | `SHELFLOOM_SERIAL_CHECK_INTERVAL` | `86400` | Seconds between web serial update checks |
-| `SHELFLOOM_LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` (`SHELFLOOM_LOG_LEVEL` still works) |
+| `LOG_FORMAT` | `json` | `text` for reading in a terminal |
 | `HOMEPAGE_URL` | | Foyer address for the sidebar link |
 | `SHELFLOOM_ZLIBRARY_EMAIL` | | Z-Library account email |
 | `SHELFLOOM_ZLIBRARY_PASSWORD` | | Z-Library account password |

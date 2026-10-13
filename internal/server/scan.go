@@ -16,6 +16,7 @@ import (
 	"github.com/audemed44/shelfloom/internal/epub"
 	"github.com/audemed44/shelfloom/internal/hashing"
 	"github.com/audemed44/shelfloom/internal/imaging"
+	"github.com/audemed44/shelfloom/internal/logging"
 	"github.com/audemed44/shelfloom/internal/store"
 )
 
@@ -52,12 +53,9 @@ func (s *Server) Start(ctx context.Context, loops bool) {
 	go func() {
 		defer s.bg.Done()
 		for {
-			checked, found, err := s.checkAllSerials(ctx)
-			if err != nil {
-				slog.Error(fmt.Sprintf("Serial check failed: %v", err))
-			} else {
-				slog.Info(fmt.Sprintf("Serial check complete: %d checked, %d new chapters", checked, found))
-			}
+			jctx, run := logging.Job(ctx, "serials.check")
+			checked, found, err := s.checkAllSerials(jctx)
+			run.End(err, "checked", checked, "new_chapters", found)
 			if !sleepCtx(ctx, s.Config.SerialCheckInterval) {
 				return
 			}
@@ -99,6 +97,8 @@ func (s *Server) runScan(ctx context.Context) {
 	}
 	mtimes := s.scan.mtimes
 	s.scan.mu.Unlock()
+	// Quiet: scans run often; one that changed something says so below.
+	ctx, run := logging.QuietJob(ctx, "library.scan")
 
 	combined := &importProgress{Errors: []string{}}
 	err := func() error {
@@ -140,8 +140,13 @@ func (s *Server) runScan(ctx context.Context) {
 	if err != nil {
 		msg := err.Error()
 		s.scan.err = &msg
-		slog.Error(fmt.Sprintf("Scan failed: %v", err))
+		run.End(err)
 		return
+	}
+	run.End(nil, "created", combined.Created, "updated", combined.Updated, "skipped", combined.Skipped, "errors", len(combined.Errors))
+	if combined.Created+combined.Updated > 0 || len(combined.Errors) > 0 {
+		slog.InfoContext(ctx, "library scan found changes", "created", combined.Created, "updated", combined.Updated,
+			"errors", len(combined.Errors))
 	}
 	s.scan.progress = combined
 	s.scan.lastScan = store.UTCNow()
@@ -225,7 +230,7 @@ func (s *Server) backfillCoversHandler(w http.ResponseWriter, r *http.Request) e
 		}
 		cover, err := s.coverFor(b, full)
 		if err != nil {
-			slog.Warn(fmt.Sprintf("Cover backfill failed for %s: %v", b.ID, err))
+			slog.Warn("cover backfill failed", "book", b.ID, "err", err)
 			failed++
 			continue
 		}
@@ -336,7 +341,7 @@ func (s *Server) uploadCoverHandler(w http.ResponseWriter, r *http.Request) erro
 			full := filepath.Join(shelf.Path, b.FilePath)
 			if fileExists(full) {
 				if err := epub.EmbedCover(full, out); err != nil {
-					slog.Warn(fmt.Sprintf("Could not embed cover into EPUB %s: %v", filepath.Base(full), err))
+					slog.Warn("could not embed a cover into an EPUB", "file", filepath.Base(full), "err", err)
 				} else if err := refreshBookHashes(ctx, s.DB, b, full); err != nil {
 					return err
 				}
