@@ -55,7 +55,7 @@ func (f *fakeOpenRouter) answer(content string) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"model":   "google/gemini-3.8-flash",
 			"choices": []any{map[string]any{"message": map[string]any{"content": content}, "finish_reason": "stop"}},
-			"usage":   map[string]any{"prompt_tokens": 1000, "completion_tokens": 200, "cost": 0.002, "server_tool_use": map[string]any{"web_search_requests": 1}},
+			"usage":   map[string]any{"prompt_tokens": 1000, "completion_tokens": 200, "cost": 0.002, "server_tool_use_details": map[string]any{"web_search_requests": 1}},
 		})
 	})
 }
@@ -269,7 +269,8 @@ func TestDiscover(t *testing.T) {
 	]}`)
 	s.do("POST", "/api/recommendations/refresh", map[string]any{"kind": "discover"}, nil)
 	out := waitRecs(t, s)
-	if out.Discover.Run == nil || out.Discover.Run.Status != "done" || !out.Discover.Run.WebSearch {
+	if out.Discover.Run == nil || out.Discover.Run.Status != "done" || !out.Discover.Run.WebSearch ||
+		out.Discover.Run.WebSearches == nil || *out.Discover.Run.WebSearches != 1 {
 		t.Fatalf("run: %+v", out.Discover.Run)
 	}
 	if len(out.Discover.Items) != 3 || out.Discover.Items[0].Title != "Mother of Learning" {

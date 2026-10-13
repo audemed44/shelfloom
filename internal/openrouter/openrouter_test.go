@@ -18,11 +18,14 @@ func TestChat(t *testing.T) {
 		}
 		body, _ := io.ReadAll(r.Body)
 		json.Unmarshal(body, &got)
+		// Usage shaped like a real chat completion with web search (2026-10-13).
 		io.WriteString(w, `{"model": "m", "choices": [{"message": {"content": "{\"picks\": []}", "annotations": [
 			{"type": "url_citation", "url_citation": {"url": "https://www.royalroad.com/fiction/1", "title": "RR"}},
 			{"type": "url_citation", "url_citation": {"url": "https://www.royalroad.com/fiction/1", "title": "RR"}}
 		]}, "finish_reason": "stop"}],
-		"usage": {"prompt_tokens": 100, "completion_tokens": 20, "cost": 0.0012, "server_tool_use": {"web_search_requests": 2}}}`)
+		"usage": {"prompt_tokens": 100, "completion_tokens": 20, "total_tokens": 120, "cost": 0.0012,
+			"cost_details": {"upstream_inference_cost": 0.0002},
+			"server_tool_use_details": {"web_search_requests": 2, "tool_calls_requested": 2, "tool_calls_executed": 2}}}`)
 	}))
 	defer srv.Close()
 	c := New("key")
