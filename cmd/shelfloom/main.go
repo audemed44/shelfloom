@@ -69,6 +69,9 @@ func main() {
 			ZLibraryDomain:      env("SHELFLOOM_ZLIBRARY_DOMAIN", "z-library.hn"),
 			ZLibraryEmail:       os.Getenv("SHELFLOOM_ZLIBRARY_EMAIL"),
 			ZLibraryPassword:    os.Getenv("SHELFLOOM_ZLIBRARY_PASSWORD"),
+			OpenRouterKey:       env("SHELFLOOM_OPENROUTER_API_KEY", os.Getenv("OPENROUTER_API_KEY")),
+			OpenRouterModel:     os.Getenv("SHELFLOOM_OPENROUTER_MODEL"),
+			OpenRouterURL:       os.Getenv("SHELFLOOM_OPENROUTER_BASE_URL"),
 		},
 	}
 	if dir := env("SHELFLOOM_FRONTEND_DIR", "frontend/dist"); isDir(dir) {

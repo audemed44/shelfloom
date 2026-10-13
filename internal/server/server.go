@@ -26,6 +26,11 @@ type Config struct {
 	ZLibraryDomain   string
 	ZLibraryEmail    string
 	ZLibraryPassword string
+	// OpenRouter account for AI recommendations; off without a key.
+	// OpenRouterURL overrides the API's base URL (tests).
+	OpenRouterKey   string
+	OpenRouterModel string
+	OpenRouterURL   string
 }
 
 // Server holds what the handlers need.
@@ -40,6 +45,7 @@ type Server struct {
 	scan    scanState
 	fetches fetchJobs
 	zl      zlibState
+	recs    recState
 
 	// bg tracks background work (scans, chapter fetches) so shutdown can
 	// wait for it.

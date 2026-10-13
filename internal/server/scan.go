@@ -35,10 +35,11 @@ type scanState struct {
 // library scan and serial update check. Everything stops when ctx ends.
 func (s *Server) Start(ctx context.Context, loops bool) {
 	s.bgCtx = ctx
+	s.failInterruptedRecRuns(ctx)
 	if !loops {
 		return
 	}
-	s.bg.Add(2)
+	s.bg.Add(3)
 	go func() {
 		defer s.bg.Done()
 		for {
@@ -60,6 +61,12 @@ func (s *Server) Start(ctx context.Context, loops bool) {
 			if !sleepCtx(ctx, s.Config.SerialCheckInterval) {
 				return
 			}
+		}
+	}()
+	go func() {
+		defer s.bg.Done()
+		for sleepCtx(ctx, time.Hour) {
+			s.weeklyRecs(ctx)
 		}
 	}()
 }
