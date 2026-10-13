@@ -15,6 +15,7 @@ const SerialDetail = lazy(() => import('./pages/SerialDetail'))
 const SeriesList = lazy(() => import('./pages/SeriesList'))
 const SeriesDetail = lazy(() => import('./pages/SeriesDetail'))
 const Settings = lazy(() => import('./pages/Settings'))
+const Recommendations = lazy(() => import('./pages/Recommendations'))
 const DataManagement = lazy(() => import('./pages/DataManagement'))
 const Lenses = lazy(() => import('./pages/Lenses'))
 const LensDetail = lazy(() => import('./pages/LensDetail'))
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="series/:id" element={<SeriesDetail />} />
           <Route path="lenses" element={<Lenses />} />
           <Route path="lenses/:id" element={<LensDetail />} />
+          <Route path="recommendations" element={<Recommendations />} />
           <Route path="settings" element={<Settings />} />
           <Route path="data-management" element={<DataManagement />} />
           <Route path="*" element={<NotFound />} />

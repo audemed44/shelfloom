@@ -6,6 +6,7 @@ import {
   BookMarked,
   BarChart3,
   Settings,
+  Sparkles,
   MoreHorizontal,
   type LucideIcon,
 } from 'lucide-react'
@@ -25,6 +26,7 @@ export const NAV_ITEMS: NavItem[] = [
 ]
 
 export const MORE_ITEMS: NavItem[] = [
+  { to: '/recommendations', icon: Sparkles, label: 'For You' },
   { to: '/series', icon: BookMarked, label: 'Series' },
   { to: '/stats', icon: BarChart3, label: 'Stats' },
   { to: '/settings', icon: Settings, label: 'Settings' },

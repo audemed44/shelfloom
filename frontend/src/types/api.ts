@@ -561,3 +561,96 @@ export interface ZLibraryDomainCheck {
   ms: number
   error: string | null
 }
+
+// ── AI recommendations ────────────────────────────────────────────────────
+
+export type RecommendationKind = 'read_next' | 'discover'
+export type DiscoverKinds = 'both' | 'books' | 'web_serials'
+export type RecommendationVerdict =
+  | 'not_interested'
+  | 'already_read'
+  | 'not_found'
+  | 'saved'
+
+export interface RecommendationSettings {
+  model: string
+  web_search: boolean
+  share_notes: boolean
+  weekly: boolean
+  discover_kinds: DiscoverKinds
+}
+
+export interface RecommendationRun {
+  id: number
+  status: 'running' | 'done' | 'error'
+  model: string
+  web_search: boolean
+  error: string | null
+  input_tokens: number | null
+  output_tokens: number | null
+  web_searches: number | null
+  cost: number | null
+  started_at: string
+  finished_at: string | null
+}
+
+export interface Recommendation {
+  id: number
+  book: {
+    id: string
+    cover_path: string | null
+    series_name: string | null
+    series_sequence: number | null
+    progress: number | null
+  } | null
+  title: string
+  author: string | null
+  format: 'book' | 'web_serial'
+  site: string | null
+  reason: string
+  source_url: string | null
+  feedback: RecommendationVerdict | null
+}
+
+export interface RecommendationList {
+  run: RecommendationRun | null
+  running: boolean
+  items: Recommendation[]
+}
+
+export interface SavedRecommendation {
+  id: number
+  book_id: string | null
+  title: string
+  author: string | null
+  format: 'book' | 'web_serial'
+  site: string | null
+  reason: string | null
+  source_url: string | null
+  verdict: RecommendationVerdict
+  created_at: string
+}
+
+export interface RecommendationsResponse {
+  enabled: boolean
+  settings: RecommendationSettings
+  read_next: RecommendationList
+  discover: RecommendationList
+  saved: SavedRecommendation[]
+}
+
+export interface RecommendationSettingsResponse {
+  enabled: boolean
+  settings: RecommendationSettings
+  default_model: string
+}
+
+export interface OpenRouterModel {
+  id: string
+  name: string
+  context_length: number
+  input_price: number
+  output_price: number
+  structured_outputs: boolean
+  tools: boolean
+}

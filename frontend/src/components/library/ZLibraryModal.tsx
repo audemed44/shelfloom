@@ -18,6 +18,8 @@ interface Props {
   onClose: () => void
   /** Called whenever a book was added, so the library can refresh. */
   onAdded: () => void
+  /** Searched for straight away when given. */
+  initialQuery?: string
 }
 
 const FORMATS = [
@@ -55,9 +57,13 @@ function ResultCover({ result }: { result: ZLibraryResult }) {
   )
 }
 
-export default function ZLibraryModal({ onClose, onAdded }: Props) {
+export default function ZLibraryModal({
+  onClose,
+  onAdded,
+  initialQuery,
+}: Props) {
   const [status, setStatus] = useState<ZLibraryStatus | null>(null)
-  const [text, setText] = useState('')
+  const [text, setText] = useState(initialQuery ?? '')
   // Filters are remembered; English unless changed.
   const [format, setFormat] = usePersistedState('shelfloom:zlib-format', 'epub')
   const [language, setLanguage] = usePersistedState(
@@ -89,7 +95,10 @@ export default function ZLibraryModal({ onClose, onAdded }: Props) {
 
   useEffect(() => {
     loadStatus()
-    inputRef.current?.focus()
+    if (initialQuery?.trim()) search(1, initialQuery)
+    else inputRef.current?.focus()
+    // Once, when the modal opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -100,8 +109,8 @@ export default function ZLibraryModal({ onClose, onAdded }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [onClose, editing])
 
-  const search = async (nextPage: number) => {
-    const q = text.trim()
+  const search = async (nextPage: number, query = text) => {
+    const q = query.trim()
     if (!q) return
     setSearching(true)
     setError(null)

@@ -156,6 +156,27 @@ channels: lookalike domains exist to steal account passwords.
 `SHELFLOOM_ZLIBRARY_DOMAIN` is only the starting choice (`HTTPS_PROXY` is
 honoured if the server needs a proxy).
 
+### AI recommendations
+
+With an [OpenRouter](https://openrouter.ai) API key set (`OPENROUTER_API_KEY`),
+**For You** (in the sidebar, or **More** on phones) suggests what to read:
+
+- **Read next** picks from the unread books in your library: the next book of
+  each series and unread standalones. The top picks also show on Home.
+- **Discover** suggests books and web serials you don't have, optionally
+  searching the web (Royal Road, Reddit, Goodreads, Scribble Hub, Novel
+  Updates) to find newer and lesser-known ones. Books link to a Z-Library
+  search, Royal Road serials to Royal Road.
+
+The model is told what you read, grouped by series and web serial: ratings,
+reading time, when you last read it, DNFs, genres and tags, the serials you
+follow and your feedback on earlier picks (not for me, read it, doesn't exist,
+saved). Reviews and highlights are only sent when allowed in **Settings →
+Recommendations**, which is also where the model is picked (any OpenRouter
+model; the default is Google's Gemini 3.8 Flash) and weekly refreshes are
+turned on. A refresh sends about 10k tokens per list and costs a cent or a few;
+each run's tokens, searches and cost are shown under the list.
+
 ### KOReader Sync and the web reader
 
 Shelfloom runs a sync server for KOReader's built-in **Progress sync** plugin, and has a web reader for EPUBs (the **Read** button on a book). Both share one reading position per book, so you can read a chapter in the browser and pick up on your e-reader, or the other way round. No KOReader plugin is needed.
@@ -204,6 +225,9 @@ npm run lint           # gofmt + go vet, eslint
 | `SHELFLOOM_ZLIBRARY_EMAIL` | | Z-Library account email |
 | `SHELFLOOM_ZLIBRARY_PASSWORD` | | Z-Library account password |
 | `SHELFLOOM_ZLIBRARY_DOMAIN` | `z-library.hn` | Z-Library domain until one is picked in Settings |
+| `OPENROUTER_API_KEY` | | OpenRouter key for recommendations (`SHELFLOOM_OPENROUTER_API_KEY` wins if both are set) |
+| `SHELFLOOM_OPENROUTER_MODEL` | `google/gemini-3.8-flash` | Model until one is picked in Settings |
+| `SHELFLOOM_OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API address (a proxy or test server) |
 | `TZ` | | Time zone stats are grouped in |
 
 Databases from the earlier Python-based releases open as they are, as long as
