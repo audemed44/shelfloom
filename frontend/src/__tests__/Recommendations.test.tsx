@@ -104,6 +104,17 @@ describe('Recommendations page', () => {
       let body: unknown = {}
       let status = 200
       if (u === '/api/recommendations') body = data
+      else if (u.startsWith('/api/recommendations/prompt'))
+        body = {
+          kind: 'discover',
+          model: 'google/gemini-3.8-flash',
+          web_search: true,
+          system: 'You are a librarian.',
+          user: '## Reading history\n- The Saga — Ann Author',
+          schema: { type: 'object' },
+          tools: [{ type: 'openrouter:web_search' }],
+          approx_tokens: 6100,
+        }
       else if (u === '/api/zlibrary/status')
         body = {
           enabled: false,
@@ -212,6 +223,42 @@ describe('Recommendations page', () => {
       'No credits'
     )
     expect(screen.getByText('Saga Two')).toBeInTheDocument()
+  })
+
+  it('shows the prompt and copies it', async () => {
+    const exec = vi.fn(() => true)
+    document.execCommand = exec
+    let copied = ''
+    const append = document.body.appendChild.bind(document.body)
+    const spy = vi
+      .spyOn(document.body, 'appendChild')
+      .mockImplementation(<T extends Node>(n: T) => {
+        if (n instanceof HTMLTextAreaElement) copied = n.value
+        return append(n)
+      })
+    renderPage()
+    fireEvent.click(await screen.findByRole('tab', { name: 'Discover' }))
+    fireEvent.click(await screen.findByTestId('view-prompt'))
+    expect(await screen.findByTestId('prompt-user')).toHaveTextContent(
+      'The Saga — Ann Author'
+    )
+    expect(
+      calls.some((c) => c.url === '/api/recommendations/prompt?kind=discover')
+    ).toBe(true)
+    expect(screen.getByTestId('prompt-meta')).toHaveTextContent(
+      'about 6.1k tokens · web search on'
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Copy prompt/ }))
+    await waitFor(() => expect(exec).toHaveBeenCalledWith('copy'))
+    expect(copied).toBe(
+      'You are a librarian.\n\n## Reading history\n- The Saga — Ann Author'
+    )
+    expect(await screen.findByText('Copied')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Copy full request/ }))
+    await waitFor(() =>
+      expect(JSON.parse(copied).tools[0].type).toBe('openrouter:web_search')
+    )
+    spy.mockRestore()
   })
 
   it('explains how to turn it on', async () => {
