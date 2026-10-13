@@ -165,7 +165,12 @@ type wireResponse struct {
 		InputTokens      int     `json:"input_tokens"`
 		OutputTokens     int     `json:"output_tokens"`
 		Cost             float64 `json:"cost"`
-		ServerToolUse    struct {
+		// Chat completions report searches in server_tool_use_details;
+		// server_tool_use is the Responses API's name, kept just in case.
+		ServerToolUseDetails struct {
+			WebSearchRequests int `json:"web_search_requests"`
+		} `json:"server_tool_use_details"`
+		ServerToolUse struct {
 			WebSearchRequests int `json:"web_search_requests"`
 		} `json:"server_tool_use"`
 	} `json:"usage"`
@@ -241,7 +246,7 @@ func (c *Client) Chat(ctx context.Context, req Request) (*Response, error) {
 		InputTokens:  max(u.PromptTokens, u.InputTokens),
 		OutputTokens: max(u.CompletionTokens, u.OutputTokens),
 		Cost:         u.Cost,
-		WebSearches:  u.ServerToolUse.WebSearchRequests,
+		WebSearches:  max(u.ServerToolUseDetails.WebSearchRequests, u.ServerToolUse.WebSearchRequests),
 	}
 	if strings.TrimSpace(r.Content) == "" {
 		reason := ch.FinishReason
