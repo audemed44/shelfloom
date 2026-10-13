@@ -654,3 +654,14 @@ export interface OpenRouterModel {
   structured_outputs: boolean
   tools: boolean
 }
+
+export interface RecommendationPrompt {
+  kind: RecommendationKind
+  model: string
+  web_search: boolean
+  system: string
+  user: string
+  schema: unknown
+  tools: unknown[] | null
+  approx_tokens: number
+}

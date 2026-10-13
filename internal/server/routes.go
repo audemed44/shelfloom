@@ -149,6 +149,7 @@ func (s *Server) routes() []route {
 		{"POST /api/recommendations/refresh", s.refreshRecommendationsHandler},
 		{"POST /api/recommendations/{rec_id}/feedback", s.recFeedbackHandler},
 		{"DELETE /api/recommendations/feedback/{feedback_id}", s.deleteRecFeedbackHandler},
+		{"GET /api/recommendations/prompt", s.recPromptHandler},
 		{"GET /api/recommendations/settings", s.recSettingsHandler},
 		{"PUT /api/recommendations/settings", s.putRecSettingsHandler},
 		{"GET /api/recommendations/models", s.recModelsHandler},

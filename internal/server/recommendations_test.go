@@ -386,3 +386,34 @@ func TestRecommendationSettings(t *testing.T) {
 }
 
 func itoa(n int64) string { return strconv.FormatInt(n, 10) }
+
+func TestRecommendationPrompt(t *testing.T) {
+	s, f := newRecServer(t)
+	var out struct {
+		Model        string          `json:"model"`
+		WebSearch    bool            `json:"web_search"`
+		System       string          `json:"system"`
+		User         string          `json:"user"`
+		Schema       json.RawMessage `json:"schema"`
+		Tools        []any           `json:"tools"`
+		ApproxTokens int             `json:"approx_tokens"`
+	}
+	expect(t, "read next", s.do("GET", "/api/recommendations/prompt?kind=read_next", nil, &out), 200)
+	if !strings.Contains(out.User, "Saga Two — Ann Author") || out.WebSearch || out.Tools != nil || out.ApproxTokens == 0 || len(out.Schema) == 0 {
+		t.Errorf("read next prompt: %+v", out)
+	}
+	// The preview is what a refresh sends.
+	f.answer(`{"picks": [{"id": "b1", "reason": "x"}]}`)
+	s.do("POST", "/api/recommendations/refresh", map[string]any{"kind": "read_next"}, nil)
+	waitRecs(t, s)
+	sent := f.request(0)["messages"].([]any)
+	if sent[0].(map[string]any)["content"] != out.System || sent[1].(map[string]any)["content"] != out.User {
+		t.Error("preview differs from what was sent")
+	}
+
+	expect(t, "discover", s.do("GET", "/api/recommendations/prompt?kind=discover", nil, &out), 200)
+	if !out.WebSearch || len(out.Tools) != 1 || !strings.Contains(out.User, "search the web") {
+		t.Errorf("discover prompt: %+v", out)
+	}
+	expect(t, "bad kind", s.do("GET", "/api/recommendations/prompt?kind=films", nil, nil), 400)
+}

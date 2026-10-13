@@ -660,21 +660,30 @@ func (s *Server) runRec(ctx context.Context, c *openrouter.Client, runID int64, 
 		kind, n, settings.Model, time.Since(start).Round(time.Second), usage.InputTokens, usage.OutputTokens, usage.WebSearches, usage.Cost))
 }
 
-func (s *Server) generateRec(ctx context.Context, c *openrouter.Client, runID int64, kind string, settings recSettings, webSearch bool) (int, openrouter.Usage, error) {
-	var usage openrouter.Usage
+// recPrompt is a request ready to send, with what is needed to read the
+// answer.
+type recPrompt struct {
+	req        openrouter.Request
+	ids        map[string]string // read next: prompt id → book id
+	owned      *recommend.Owned
+	turnedDown map[string]bool
+}
+
+// buildRecPrompt builds exactly what a refresh of this kind sends.
+func (s *Server) buildRecPrompt(ctx context.Context, kind string, settings recSettings, webSearch bool) (*recPrompt, error) {
 	lib, err := s.loadRecLibrary(ctx, settings.ShareNotes)
 	if err != nil {
-		return 0, usage, err
+		return nil, err
 	}
 	fbRows, err := s.recFeedback(ctx)
 	if err != nil {
-		return 0, usage, err
+		return nil, err
 	}
 	var feedback []recommend.Feedback
 	rejectedBooks := map[string]bool{}
-	turnedDown := map[string]bool{}
+	p := &recPrompt{turnedDown: map[string]bool{}, req: openrouter.Request{Model: settings.Model}}
 	for _, f := range fbRows {
-		turnedDown[f.matchKey] = true
+		p.turnedDown[f.matchKey] = true
 		if f.BookID != nil {
 			if f.Verdict == "not_interested" {
 				rejectedBooks[*f.BookID] = true
@@ -688,36 +697,59 @@ func (s *Server) generateRec(ctx context.Context, c *openrouter.Client, runID in
 	profile, dnfWorks := lib.profile(feedback, settings.ShareNotes, time.Now())
 	text := profile.Text()
 
-	req := openrouter.Request{Model: settings.Model}
+	var system, user string
 	switch kind {
 	case recReadNext:
 		cands, ids := lib.candidates(dnfWorks, rejectedBooks)
 		if len(cands) == 0 {
-			return 0, usage, errors.New("there are no unread books to pick from")
+			return nil, unprocessable("There are no unread books to pick from")
 		}
-		system, user := recommend.ReadNextPrompt(text, cands, readNextPicks)
-		req.Messages = []openrouter.Message{{Role: "system", Content: system}, {Role: "user", Content: user}}
-		req.SchemaName, req.Schema = "read_next", recommend.ReadNextSchema
-		resp, err := chatWithFallback(ctx, c, req)
-		if resp != nil {
-			usage = resp.Usage
+		system, user = recommend.ReadNextPrompt(text, cands, readNextPicks)
+		p.ids = ids
+		p.req.SchemaName, p.req.Schema = "read_next", recommend.ReadNextSchema
+	case recDiscover:
+		var ownedLines []string
+		ownedLines, p.owned = lib.owned()
+		system, user = recommend.DiscoverPrompt(text, ownedLines, settings.DiscoverKinds, discoverAsk, webSearch)
+		p.req.SchemaName, p.req.Schema = "discover", recommend.DiscoverSchema
+		if webSearch {
+			p.req.WebSearch = &openrouter.WebSearch{Engine: "exa", MaxResults: 5, MaxUses: 6, AllowedDomains: recSearchDomains}
 		}
-		if err != nil {
-			return 0, usage, err
-		}
+	default:
+		return nil, fmt.Errorf("unknown kind %q", kind)
+	}
+	p.req.Messages = []openrouter.Message{{Role: "system", Content: system}, {Role: "user", Content: user}}
+	return p, nil
+}
+
+func (s *Server) generateRec(ctx context.Context, c *openrouter.Client, runID int64, kind string, settings recSettings, webSearch bool) (int, openrouter.Usage, error) {
+	var usage openrouter.Usage
+	p, err := s.buildRecPrompt(ctx, kind, settings, webSearch)
+	if err != nil {
+		return 0, usage, err
+	}
+	resp, err := chatWithFallback(ctx, c, p.req)
+	if resp != nil {
+		usage = resp.Usage
+	}
+	if err != nil {
+		return 0, usage, err
+	}
+	var items []recItem
+	switch kind {
+	case recReadNext:
 		picks, err := recommend.ParseReadNext(resp.Content)
 		if err != nil {
 			return 0, usage, err
 		}
-		var items []recItem
 		used := map[string]bool{}
-		for _, p := range picks {
-			id, found := ids[p.ID]
+		for _, pick := range picks {
+			id, found := p.ids[pick.ID]
 			if !found || used[id] {
 				continue
 			}
 			used[id] = true
-			items = append(items, recItem{BookID: &id, Reason: p.Reason, Format: "book"})
+			items = append(items, recItem{BookID: &id, Reason: pick.Reason, Format: "book"})
 			if len(items) == readNextPicks {
 				break
 			}
@@ -725,46 +757,29 @@ func (s *Server) generateRec(ctx context.Context, c *openrouter.Client, runID in
 		if len(items) == 0 {
 			return 0, usage, errors.New("the model picked none of the library's unread books")
 		}
-		return len(items), usage, s.saveRecItems(ctx, runID, items)
-
 	case recDiscover:
-		ownedLines, owned := lib.owned()
-		system, user := recommend.DiscoverPrompt(text, ownedLines, settings.DiscoverKinds, discoverAsk, webSearch)
-		req.Messages = []openrouter.Message{{Role: "system", Content: system}, {Role: "user", Content: user}}
-		req.SchemaName, req.Schema = "discover", recommend.DiscoverSchema
-		if webSearch {
-			req.WebSearch = &openrouter.WebSearch{Engine: "exa", MaxResults: 5, MaxUses: 6, AllowedDomains: recSearchDomains}
-		}
-		resp, err := chatWithFallback(ctx, c, req)
-		if resp != nil {
-			usage = resp.Usage
-		}
-		if err != nil {
-			return 0, usage, err
-		}
 		picks, err := recommend.ParseDiscover(resp.Content)
 		if err != nil {
 			return 0, usage, err
 		}
-		var items []recItem
 		used := map[string]bool{}
-		for _, p := range picks {
-			key := recommend.Key(p.Title, p.Author)
-			if used[key] || turnedDown[key] || owned.Has(p.Title) {
+		for _, pick := range picks {
+			key := recommend.Key(pick.Title, pick.Author)
+			if used[key] || p.turnedDown[key] || p.owned.Has(pick.Title) {
 				continue
 			}
 			switch settings.DiscoverKinds {
 			case recommend.KindBooks:
-				if p.Kind != "book" {
+				if pick.Kind != "book" {
 					continue
 				}
 			case recommend.KindWebSerials:
-				if p.Kind != "web_serial" {
+				if pick.Kind != "web_serial" {
 					continue
 				}
 			}
 			used[key] = true
-			items = append(items, recItem{Title: p.Title, Author: p.Author, Format: p.Kind, Site: p.Site, Reason: p.Reason, SourceURL: p.SourceURL})
+			items = append(items, recItem{Title: pick.Title, Author: pick.Author, Format: pick.Kind, Site: pick.Site, Reason: pick.Reason, SourceURL: pick.SourceURL})
 			if len(items) == discoverPicks {
 				break
 			}
@@ -772,9 +787,8 @@ func (s *Server) generateRec(ctx context.Context, c *openrouter.Client, runID in
 		if len(items) == 0 {
 			return 0, usage, errors.New("every title the model suggested is already in the library or was turned down")
 		}
-		return len(items), usage, s.saveRecItems(ctx, runID, items)
 	}
-	return 0, usage, fmt.Errorf("unknown kind %q", kind)
+	return len(items), usage, s.saveRecItems(ctx, runID, items)
 }
 
 // chatWithFallback asks for structured output, and asks again without it
@@ -1092,6 +1106,43 @@ func (s *Server) deleteRecFeedbackHandler(w http.ResponseWriter, r *http.Request
 		return err
 	}
 	return noContent(w)
+}
+
+// recPromptHandler shows what a refresh of one kind would send now.
+func (s *Server) recPromptHandler(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+	kind := newQuery(r).StrDefault("kind", recReadNext)
+	if kind != recReadNext && kind != recDiscover {
+		return badRequest("kind must be read_next or discover")
+	}
+	settings, err := s.recSettings(ctx)
+	if err != nil {
+		return err
+	}
+	webSearch := kind == recDiscover && settings.WebSearch
+	p, err := s.buildRecPrompt(ctx, kind, settings, webSearch)
+	if err != nil {
+		return err
+	}
+	var tools any
+	if p.req.WebSearch != nil {
+		tools = []any{map[string]any{"type": "openrouter:web_search", "parameters": p.req.WebSearch}}
+	}
+	chars := 0
+	for _, m := range p.req.Messages {
+		chars += len(m.Content)
+	}
+	return ok(w, map[string]any{
+		"kind":       kind,
+		"model":      p.req.Model,
+		"web_search": webSearch,
+		"system":     p.req.Messages[0].Content,
+		"user":       p.req.Messages[1].Content,
+		"schema":     p.req.Schema,
+		"tools":      tools,
+		// About four characters a token.
+		"approx_tokens": chars / 4,
+	})
 }
 
 func (s *Server) recSettingsHandler(w http.ResponseWriter, r *http.Request) error {

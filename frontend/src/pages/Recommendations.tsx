@@ -5,6 +5,7 @@ import {
   BookmarkCheck,
   Check,
   ExternalLink,
+  FileText,
   Loader2,
   RefreshCw,
   SearchX,
@@ -19,6 +20,7 @@ import { usePersistedState } from '../hooks/usePersistedState'
 import { getBookCoverUrl } from '../utils/bookCover'
 import { CoverImage } from '../components/shared/CoverFallback'
 import ZLibraryModal from '../components/library/ZLibraryModal'
+import PromptModal from '../components/recommendations/PromptModal'
 import type {
   DiscoverKinds,
   Recommendation,
@@ -377,6 +379,7 @@ export default function Recommendations() {
     verdict: RecommendationVerdict
   } | null>(null)
   const [zlibQuery, setZlibQuery] = useState<string | null>(null)
+  const [promptKind, setPromptKind] = useState<RecommendationKind | null>(null)
   const { data: zlib } = useApi<ZLibraryStatus>('/api/zlibrary/status')
 
   const load = useCallback(async () => {
@@ -588,6 +591,15 @@ export default function Recommendations() {
             )}
             <button
               type="button"
+              onClick={() => setPromptKind(tab as RecommendationKind)}
+              className="inline-flex items-center gap-1.5 border border-white/25 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white hover:text-black"
+              data-testid="view-prompt"
+            >
+              <FileText size={12} />
+              Prompt
+            </button>
+            <button
+              type="button"
               onClick={() => refresh(tab as RecommendationKind)}
               disabled={!data.enabled || current.running}
               className="inline-flex items-center gap-1.5 border border-white/25 px-2.5 py-1 text-[11px] font-semibold text-white/80 hover:bg-white hover:text-black disabled:opacity-40"
@@ -740,6 +752,9 @@ export default function Recommendations() {
           </p>
         ))}
 
+      {promptKind && (
+        <PromptModal kind={promptKind} onClose={() => setPromptKind(null)} />
+      )}
       {zlibQuery != null && (
         <ZLibraryModal
           initialQuery={zlibQuery}
