@@ -24,6 +24,8 @@ import type { HeatmapEntry } from '../components/ReadingHeatmap'
 import type {
   PendingChapterBatchStatusResponse,
   PendingChapterFetchResponse,
+  Recommendation,
+  RecommendationsResponse,
 } from '../types/api'
 import { getBookCoverUrl } from '../utils/bookCover'
 import { GOAL_STATUS } from '../types/goals'
@@ -458,6 +460,35 @@ function CurrentlyReadingCard({
   )
 }
 
+function UpNextCard({ item }: { item: Recommendation }) {
+  const book = item.book
+  if (!book) return null
+  return (
+    <Link
+      to={`/books/${book.id}`}
+      className="group block"
+      data-testid="up-next-card"
+    >
+      <div className="book-cover aspect-[2/3] overflow-hidden bg-white/5 transition-transform duration-300 group-hover:-translate-y-1">
+        <CoverImage
+          src={getBookCoverUrl(book.id, book.cover_path)}
+          title={item.title}
+          author={item.author}
+          alt={item.title}
+          loading="lazy"
+          className="h-full w-full object-cover"
+        />
+      </div>
+      <p className="mt-2.5 text-sm font-semibold leading-snug text-white line-clamp-2 group-hover:text-primary-300">
+        {item.title}
+      </p>
+      <p className="mt-1 text-xs leading-snug text-white/50 line-clamp-3">
+        {item.reason}
+      </p>
+    </Link>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Activity feed — ruled table
 // ---------------------------------------------------------------------------
@@ -640,6 +671,14 @@ export default function Home() {
   )
   const { data: completedBooks } = useApi<{ completed_at: string }[]>(
     '/api/stats/books-completed'
+  )
+  const { data: recs } = useApi<RecommendationsResponse>('/api/recommendations')
+  const upNext = useMemo(
+    () =>
+      recs?.enabled && Array.isArray(recs.read_next?.items)
+        ? recs.read_next.items.filter((i) => i.book && !i.feedback)
+        : [],
+    [recs]
   )
 
   const [serialRefreshKey, setSerialRefreshKey] = useState(0)
@@ -859,6 +898,32 @@ export default function Home() {
               {currentlyReading.map((book) => (
                 <div key={book.id} className={ROW_ITEM_CLASS}>
                   <CurrentlyReadingCard book={book} />
+                </div>
+              ))}
+            </ScrollRow>
+          </section>
+        )}
+
+        {/* Up next: AI picks from the unread books */}
+        {upNext.length > 0 && (
+          <section className="col-span-12">
+            <SectionTitle
+              index={next()}
+              action={
+                <Link
+                  to="/recommendations"
+                  className="flex items-center gap-1.5 text-xs font-semibold text-primary-400 hover:text-white"
+                >
+                  All picks <ArrowRight size={13} />
+                </Link>
+              }
+            >
+              Up Next
+            </SectionTitle>
+            <ScrollRow>
+              {upNext.map((item) => (
+                <div key={item.id} className={ROW_ITEM_CLASS}>
+                  <UpNextCard item={item} />
                 </div>
               ))}
             </ScrollRow>

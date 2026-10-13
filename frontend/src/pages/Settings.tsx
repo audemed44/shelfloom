@@ -20,6 +20,7 @@ import { api } from '../api/client'
 import ShelfModal from '../components/settings/ShelfModal'
 import KoreaderSync from '../components/settings/KoreaderSync'
 import ZLibrarySettings from '../components/settings/ZLibrarySettings'
+import RecommendationSettings from '../components/settings/RecommendationSettings'
 import type {
   Shelf,
   OrganizerResult,
@@ -804,10 +805,22 @@ export default function Settings() {
         </div>
       </section>
 
-      {/* ── 06 Data Management ── */}
+      {/* ── 06 Recommendations ── */}
       <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
         <SectionHeader
           num="06"
+          title="Recommendations"
+          description="The OpenRouter model that picks what to read next and what to discover, and what it may use."
+        />
+        <div className="min-w-0 lg:col-span-8">
+          <RecommendationSettings />
+        </div>
+      </section>
+
+      {/* ── 07 Data Management ── */}
+      <section className="grid grid-cols-1 gap-6 border-t-2 border-white pt-4 lg:grid-cols-12 lg:gap-10">
+        <SectionHeader
+          num="07"
           title="Data Management"
           description="Review duplicate sessions, link unmatched KOReader data, and merge duplicate books."
         />
