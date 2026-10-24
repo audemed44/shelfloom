@@ -255,10 +255,19 @@ export default function Settings() {
     useState<BackfillCoversResponse | null>(null)
   const [backfillError, setBackfillError] = useState<string | null>(null)
 
+  // Start from the shelf's own template, the one auto-organize uses.
+  const applyShelfTemplate = (shelfId: string) => {
+    const shelf = shelves?.find((s) => String(s.id) === shelfId)
+    setTemplate(shelf?.organize_template || DEFAULT_TEMPLATE)
+    setSeqPad(shelf?.seq_pad ?? 2)
+  }
+
   // Auto-select first shelf when shelves load
   useEffect(() => {
     if (shelves && shelves.length > 0 && !organizeShelfId) {
       setOrganizeShelfId(String(shelves[0].id))
+      setTemplate(shelves[0].organize_template || DEFAULT_TEMPLATE)
+      setSeqPad(shelves[0].seq_pad ?? 2)
     }
   }, [shelves, organizeShelfId])
 
@@ -497,6 +506,7 @@ export default function Settings() {
                 value={organizeShelfId}
                 onChange={(e) => {
                   setOrganizeShelfId(e.target.value)
+                  applyShelfTemplate(e.target.value)
                   setPreviewResults(null)
                   setApplyDone(null)
                 }}

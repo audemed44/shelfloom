@@ -230,8 +230,8 @@ export default function ShelfModal({
             </div>
 
             <Toggle
-              label="Auto-organize on scan"
-              hint="Files are reorganized automatically after each scan."
+              label="Auto-organize"
+              hint="Keeps files filed by the template: new books and serial volumes, and books whose series change, are moved after each scan or edit."
               checked={form.auto_organize}
               onChange={(v) => setForm((f) => ({ ...f, auto_organize: v }))}
             />

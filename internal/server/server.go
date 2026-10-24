@@ -48,9 +48,9 @@ type Server struct {
 	zl      zlibState
 	recs    recState
 
-	// epubMetaNudge asks epubMetadataLoop to write library metadata into
-	// EPUBs after an edit.
-	epubMetaNudge chan struct{}
+	// libraryNudge asks librarySyncLoop to organize books and write their
+	// metadata into EPUBs after an edit.
+	libraryNudge chan struct{}
 
 	// bg tracks background work (scans, chapter fetches) so shutdown can
 	// wait for it.
@@ -63,7 +63,7 @@ func (s *Server) Handler() http.Handler {
 	if s.bgCtx == nil {
 		s.bgCtx = context.Background()
 	}
-	s.epubMetaNudge = make(chan struct{}, 1)
+	s.libraryNudge = make(chan struct{}, 1)
 	s.mux = http.NewServeMux()
 	for _, r := range s.routes() {
 		s.mux.HandleFunc(r.pattern, s.wrap(r.handler))
@@ -77,7 +77,7 @@ func (s *Server) serve(w http.ResponseWriter, r *http.Request) {
 		// ServeHTTP (not the handler Handler returns) sets r.PathValue.
 		s.mux.ServeHTTP(w, r)
 		if changesLibrary(r) {
-			s.queueEPUBMetadataSync()
+			s.queueLibrarySync()
 		}
 		return
 	}
