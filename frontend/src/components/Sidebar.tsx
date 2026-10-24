@@ -93,7 +93,7 @@ export default function Sidebar() {
         </button>
       </div>
 
-      <nav className="flex-1 px-3 lg:px-4">
+      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-4 lg:px-4">
         <p className="hidden lg:block border-t border-white/[0.14] px-3 pb-2 pt-4 text-[10px] font-semibold tracking-widest text-white/40">
           Browse
         </p>
