@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/audemed44/shelfloom/internal/koreader"
 )
 
 // copyEPUB writes a copy of src whose bytes differ (a zip comment) but
@@ -72,5 +74,32 @@ func TestScanLeavesDuplicateCopyAlone(t *testing.T) {
 	expect(t, "list", s.do("GET", "/api/books", nil, &list), 200)
 	if list.Total != 1 || list.Items[0].FilePath != filepath.Join("Old", "Book copy.epub") {
 		t.Fatalf("%+v", list)
+	}
+}
+
+// A rewrite that leaves KOReader's partial MD5 alone (it samples a few
+// chunks) gives one book two hash rows with the same fingerprint; matching
+// must still find the book once.
+func TestStatsMatchSharedFingerprint(t *testing.T) {
+	s := newTestServer(t)
+	ctx := context.Background()
+	expect(t, "shelf", s.do("POST", "/api/shelves", map[string]any{"name": "Library", "path": s.shelf, "is_default": true}, nil), 201)
+	epubData, _ := os.ReadFile("testdata/test.epub")
+	var book map[string]any
+	expect(t, "upload", s.upload("/api/books", "a.epub", "application/epub+zip", epubData, &book), 201)
+	id := book["id"].(string)
+	db := s.app.DB
+	ko := "0123456789abcdef0123456789abcdef"
+	for _, sha := range []string{"sha-old", "sha-older"} {
+		if err := recordHash(ctx, db, id, sha, sha+"-md5", nil, &ko); err != nil {
+			t.Fatal(err)
+		}
+	}
+	b, err := findBookForStats(ctx, db, koreader.StatsBook{Title: "x", MD5: &ko})
+	if err != nil || b == nil || b.ID != id {
+		t.Fatalf("book=%v err=%v", b, err)
+	}
+	if b, err := findByHash(ctx, db, "sha-old"); err != nil || b == nil || b.ID != id {
+		t.Fatalf("by hash: book=%v err=%v", b, err)
 	}
 }
