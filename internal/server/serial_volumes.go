@@ -836,6 +836,20 @@ func (s *Server) generateVolume(ctx context.Context, serialID, volumeID int64, s
 		return nil, errVolumeGeneration("EPUB generation failed: %v", err)
 	}
 	slog.Info("EPUB written: " + epubPath)
+	// A rebuild replaces the book's file where it is (it may have been
+	// organized into a folder); a fresh copy beside it would be skipped as a
+	// duplicate by the import.
+	if existingBookID != nil {
+		if old, err := getBook(ctx, s.DB, *existingBookID); err == nil && old != nil && old.ShelfID == shelf.ID {
+			if current, err := s.bookFile(ctx, old); err == nil && current != "" && current != epubPath && fileExists(current) {
+				if err := os.Rename(epubPath, current); err != nil {
+					os.Remove(epubPath)
+					return nil, errVolumeGeneration("Could not replace %s: %v", old.FilePath, err)
+				}
+				epubPath = current
+			}
+		}
+	}
 	if _, err := s.processFile(ctx, shelf, epubPath); err != nil {
 		return nil, err
 	}
