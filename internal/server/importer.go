@@ -103,7 +103,7 @@ func findByHash(ctx context.Context, q querier, sha string) (*Book, error) {
 	if err != nil || b != nil {
 		return b, err
 	}
-	return oneBook(ctx, q, "SELECT "+bookColumns("books")+" FROM books JOIN book_hashes ON books.id = book_hashes.book_id WHERE book_hashes.hash_sha = ?", sha)
+	return oneBook(ctx, q, "SELECT "+bookColumns("books")+" FROM books WHERE books.id IN (SELECT book_id FROM book_hashes WHERE hash_sha = ?)", sha)
 }
 
 // recordHash keeps a file version's hashes (once per SHA-256).
@@ -488,7 +488,7 @@ func findBookForSDR(ctx context.Context, db *store.DB, data *koreader.SDR, sdrDi
 		if err != nil || b != nil {
 			return b, err
 		}
-		b, err = oneBook(ctx, db, "SELECT "+bookColumns("books")+" FROM books JOIN book_hashes ON books.id = book_hashes.book_id WHERE (book_hashes.hash_md5 LIKE ? || '%')", *data.PartialMD5)
+		b, err = oneBook(ctx, db, "SELECT "+bookColumns("books")+" FROM books WHERE books.id IN (SELECT book_id FROM book_hashes WHERE hash_md5 LIKE ? || '%')", *data.PartialMD5)
 		if err != nil || b != nil {
 			return b, err
 		}
@@ -622,7 +622,7 @@ func findBookForStats(ctx context.Context, q querier, sb koreader.StatsBook) (*B
 		if err != nil || b != nil {
 			return b, err
 		}
-		b, err = oneBook(ctx, q, "SELECT "+bookColumns("books")+" FROM books JOIN book_hashes ON books.id = book_hashes.book_id WHERE book_hashes.hash_md5_ko = ?", *sb.MD5)
+		b, err = oneBook(ctx, q, "SELECT "+bookColumns("books")+" FROM books WHERE books.id IN (SELECT book_id FROM book_hashes WHERE hash_md5_ko = ?)", *sb.MD5)
 		if err != nil || b != nil {
 			return b, err
 		}
