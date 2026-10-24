@@ -207,68 +207,118 @@ func EmbedCover(file, coverPath string) error {
 		}
 		return &CoverError{fmt.Sprintf("Failed to write the cover into the EPUB: %v", err)}
 	}
-	zr, err := zip.OpenReader(file)
+	p, err := openPackage(file)
 	if err != nil {
+		var me *missingOPF
+		if errors.As(err, &me) {
+			return &CoverError{"No OPF file listed in META-INF/container.xml"}
+		}
 		return fail(err)
 	}
-	defer zr.Close()
-	byName := map[string]*zip.File{}
-	for _, f := range zr.File {
-		byName[f.Name] = f
-	}
-	readEntry := func(name string) ([]byte, error) {
-		f, ok := byName[name]
-		if !ok {
-			return nil, fmt.Errorf("There is no item named %q in the archive", name)
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return nil, err
-		}
-		defer rc.Close()
-		return io.ReadAll(rc)
-	}
-	containerData, err := readEntry("META-INF/container.xml")
-	if err != nil {
-		return fail(err)
-	}
-	container, err := parseStrict(containerData)
-	if err != nil {
-		return fail(err)
-	}
-	var opfPath string
-	container.walk(func(e *strictElement) bool {
-		if strings.HasSuffix(e.XMLName.Local, "rootfile") {
-			if p, ok := e.attr("full-path"); ok && p != "" {
-				opfPath = p
-				return false
-			}
-		}
-		return true
-	})
-	if opfPath == "" {
-		return &CoverError{"No OPF file listed in META-INF/container.xml"}
-	}
-	opfDir := path.Dir(opfPath)
+	defer p.zr.Close()
+	opfDir := path.Dir(p.opfPath)
 	imagePath := coverName
 	if opfDir != "." && opfDir != "" {
 		imagePath = path.Join(opfDir, coverName)
 	}
-	opfBytes, err := readEntry(opfPath)
-	if err != nil {
-		return fail(err)
-	}
-	if !utf8Valid(opfBytes) {
+	if !utf8Valid(p.opf) {
 		return &CoverError{"Failed to write the cover into the EPUB: 'utf-8' codec can't decode the OPF"}
 	}
-	newOPF, err := setCoverInOPF(string(opfBytes), coverName)
+	newOPF, err := setCoverInOPF(string(p.opf), coverName)
 	if err != nil {
 		return err
 	}
-
-	tmp, err := os.CreateTemp(filepath.Dir(file), "*.epub.tmp")
+	err = p.rewrite(file, []byte(newOPF), imagePath, func(zw *zip.Writer) error {
+		w, err := zw.CreateHeader(&zip.FileHeader{Name: imagePath, Method: zip.Store, Modified: nowForZip()})
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(cover)
+		return err
+	})
 	if err != nil {
 		return fail(err)
+	}
+	return nil
+}
+
+// ── rewriting the package ─────────────────────────────────────────────────────
+
+// missingOPF is a container.xml that names no package document.
+type missingOPF struct{}
+
+func (*missingOPF) Error() string { return "No OPF file listed in META-INF/container.xml" }
+
+// epubPackage is an open EPUB and its package document (the OPF).
+type epubPackage struct {
+	zr      *zip.ReadCloser
+	byName  map[string]*zip.File
+	opfPath string
+	opf     []byte
+}
+
+// openPackage opens an EPUB and reads the OPF that container.xml points to.
+// The caller closes p.zr.
+func openPackage(file string) (*epubPackage, error) {
+	zr, err := zip.OpenReader(file)
+	if err != nil {
+		return nil, err
+	}
+	p := &epubPackage{zr: zr, byName: map[string]*zip.File{}}
+	for _, f := range zr.File {
+		p.byName[f.Name] = f
+	}
+	err = func() error {
+		containerData, err := p.read("META-INF/container.xml")
+		if err != nil {
+			return err
+		}
+		container, err := parseStrict(containerData)
+		if err != nil {
+			return err
+		}
+		container.walk(func(e *strictElement) bool {
+			if strings.HasSuffix(e.XMLName.Local, "rootfile") {
+				if fp, ok := e.attr("full-path"); ok && fp != "" {
+					p.opfPath = fp
+					return false
+				}
+			}
+			return true
+		})
+		if p.opfPath == "" {
+			return &missingOPF{}
+		}
+		p.opf, err = p.read(p.opfPath)
+		return err
+	}()
+	if err != nil {
+		zr.Close()
+		return nil, err
+	}
+	return p, nil
+}
+
+func (p *epubPackage) read(name string) ([]byte, error) {
+	f, ok := p.byName[name]
+	if !ok {
+		return nil, fmt.Errorf("There is no item named %q in the archive", name)
+	}
+	rc, err := f.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+	return io.ReadAll(rc)
+}
+
+// rewrite writes the EPUB again with a new OPF, leaving out the entry named
+// skip (if any) and adding what extra writes at the end. The new file
+// replaces the old one only once it is complete.
+func (p *epubPackage) rewrite(file string, opf []byte, skip string, extra func(*zip.Writer) error) error {
+	tmp, err := os.CreateTemp(filepath.Dir(file), "*.epub.tmp")
+	if err != nil {
+		return err
 	}
 	tmpName := tmp.Name()
 	ok := false
@@ -279,44 +329,50 @@ func EmbedCover(file, coverPath string) error {
 		}
 	}()
 	zw := zip.NewWriter(tmp)
-	if f, has := byName["mimetype"]; has {
-		data, err := readEntry("mimetype")
+	if f, has := p.byName["mimetype"]; has {
+		data, err := p.read("mimetype")
 		if err != nil {
-			return fail(err)
+			return err
 		}
 		if err := writeEntry(zw, f, data, zip.Store); err != nil {
-			return fail(err)
+			return err
 		}
 	}
-	for _, f := range zr.File {
-		if f.Name == "mimetype" || f.Name == imagePath {
+	for _, f := range p.zr.File {
+		if f.Name == "mimetype" || (skip != "" && f.Name == skip) {
 			continue
 		}
-		if f.Name == opfPath {
-			if err := writeEntry(zw, f, []byte(newOPF), f.Method); err != nil {
-				return fail(err)
+		if f.Name == p.opfPath {
+			if err := writeEntry(zw, f, opf, f.Method); err != nil {
+				return err
+			}
+			continue
+		}
+		if strings.HasSuffix(f.Name, "/") {
+			// Copy fails on a directory stored deflated (it has a couple of
+			// bytes of compressed nothing); write it again, empty.
+			if err := writeEntry(zw, f, nil, zip.Store); err != nil {
+				return err
 			}
 			continue
 		}
 		if err := zw.Copy(f); err != nil {
-			return fail(err)
+			return err
 		}
 	}
-	w, err := zw.CreateHeader(&zip.FileHeader{Name: imagePath, Method: zip.Store, Modified: nowForZip()})
-	if err != nil {
-		return fail(err)
-	}
-	if _, err := w.Write(cover); err != nil {
-		return fail(err)
+	if extra != nil {
+		if err := extra(zw); err != nil {
+			return err
+		}
 	}
 	if err := zw.Close(); err != nil {
-		return fail(err)
+		return err
 	}
 	if err := tmp.Close(); err != nil {
-		return fail(err)
+		return err
 	}
 	if err := os.Rename(tmpName, file); err != nil {
-		return fail(err)
+		return err
 	}
 	ok = true
 	return nil

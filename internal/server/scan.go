@@ -40,7 +40,11 @@ func (s *Server) Start(ctx context.Context, loops bool) {
 	if !loops {
 		return
 	}
-	s.bg.Add(3)
+	s.bg.Add(4)
+	go func() {
+		defer s.bg.Done()
+		s.epubMetadataLoop(ctx)
+	}()
 	go func() {
 		defer s.bg.Done()
 		for {
@@ -131,6 +135,8 @@ func (s *Server) runScan(ctx context.Context) {
 			combined.Skipped += p.Skipped
 			combined.Errors = append(combined.Errors, p.Errors...)
 		}
+		// New books, and anything an edit's sync missed.
+		s.logEPUBMetadataSync(ctx)
 		return ctx.Err()
 	}()
 
