@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/audemed44/shelfloom/internal/hashing"
+	"github.com/audemed44/shelfloom/internal/logging"
 	"github.com/audemed44/shelfloom/internal/store"
 )
 
@@ -385,6 +387,9 @@ func (s *Server) organizeShelf(ctx context.Context, shelfID int64, template *str
 	}
 	out := []organizerResult{}
 	for _, b := range books {
+		if b.isManual() {
+			continue
+		}
 		name, path, seq, err := seriesInfo(ctx, s.DB, b.ID)
 		if err != nil {
 			return nil, err
@@ -407,6 +412,17 @@ func (s *Server) organizeShelf(ctx context.Context, shelfID int64, template *str
 			out = append(out, res)
 			continue
 		}
+		if fileExists(dst) {
+			// A copy of the same file can be replaced; anything else is
+			// another book, which a move must not delete.
+			srcSHA, _, err1 := hashing.Files(src)
+			dstSHA, _, err2 := hashing.Files(dst)
+			if err1 != nil || err2 != nil || srcSHA != dstSHA {
+				res.Error = ptr("A different file is already at " + newRel)
+				out = append(out, res)
+				continue
+			}
+		}
 		err = safeMoveWithSDR(src, dst)
 		if err == nil {
 			pruneEmptyDirs(filepath.Dir(src), shelf.Path)
@@ -426,6 +442,46 @@ func (s *Server) organizeShelf(ctx context.Context, shelfID int64, template *str
 		out = append(out, res)
 	}
 	return out, nil
+}
+
+// autoOrganize files the books on every auto-organize shelf by its template:
+// new books (uploads, downloads, serial volumes, files a scan found) and
+// books whose series changed. Returns how many it moved.
+func (s *Server) autoOrganize(ctx context.Context) (moved, failed int, err error) {
+	rows, err := s.DB.QueryContext(ctx, "SELECT id FROM shelves WHERE auto_organize = 1 ORDER BY id")
+	if err != nil {
+		return 0, 0, err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return 0, 0, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, 0, err
+	}
+	for _, id := range ids {
+		results, err := s.organizeShelf(ctx, id, nil, nil, false)
+		if err != nil {
+			return moved, failed, err
+		}
+		for _, r := range results {
+			switch {
+			case r.Moved:
+				moved++
+				logging.Audit(ctx, "book.organize", "book_id", r.BookID, "shelf_id", id)
+			case r.Error != nil:
+				failed++
+				slog.WarnContext(ctx, "could not organize a book", "book_id", r.BookID, "shelf_id", id, "err", *r.Error)
+			}
+		}
+	}
+	return moved, failed, nil
 }
 
 func (s *Server) organizePreviewHandler(w http.ResponseWriter, r *http.Request) error {

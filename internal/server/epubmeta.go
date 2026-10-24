@@ -24,8 +24,9 @@ import (
 // written changes so every file is written again.
 const epubMetaVersion = "1"
 
-// epubMetaDelay lets a burst of edits settle before files are rewritten.
-const epubMetaDelay = 5 * time.Second
+// librarySyncDelay lets a burst of edits settle before files are moved or
+// rewritten.
+const librarySyncDelay = 5 * time.Second
 
 // libraryMetadata is what Shelfloom wants in each EPUB, by book ID.
 func libraryMetadata(ctx context.Context, q querier) (map[string]*epub.LibraryMetadata, error) {
@@ -197,9 +198,10 @@ func (s *Server) syncEPUBMetadata(ctx context.Context) (written, failed int, err
 	return written, failed, nil
 }
 
-// runEPUBMetadataSync syncs EPUB metadata once, waiting for a library scan
-// to finish first so the two don't hash and rewrite the same files.
-func (s *Server) runEPUBMetadataSync(ctx context.Context) {
+// runLibrarySync files books on auto-organize shelves and syncs EPUB
+// metadata once, waiting for a library scan to finish first so the two
+// don't hash, move and rewrite the same files.
+func (s *Server) runLibrarySync(ctx context.Context) {
 	for {
 		s.scan.mu.Lock()
 		if !s.scan.running {
@@ -217,7 +219,22 @@ func (s *Server) runEPUBMetadataSync(ctx context.Context) {
 		s.scan.running = false
 		s.scan.mu.Unlock()
 	}()
+	s.syncLibrary(ctx)
+}
+
+// syncLibrary is the work done after edits and at the end of every scan.
+func (s *Server) syncLibrary(ctx context.Context) {
+	s.logAutoOrganize(ctx)
 	s.logEPUBMetadataSync(ctx)
+}
+
+func (s *Server) logAutoOrganize(ctx context.Context) {
+	ctx, run := logging.QuietJob(ctx, "library.organize")
+	moved, failed, err := s.autoOrganize(ctx)
+	run.End(err, "moved", moved, "failed", failed)
+	if moved > 0 {
+		slog.InfoContext(ctx, "organized books", "moved", moved, "failed", failed)
+	}
 }
 
 func (s *Server) logEPUBMetadataSync(ctx context.Context) {
@@ -229,41 +246,42 @@ func (s *Server) logEPUBMetadataSync(ctx context.Context) {
 	}
 }
 
-// queueEPUBMetadataSync asks for a sync soon; edits arrive through the API.
-func (s *Server) queueEPUBMetadataSync() {
+// queueLibrarySync asks for a library sync soon, after an edit.
+func (s *Server) queueLibrarySync() {
 	select {
-	case s.epubMetaNudge <- struct{}{}:
+	case s.libraryNudge <- struct{}{}:
 	default:
 	}
 }
 
-// epubMetadataLoop runs a sync once edits have been quiet for epubMetaDelay.
-func (s *Server) epubMetadataLoop(ctx context.Context) {
+// librarySyncLoop runs a library sync once edits have been quiet for
+// librarySyncDelay.
+func (s *Server) librarySyncLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-s.epubMetaNudge:
+		case <-s.libraryNudge:
 		}
-		t := time.NewTimer(epubMetaDelay)
+		t := time.NewTimer(librarySyncDelay)
 	settle:
 		for {
 			select {
 			case <-ctx.Done():
 				t.Stop()
 				return
-			case <-s.epubMetaNudge:
-				t.Reset(epubMetaDelay)
+			case <-s.libraryNudge:
+				t.Reset(librarySyncDelay)
 			case <-t.C:
 				break settle
 			}
 		}
-		s.runEPUBMetadataSync(ctx)
+		s.runLibrarySync(ctx)
 	}
 }
 
-// changesLibrary is whether a request may have changed what goes into the
-// EPUBs. KOReader's progress sync is frequent and never does.
+// changesLibrary is whether a request may have changed where books belong or
+// what goes into their EPUBs. KOReader's progress sync is frequent and never does.
 func changesLibrary(r *http.Request) bool {
 	switch r.Method {
 	case http.MethodGet, http.MethodHead, http.MethodOptions:

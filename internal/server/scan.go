@@ -43,7 +43,7 @@ func (s *Server) Start(ctx context.Context, loops bool) {
 	s.bg.Add(4)
 	go func() {
 		defer s.bg.Done()
-		s.epubMetadataLoop(ctx)
+		s.librarySyncLoop(ctx)
 	}()
 	go func() {
 		defer s.bg.Done()
@@ -60,6 +60,8 @@ func (s *Server) Start(ctx context.Context, loops bool) {
 			jctx, run := logging.Job(ctx, "serials.check")
 			checked, found, err := s.checkAllSerials(jctx)
 			run.End(err, "checked", checked, "new_chapters", found)
+			// It may have built volumes; file them.
+			s.queueLibrarySync()
 			if !sleepCtx(ctx, s.Config.SerialCheckInterval) {
 				return
 			}
@@ -136,7 +138,7 @@ func (s *Server) runScan(ctx context.Context) {
 			combined.Errors = append(combined.Errors, p.Errors...)
 		}
 		// New books, and anything an edit's sync missed.
-		s.logEPUBMetadataSync(ctx)
+		s.syncLibrary(ctx)
 		return ctx.Err()
 	}()
 
