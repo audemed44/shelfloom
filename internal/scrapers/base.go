@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"html"
 	"io"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -115,8 +116,12 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("%s '%d %s' for url '%s'", kind, e.Status, reason, e.URL)
 }
 
-// get fetches a page with browser-like headers and returns its body.
+// get fetches a page with browser-like headers and returns its body. Pages
+// behind a bot wall go through the Solver when one is configured.
 func get(ctx context.Context, url string) ([]byte, error) {
+	if Solver != nil && Solver.isWalled(bareHost(url)) {
+		return Solver.get(ctx, url)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -132,6 +137,13 @@ func get(ctx context.Context, url string) ([]byte, error) {
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 	if err != nil {
 		return nil, err
+	}
+	if isBotWall(resp.StatusCode, resp.Header, body) {
+		if Solver == nil {
+			return nil, &BotWallError{URL: url, Reason: "set SHELFLOOM_FLARESOLVERR_URL to fetch it through FlareSolverr"}
+		}
+		slog.InfoContext(ctx, "bot wall; fetching through FlareSolverr", "host", bareHost(url))
+		return Solver.get(ctx, url)
 	}
 	if resp.StatusCode >= 400 {
 		return nil, &HTTPError{Status: resp.StatusCode, URL: resp.Request.URL.String()}
