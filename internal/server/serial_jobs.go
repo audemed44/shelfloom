@@ -379,6 +379,18 @@ func syncChapterList(ctx context.Context, tx *sql.Tx, sr *Serial, remote []scrap
 	return newCount, changed, nil
 }
 
+// fetchChapterList fetches a serial's chapter list. An empty list for a
+// serial that has chapters is an error rather than every chapter going
+// stubbed: it is a page the scraper couldn't read (a bot check, a redesign),
+// not a serial taken down.
+func fetchChapterList(ctx context.Context, adapter scrapers.Adapter, sr *Serial) ([]scrapers.ChapterInfo, error) {
+	remote, err := adapter.FetchChapterList(ctx, sr.URL)
+	if err == nil && len(remote) == 0 && sr.TotalChapters > 0 {
+		err = fmt.Errorf("no chapters found at %s; keeping the stored chapter list", sr.URL)
+	}
+	return remote, err
+}
+
 // updateFromSource refreshes a serial's chapter list.
 func (s *Server) updateFromSource(ctx context.Context, id int64) (int64, int64, error) {
 	sr, err := getSerial(ctx, s.DB, id)
@@ -389,7 +401,7 @@ func (s *Server) updateFromSource(ctx context.Context, id int64) (int64, int64, 
 	if adapter == nil {
 		return 0, 0, unprocessable("No adapter named '%s' for serial URL: '%s'", sr.Source, sr.URL)
 	}
-	remote, err := adapter.FetchChapterList(ctx, sr.URL)
+	remote, err := fetchChapterList(ctx, adapter, sr)
 	if err != nil {
 		if _, dbErr := s.DB.ExecContext(ctx, "UPDATE web_serials SET last_error = ?, status = 'error' WHERE id = ?", err.Error(), id); dbErr != nil {
 			return 0, 0, dbErr
@@ -423,7 +435,7 @@ func (s *Server) checkSerial(ctx context.Context, sr *Serial) int64 {
 		s.DB.ExecContext(ctx, "UPDATE web_serials SET status = 'error', last_error = ?, last_checked_at = ? WHERE id = ?", fmt.Sprintf("No adapter named '%s'", sr.Source), store.Now(), sr.ID)
 		return 0
 	}
-	remote, err := adapter.FetchChapterList(ctx, sr.URL)
+	remote, err := fetchChapterList(ctx, adapter, sr)
 	if err != nil {
 		s.DB.ExecContext(ctx, "UPDATE web_serials SET status = 'error', last_error = ?, last_checked_at = ? WHERE id = ?", err.Error(), store.Now(), sr.ID)
 		slog.WarnContext(ctx, "could not fetch a serial's chapter list", "serial", sr.ID, "err", err)
