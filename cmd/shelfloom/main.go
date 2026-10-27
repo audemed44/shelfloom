@@ -16,6 +16,7 @@ import (
 	_ "time/tzdata" // the runtime image may have no zoneinfo; TZ needs this
 
 	"github.com/audemed44/shelfloom/internal/logging"
+	"github.com/audemed44/shelfloom/internal/scrapers"
 	"github.com/audemed44/shelfloom/internal/server"
 	"github.com/audemed44/shelfloom/internal/store"
 )
@@ -73,6 +74,9 @@ func main() {
 			OpenRouterModel:     os.Getenv("SHELFLOOM_OPENROUTER_MODEL"),
 			OpenRouterURL:       os.Getenv("SHELFLOOM_OPENROUTER_BASE_URL"),
 		},
+	}
+	if u := os.Getenv("SHELFLOOM_FLARESOLVERR_URL"); u != "" {
+		scrapers.Solver = scrapers.NewFlareSolverr(u)
 	}
 	if dir := env("SHELFLOOM_FRONTEND_DIR", "frontend/dist"); isDir(dir) {
 		app.Frontend = os.DirFS(dir)

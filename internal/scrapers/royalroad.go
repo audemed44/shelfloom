@@ -2,7 +2,9 @@ package scrapers
 
 import (
 	"context"
+	"encoding/json"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -69,9 +71,31 @@ func (rr *RoyalRoad) FetchMetadata(ctx context.Context, u string) (*Metadata, er
 
 func (rr *RoyalRoad) FetchChapterList(ctx context.Context, u string) ([]ChapterInfo, error) {
 	story := rr.storyURL(u)
-	doc, _, err := getDoc(ctx, story)
+	doc, body, err := getDoc(ctx, story)
 	if err != nil {
 		return nil, err
+	}
+	// The page embeds the whole list; its script then pages the table, so a
+	// page fetched through a browser (FlareSolverr) has only 20 rows.
+	if m := rrChaptersJSON.FindSubmatch(body); m != nil {
+		var entries []struct {
+			Title   string `json:"title"`
+			Date    string `json:"date"`
+			URL     string `json:"url"`
+			Visible int    `json:"visible"`
+			Order   int    `json:"order"`
+		}
+		if json.Unmarshal(m[1], &entries) == nil && len(entries) > 0 {
+			sort.SliceStable(entries, func(i, j int) bool { return entries[i].Order < entries[j].Order })
+			var links []link
+			for _, e := range entries {
+				if e.Visible == 0 || !strings.Contains(e.URL, "/chapter/") {
+					continue
+				}
+				links = append(links, link{href: e.URL, text: stripEntities(e.Title), date: parseISOWall(e.Date)})
+			}
+			return normalizeChapterList(story, links), nil
+		}
 	}
 	var links []link
 	doc.Find("table#chapters tr").Each(func(_ int, row *goquery.Selection) {
@@ -102,6 +126,7 @@ func parseISOWall(s string) *time.Time {
 }
 
 var (
+	rrChaptersJSON    = regexp.MustCompile(`window\.chapters\s*=\s*(\[.*?\]);\s*\n`)
 	hidingDeclaration = regexp.MustCompile(`(?i)display\s*:\s*none|visibility\s*:\s*hidden|speak\s*:\s*never`)
 	classRule         = regexp.MustCompile(`([^{}]+)\{([^}]*)\}`)
 	className         = regexp.MustCompile(`\.([A-Za-z_][\w-]*)`)

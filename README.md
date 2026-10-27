@@ -232,6 +232,7 @@ npm run lint           # gofmt + go vet, eslint
 | `SHELFLOOM_LISTEN` | `:8000` | Listen address |
 | `SHELFLOOM_SCAN_INTERVAL` | `300` | Seconds between library scans |
 | `SHELFLOOM_SERIAL_CHECK_INTERVAL` | `86400` | Seconds between web serial update checks |
+| `SHELFLOOM_FLARESOLVERR_URL` | | [FlareSolverr](https://github.com/FlareSolverr/FlareSolverr) address (e.g. `http://flaresolverr:8191`) for serial sites behind a bot check; Royal Road needs it |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` (`SHELFLOOM_LOG_LEVEL` still works) |
 | `LOG_FORMAT` | `json` | `text` for reading in a terminal |
 | `HOMEPAGE_URL` | | Foyer address for the sidebar link |
@@ -242,6 +243,13 @@ npm run lint           # gofmt + go vet, eslint
 | `SHELFLOOM_OPENROUTER_MODEL` | `google/gemini-3.8-flash` | Model until one is picked in Settings |
 | `SHELFLOOM_OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter API address (a proxy or test server) |
 | `TZ` | | Time zone stats are grouped in |
+
+Royal Road sits behind Cloudflare and Anubis bot checks, which a plain HTTP
+client can't pass. With `SHELFLOOM_FLARESOLVERR_URL` set, pages that answer
+with a check are fetched through FlareSolverr's browser instead. Shelfloom
+keeps one session open while it works and closes it after two idle minutes,
+since an open session uses about 1 GB of RAM (an idle FlareSolverr about
+50 MB). Without it, those serials show a bot-check error.
 
 Databases from the earlier Python-based releases open as they are, as long as
 that release had upgraded them to its last migration (it does so on start).
