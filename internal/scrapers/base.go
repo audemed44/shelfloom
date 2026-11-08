@@ -55,6 +55,23 @@ type Adapter interface {
 	FetchChapterContent(ctx context.Context, url string) (*ChapterContent, error)
 }
 
+// ChapterIdentifier is an Adapter whose chapter URLs carry a stable id, so a
+// chapter whose URL changes (retitled, or its story renamed) is still known
+// as the same chapter.
+type ChapterIdentifier interface {
+	// ChapterID returns the chapter's id and the part of its URL named after
+	// the chapter itself (its slug); id is "" when url has none.
+	ChapterID(url string) (id, slug string)
+}
+
+// ChapterID is a's id and slug for a chapter URL; "" when a has no ids.
+func ChapterID(a Adapter, url string) (id, slug string) {
+	if ci, ok := a.(ChapterIdentifier); ok {
+		return ci.ChapterID(url)
+	}
+	return "", ""
+}
+
 // adapters in order: specific sites first, generic fallbacks last.
 var adapters = []Adapter{
 	&RoyalRoad{}, &NovelFire{}, &WanderingInn{}, &Wildbow{}, &Wordpress{}, &Sequential{},

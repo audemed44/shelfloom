@@ -313,35 +313,54 @@ func markVolumesStale(ctx context.Context, q querier, serialID int64, changed []
 
 // syncChapterList merges a fresh chapter list into the stored one: new
 // chapters are numbered after the last, chapters gone upstream are marked
-// stubbed (and keep their content), returning ones are unmarked.
+// stubbed (and keep their content), returning ones are unmarked. Where the
+// source gives chapters ids, a chapter whose URL changed is matched by its id
+// and keeps its place; if the chapter's own slug changed (it was retitled,
+// usually edited too) its content is dropped so it is fetched again.
 func syncChapterList(ctx context.Context, tx *sql.Tx, sr *Serial, remote []scrapers.ChapterInfo) (int64, []int64, error) {
 	existing, err := queryChapters(ctx, tx, "SELECT "+chapterColumns+" FROM serial_chapters WHERE serial_id = ? ORDER BY chapter_number", sr.ID)
 	if err != nil {
 		return 0, nil, err
 	}
+	adapter := scrapers.ByName(sr.Source)
 	byKey := map[string]*Chapter{}
+	byID := map[string]*Chapter{}
 	next := int64(0)
 	for _, c := range existing {
 		byKey[c.SourceKey] = c
+		if id, _ := scrapers.ChapterID(adapter, c.SourceKey); id != "" && byID[id] == nil {
+			byID[id] = c
+		}
 		next = max(next, c.ChapterNumber)
 	}
 	next++
 	now := store.Now()
 	seen := map[string]bool{}
+	seenID := map[string]bool{}
+	matched := map[int64]bool{}
 	var changed []int64
 	var newCount int64
 	for _, rc := range remote {
 		key := scrapers.NormalizeURL(rc.SourceURL)
-		if seen[key] {
+		id, slug := scrapers.ChapterID(adapter, key)
+		if seen[key] || (id != "" && seenID[id]) {
 			continue
 		}
 		seen[key] = true
+		if id != "" {
+			seenID[id] = true
+		}
 		var pub store.Time
 		if rc.PublishDate != nil {
 			pub = store.T(*rc.PublishDate)
 		}
 		c := byKey[key]
-		if c == nil {
+		if c == nil && id != "" {
+			if m := byID[id]; m != nil && !matched[m.ID] {
+				c = m
+			}
+		}
+		if c == nil || matched[c.ID] {
 			if _, err := tx.ExecContext(ctx, "INSERT INTO serial_chapters (serial_id, chapter_number, source_key, title, source_url, publish_date, is_stubbed) VALUES (?, ?, ?, ?, ?, ?, 0)",
 				sr.ID, next, key, rc.Title, rc.SourceURL, pub); err != nil {
 				return 0, nil, err
@@ -349,6 +368,21 @@ func syncChapterList(ctx context.Context, tx *sql.Tx, sr *Serial, remote []scrap
 			changed = append(changed, next)
 			next++
 			newCount++
+			continue
+		}
+		matched[c.ID] = true
+		if c.SourceKey != key {
+			// Same chapter, new URL.
+			refetch := ""
+			if _, oldSlug := scrapers.ChapterID(adapter, c.SourceKey); oldSlug != slug {
+				refetch = ", content = NULL, word_count = NULL, fetched_at = NULL"
+			}
+			if _, err := tx.ExecContext(ctx, "UPDATE serial_chapters SET source_key = ?, title = ?, source_url = ?, publish_date = ?, is_stubbed = 0, stubbed_at = NULL"+refetch+" WHERE id = ?", key, rc.Title, rc.SourceURL, pub, c.ID); err != nil {
+				return 0, nil, err
+			}
+			if c.IsStubbed || refetch != "" {
+				changed = append(changed, c.ChapterNumber)
+			}
 			continue
 		}
 		if c.IsStubbed {
@@ -362,7 +396,7 @@ func syncChapterList(ctx context.Context, tx *sql.Tx, sr *Serial, remote []scrap
 	}
 	var live int64
 	for _, c := range existing {
-		if seen[c.SourceKey] {
+		if matched[c.ID] {
 			live++
 			continue
 		}
