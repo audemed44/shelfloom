@@ -48,6 +48,23 @@ func (*RoyalRoad) storyURL(u string) string {
 	return strings.TrimRight(u, "/")
 }
 
+// ChapterID reads /fiction/<id>/<story>/chapter/<id>/<slug>: the slug follows
+// the chapter's title and the story's part its name, both of which the
+// author can change; the chapter id stays.
+func (*RoyalRoad) ChapterID(u string) (id, slug string) {
+	parts := strings.Split(strings.Trim(urlsplit(u).path, "/"), "/")
+	for i := 0; i+1 < len(parts); i++ {
+		if parts[i] != "chapter" || parts[i+1] == "" || strings.Trim(parts[i+1], "0123456789") != "" {
+			continue
+		}
+		if i+2 < len(parts) {
+			slug = parts[i+2]
+		}
+		return parts[i+1], slug
+	}
+	return "", ""
+}
+
 func (rr *RoyalRoad) FetchMetadata(ctx context.Context, u string) (*Metadata, error) {
 	doc, _, err := getDoc(ctx, rr.storyURL(u))
 	if err != nil {

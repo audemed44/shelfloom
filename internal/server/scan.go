@@ -37,6 +37,7 @@ type scanState struct {
 func (s *Server) Start(ctx context.Context, loops bool) {
 	s.bgCtx = ctx
 	s.failInterruptedRecRuns(ctx)
+	s.mergeAllDuplicateChapters(ctx)
 	if !loops {
 		return
 	}

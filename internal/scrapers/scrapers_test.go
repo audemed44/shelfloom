@@ -408,3 +408,17 @@ func TestWildbow(t *testing.T) {
 		}
 	}
 }
+
+func TestRoyalRoadChapterID(t *testing.T) {
+	rr := &RoyalRoad{}
+	for u, want := range map[string][2]string{
+		"https://www.royalroad.com/fiction/28806/the-flower/chapter/1442744/138-happy-ending-7": {"1442744", "138-happy-ending-7"},
+		"https://www.royalroad.com/fiction/28806/chapter/1442744":                               {"1442744", ""},
+		"https://www.royalroad.com/fiction/28806/the-flower":                                    {"", ""},
+		"https://www.royalroad.com/fiction/28806/x/chapter/abc/slug":                            {"", ""},
+	} {
+		if id, slug := rr.ChapterID(u); id != want[0] || slug != want[1] {
+			t.Errorf("ChapterID(%q) = %q, %q; want %q, %q", u, id, slug, want[0], want[1])
+		}
+	}
+}
