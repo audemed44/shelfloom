@@ -3,6 +3,8 @@ package epub
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"mime"
 	"os"
@@ -48,15 +50,20 @@ var (
 )
 
 // Slugify turns a title into a file name stem (at most 80 characters), as
-// the Python backend's _slugify did.
+// the Python backend's _slugify did, except that a long title keeps a hash
+// of its full slug so titles that differ only past the cut stay apart.
 func Slugify(text string) string {
 	text = strings.ToLower(text)
 	text = pySpaceRE.ReplaceAllString(text, " ")
 	text = slugDrop.ReplaceAllString(text, "")
 	text = slugJoin.ReplaceAllString(text, "-")
 	text = strings.Trim(text, "-")
+	// A cut-off title loses its end ("… - Volume 3"), so two volumes of a
+	// long-titled serial would share a file; a hash of the whole slug keeps
+	// them apart.
 	if r := []rune(text); len(r) > 80 {
-		text = string(r[:80])
+		sum := sha1.Sum([]byte(text))
+		text = strings.TrimRight(string(r[:71]), "-") + "-" + hex.EncodeToString(sum[:4])
 	}
 	if text == "" {
 		return "untitled"
