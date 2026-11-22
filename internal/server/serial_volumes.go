@@ -930,7 +930,23 @@ func (s *Server) generateAllHandler(w http.ResponseWriter, r *http.Request) erro
 		if v.Kind != "generated" {
 			continue
 		}
-		gen, err := s.generateVolume(ctx, id, v.ID, shelfID, nil)
+		// A volume that already has its book is rebuilt into it, where it
+		// is; generating it afresh would import a second copy of the book
+		// (on the chosen shelf, or beside an organized file).
+		hasBook := false
+		if v.BookID != nil {
+			book, err := getBook(ctx, s.DB, *v.BookID)
+			if err != nil {
+				return err
+			}
+			hasBook = book != nil
+		}
+		var gen *Volume
+		if hasBook {
+			gen, err = s.rebuildVolume(ctx, id, v.ID)
+		} else {
+			gen, err = s.generateVolume(ctx, id, v.ID, shelfID, nil)
+		}
 		if err != nil {
 			var he *httpError
 			if errors.As(err, &he) && he.status == http.StatusUnprocessableEntity {
@@ -961,9 +977,18 @@ func (s *Server) rebuildVolumeHandler(w http.ResponseWriter, r *http.Request) er
 		return err
 	}
 	ctx := r.Context()
+	if _, err := s.rebuildVolume(ctx, id, vid); err != nil {
+		return err
+	}
+	return s.writeVolume(w, ctx, id, vid, http.StatusOK)
+}
+
+// rebuildVolume regenerates a volume into the book it already has, on that
+// book's shelf, carrying the reading position across the new spine.
+func (s *Server) rebuildVolume(ctx context.Context, id, vid int64) (*Volume, error) {
 	v, err := getVolume(ctx, s.DB, id, vid)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var shelfID *int64
 	var existing *string
@@ -987,12 +1012,12 @@ func (s *Server) rebuildVolumeHandler(w http.ResponseWriter, r *http.Request) er
 	}
 	nv, err := s.generateVolume(ctx, id, vid, shelfID, existing)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if nv.BookID != nil {
 		book, err := getBook(ctx, s.DB, *nv.BookID)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if book != nil {
 			shelf, _ := getShelf(ctx, s.DB, book.ShelfID)
@@ -1011,7 +1036,7 @@ func (s *Server) rebuildVolumeHandler(w http.ResponseWriter, r *http.Request) er
 			}
 			if nv.Name == nil && oldTitle != "" && volumeTitle(serialTitle).MatchString(oldTitle) {
 				if _, err := s.DB.ExecContext(ctx, "UPDATE books SET title = ? WHERE id = ?", fmt.Sprintf("%s - Volume %d", serialTitle, nv.VolumeNumber), book.ID); err != nil {
-					return err
+					return nil, err
 				}
 			}
 			if len(oldSpine) > 0 && shelf != nil {
@@ -1019,13 +1044,13 @@ func (s *Server) rebuildVolumeHandler(w http.ResponseWriter, r *http.Request) er
 				newSpine, err := epubSpine(filepath.Join(shelf.Path, book.FilePath))
 				if err == nil && len(newSpine) > 0 {
 					if err := carryPositionAcrossRebuild(ctx, s.DB, book, oldSpine, newSpine); err != nil {
-						return err
+						return nil, err
 					}
 				}
 			}
 		}
 	}
-	return s.writeVolume(w, ctx, id, vid, http.StatusOK)
+	return nv, nil
 }
 
 // ── series that belong to a serial ────────────────────────────────────────────
