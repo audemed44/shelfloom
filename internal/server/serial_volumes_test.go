@@ -64,3 +64,58 @@ func TestRebuildOrganizedVolume(t *testing.T) {
 		t.Fatal("organized file is gone")
 	}
 }
+
+// Generate All rebuilds a volume that already has a book into that book, on
+// its own shelf, instead of importing a second copy onto the chosen shelf.
+func TestGenerateAllKeepsExistingBooks(t *testing.T) {
+	ts := newTestServer(t)
+	ctx := context.Background()
+	db := ts.app.DB
+	var library, other Shelf
+	otherPath := t.TempDir()
+	expect(t, "create shelf", ts.do("POST", "/api/shelves", map[string]any{"name": "Books", "path": ts.shelf}, &library), 201)
+	expect(t, "create shelf", ts.do("POST", "/api/shelves", map[string]any{"name": "Reader", "path": otherPath}, &other), 201)
+	if _, err := db.ExecContext(ctx, "INSERT INTO web_serials (id, url, source, title, author, status, total_chapters) VALUES (1, 'https://www.royalroad.com/fiction/1/x', 'royalroad', 'Serial', 'Author', 'ongoing', 2)"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 2; i++ {
+		if _, err := db.ExecContext(ctx, "INSERT INTO serial_chapters (serial_id, chapter_number, title, source_url, content, source_key) VALUES (1, ?, ?, ?, '<p>Text</p>', ?)", i, "Chapter", "https://example.com/"+string(rune('0'+i)), string(rune('0'+i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO serial_volumes (id, serial_id, volume_number, chapter_start, chapter_end, is_stale) VALUES (1, 1, 1, 1, 1, 0), (2, 1, 2, 2, 2, 0)"); err != nil {
+		t.Fatal(err)
+	}
+	var v Volume
+	expect(t, "generate", ts.do("POST", "/api/serials/1/volumes/1/generate?shelf_id="+itoa(other.ID), nil, &v), 200)
+	if v.BookID == nil {
+		t.Fatal("generated volume has no book")
+	}
+
+	var out []Volume
+	expect(t, "generate all", ts.do("POST", "/api/serials/1/volumes/generate-all?shelf_id="+itoa(library.ID), nil, &out), 200)
+	if len(out) != 2 {
+		t.Fatalf("generate all returned %d volumes, want 2", len(out))
+	}
+	var count int
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM books").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 {
+		t.Fatalf("%d books after generate all, want 2", count)
+	}
+	nv, err := getVolume(ctx, db, 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nv.BookID == nil || *nv.BookID != *v.BookID {
+		t.Fatalf("volume 1 linked to %v, want %s", nv.BookID, *v.BookID)
+	}
+	book, err := getBook(ctx, db, *v.BookID)
+	if err != nil || book == nil {
+		t.Fatal(err)
+	}
+	if book.ShelfID != other.ID {
+		t.Fatalf("volume 1 book moved to shelf %d, want %d", book.ShelfID, other.ID)
+	}
+}
