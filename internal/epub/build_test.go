@@ -19,6 +19,21 @@ func TestSlugify(t *testing.T) {
 	}
 }
 
+// Long titles that differ only after the cut get different slugs.
+func TestSlugifyLongTitles(t *testing.T) {
+	base := "Surprisingly Enough(NOT), Common Sense Is Overpowered in Cliché Cultivation World - Volume "
+	a, b := Slugify(base+"1"), Slugify(base+"2")
+	if a == b {
+		t.Fatalf("volumes 1 and 2 share slug %q", a)
+	}
+	if n := len([]rune(a)); n > 80 {
+		t.Fatalf("slug %q is %d characters, want at most 80", a, n)
+	}
+	if Slugify(base+"1") != a {
+		t.Fatal("slug is not stable")
+	}
+}
+
 func TestExpandSelfClosing(t *testing.T) {
 	cases := map[string]string{
 		`<script src="a.js" type="text/javascript"/>`: `<script src="a.js" type="text/javascript"></script>`,
