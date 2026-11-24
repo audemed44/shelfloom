@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -118,4 +119,55 @@ func TestGenerateAllKeepsExistingBooks(t *testing.T) {
 	if book.ShelfID != other.ID {
 		t.Fatalf("volume 1 book moved to shelf %d, want %d", book.ShelfID, other.ID)
 	}
+}
+
+// A volume rebuilt in place keeps its series in the EPUB: the new file is
+// written without one, so the next library sync has to write it again.
+func TestRebuiltVolumeKeepsSeries(t *testing.T) {
+	ts := newTestServer(t)
+	ctx := context.Background()
+	db := ts.app.DB
+	var shelf Shelf
+	expect(t, "create shelf", ts.do("POST", "/api/shelves", map[string]any{"name": "Books", "path": ts.shelf}, &shelf), 201)
+	var series seriesResponse
+	expect(t, "series", ts.do("POST", "/api/series", map[string]any{"name": "Serial"}, &series), 201)
+	if _, err := db.ExecContext(ctx, "INSERT INTO web_serials (id, url, source, title, author, status, total_chapters, series_id) VALUES (1, 'https://www.royalroad.com/fiction/1/x', 'royalroad', 'Serial', 'Author', 'ongoing', 1, ?)", series.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO serial_chapters (serial_id, chapter_number, title, source_url, content, source_key) VALUES (1, 1, 'Chapter', 'https://example.com/1', '<p>Text</p>', '1')"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO serial_volumes (id, serial_id, volume_number, chapter_start, chapter_end, is_stale) VALUES (1, 1, 3, 1, 1, 0)"); err != nil {
+		t.Fatal(err)
+	}
+	var v Volume
+	expect(t, "generate", ts.do("POST", "/api/serials/1/volumes/1/generate?shelf_id="+itoa(shelf.ID), nil, &v), 200)
+	book, err := getBook(ctx, db, *v.BookID)
+	if err != nil || book == nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(ts.shelf, book.FilePath)
+	wantSeries := []string{`<meta name="calibre:series" content="Serial"/>`, `<meta name="calibre:series_index" content="3"/>`}
+	sync := func(stage string) {
+		t.Helper()
+		if _, failed, err := ts.app.syncEPUBMetadata(ctx); err != nil || failed != 0 {
+			t.Fatalf("%s: sync failed=%d err=%v", stage, failed, err)
+		}
+		opf := readOPF(t, file)
+		for _, want := range wantSeries {
+			if !strings.Contains(opf, want) {
+				t.Fatalf("%s: missing %s:\n%s", stage, want, opf)
+			}
+		}
+	}
+	sync("generate")
+
+	if _, err := db.ExecContext(ctx, "UPDATE serial_chapters SET content = '<p>New text</p>'"); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, "rebuild", ts.do("POST", "/api/serials/1/volumes/1/rebuild", nil, &v), 200)
+	if strings.Contains(readOPF(t, file), "calibre:series") {
+		t.Fatal("the rebuilt file already has a series; the test no longer covers the sync")
+	}
+	sync("rebuild")
 }

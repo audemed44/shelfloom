@@ -21,8 +21,9 @@ import (
 // EPUB 3 collections for series, <dc:subject> for genres and tags.
 
 // epubMetaVersion goes into every fingerprint; bump it when what gets
-// written changes so every file is written again.
-const epubMetaVersion = "1"
+// written changes so every file is written again. 2: volumes rebuilt in
+// place before the importer forgot their fingerprint had lost their series.
+const epubMetaVersion = "2"
 
 // librarySyncDelay lets a burst of edits settle before files are moved or
 // rewritten.
