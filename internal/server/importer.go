@@ -313,6 +313,12 @@ func (s *Server) processFile(ctx context.Context, shelf *Shelf, p string) (strin
 			if err := recordHash(ctx, tx, book.ID, preSHA, preMD5, book.PageCount, preKO); err != nil {
 				return err
 			}
+			// A new file (a rebuilt volume, a replaced download) has none of
+			// the series, genres and tags written into the old one; forget
+			// that they were, so the next library sync writes them again.
+			if _, err := tx.ExecContext(ctx, "DELETE FROM epub_metadata WHERE book_id = ?", book.ID); err != nil {
+				return err
+			}
 			_, err := tx.ExecContext(ctx, "UPDATE books SET file_hash = ?, file_hash_md5 = ?, file_hash_md5_ko = ?, file_path = ?, shelf_id = ?, file_size = ?, epub_uid = ?, metadata_raw = ?, cover_path = ? WHERE id = ?",
 				preSHA, preMD5, preKO, rel, shelf.ID, st.Size(), md.epubUID, md.raw, strOrNil(coverPath), book.ID)
 			return err
