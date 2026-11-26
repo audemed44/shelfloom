@@ -643,7 +643,6 @@ func (e xmlElement) has(name string) bool {
 func walkXML(data []byte, fn func(el xmlElement) bool) error {
 	d := xml.NewDecoder(strings.NewReader(string(data)))
 	d.Strict = false
-	d.AutoClose = xml.HTMLAutoClose
 	d.Entity = xml.HTMLEntity
 	for {
 		tok, err := d.Token()
