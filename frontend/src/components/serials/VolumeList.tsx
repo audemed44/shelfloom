@@ -9,6 +9,7 @@ import {
   Trash2,
   Loader2,
   Link2,
+  Pencil,
 } from 'lucide-react'
 import { api } from '../../api/client'
 import { getBookCoverUrl } from '../../utils/bookCover'
@@ -114,6 +115,12 @@ export default function VolumeList({
   const [uploadingId, setUploadingId] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [coverTargetId, setCoverTargetId] = useState<number | null>(null)
+
+  // Edit a volume's chapter range inline
+  const [editRangeId, setEditRangeId] = useState<number | null>(null)
+  const [editStart, setEditStart] = useState('')
+  const [editEnd, setEditEnd] = useState('')
+  const [savingRange, setSavingRange] = useState(false)
 
   // Add volume inline form
   const [showAddForm, setShowAddForm] = useState(false)
@@ -317,6 +324,40 @@ export default function VolumeList({
       setError(e.data?.detail ?? 'Failed to upload cover')
     } finally {
       setUploadingId(null)
+    }
+  }
+
+  const openEditRange = (vol: SerialVolume) => {
+    if (editRangeId === vol.id) {
+      setEditRangeId(null)
+      return
+    }
+    setEditRangeId(vol.id)
+    setEditStart(String(vol.chapter_start ?? ''))
+    setEditEnd(String(vol.chapter_end ?? ''))
+  }
+
+  const handleSaveRange = async (volumeId: number) => {
+    const start = parseInt(editStart, 10)
+    const end = parseInt(editEnd, 10)
+    if (isNaN(start) || isNaN(end) || start < 1 || end < start) {
+      setError('Enter a valid chapter range (start <= end)')
+      return
+    }
+    setSavingRange(true)
+    setError(null)
+    try {
+      await api.patch(`/api/serials/${serialId}/volumes/${volumeId}`, {
+        chapter_start: start,
+        chapter_end: end,
+      })
+      setEditRangeId(null)
+      onRefresh()
+    } catch (err) {
+      const e = err as { data?: { detail?: string } }
+      setError(e.data?.detail ?? 'Failed to update chapter range')
+    } finally {
+      setSavingRange(false)
     }
   }
 
@@ -728,6 +769,15 @@ export default function VolumeList({
 
                   {/* Actions */}
                   <div className="flex gap-2 shrink-0">
+                    {/* Edit chapter range */}
+                    <button
+                      onClick={() => openEditRange(vol)}
+                      className="p-1.5 text-white/30 hover:text-white/60 transition-colors"
+                      title="Edit chapter range"
+                    >
+                      <Pencil size={13} />
+                    </button>
+
                     {/* Cover upload */}
                     <button
                       onClick={() => {
@@ -793,6 +843,74 @@ export default function VolumeList({
                     )}
                   </div>
                 </div>
+
+                {/* Inline chapter range edit */}
+                {editRangeId === vol.id && (
+                  <div className="mt-3 pt-3 border-t border-white/5 flex flex-wrap items-end gap-3">
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor={`range-start-${vol.id}`}
+                        className="block text-[10px] font-black tracking-widest uppercase text-white/40"
+                      >
+                        Start
+                      </label>
+                      <input
+                        id={`range-start-${vol.id}`}
+                        type="number"
+                        min={1}
+                        value={editStart}
+                        onChange={(e) => setEditStart(e.target.value)}
+                        className="w-20 bg-black border border-white/10 px-2 py-1.5 text-sm text-white focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor={`range-end-${vol.id}`}
+                        className="block text-[10px] font-black tracking-widest uppercase text-white/40"
+                      >
+                        End
+                      </label>
+                      <input
+                        id={`range-end-${vol.id}`}
+                        type="number"
+                        min={1}
+                        value={editEnd}
+                        onChange={(e) => setEditEnd(e.target.value)}
+                        className="w-20 bg-black border border-white/10 px-2 py-1.5 text-sm text-white focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    {totalChapters > 0 && (
+                      <button
+                        onClick={() => setEditEnd(String(totalChapters))}
+                        className="py-1.5 text-[10px] font-black tracking-widest uppercase text-primary hover:underline"
+                      >
+                        To latest ({totalChapters})
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleSaveRange(vol.id)}
+                      disabled={savingRange}
+                      className="flex items-center gap-2 px-4 py-1.5 text-xs font-black tracking-widest uppercase bg-primary text-white hover:bg-primary/80 disabled:opacity-50 transition-colors"
+                    >
+                      {savingRange && (
+                        <Loader2 size={12} className="animate-spin" />
+                      )}
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditRangeId(null)}
+                      className="py-1.5 text-[10px] font-black tracking-widest uppercase text-white/30 hover:text-white/60 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    {vol.book_id && (
+                      <p className="basis-full text-[10px] text-white/40 normal-case">
+                        Rebuild afterwards to update the book. Your reading
+                        position carries over.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Inline delete confirm */}
                 {confirmDeleteId === vol.id && (
