@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/audemed44/shelfloom/internal/epub"
+	"github.com/audemed44/shelfloom/internal/logging"
 	"github.com/audemed44/shelfloom/internal/store"
 )
 
@@ -380,16 +381,41 @@ func (s *Server) updateVolumeHandler(w http.ResponseWriter, r *http.Request) err
 		return err
 	}
 	name := b.Str("name", false, true)
+	start := b.Int("chapter_start", false, false)
+	end := b.Int("chapter_end", false, false)
 	if err := b.err(); err != nil {
 		return err
 	}
 	ctx := r.Context()
-	if _, err := getVolume(ctx, s.DB, id, vid); err != nil {
+	v, err := getVolume(ctx, s.DB, id, vid)
+	if err != nil {
 		return err
 	}
 	if name != nil {
 		if _, err := s.DB.ExecContext(ctx, "UPDATE serial_volumes SET name = ? WHERE id = ?", *name, vid); err != nil {
 			return err
+		}
+	}
+	if start != nil || end != nil {
+		newStart, newEnd := v.ChapterStart, v.ChapterEnd
+		if start != nil {
+			newStart = start
+		}
+		if end != nil {
+			newEnd = end
+		}
+		if newStart == nil || newEnd == nil || *newStart < 1 || *newEnd < *newStart {
+			return badRequest("Enter a valid chapter range (start <= end)")
+		}
+		changed := v.ChapterStart == nil || v.ChapterEnd == nil || *v.ChapterStart != *newStart || *v.ChapterEnd != *newEnd
+		if changed {
+			// A generated book no longer matches its new range: mark it stale
+			// so a rebuild brings the file (and the reader's place) along.
+			stale := v.IsStale || (v.Kind == "generated" && v.BookID != nil)
+			if _, err := s.DB.ExecContext(ctx, "UPDATE serial_volumes SET chapter_start = ?, chapter_end = ?, is_stale = ? WHERE id = ?", *newStart, *newEnd, stale, vid); err != nil {
+				return err
+			}
+			logging.Audit(ctx, "serial.volume.range", "serial_id", id, "volume_id", vid)
 		}
 	}
 	return s.writeVolume(w, ctx, id, vid, http.StatusOK)

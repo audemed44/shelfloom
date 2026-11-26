@@ -171,3 +171,66 @@ func TestRebuiltVolumeKeepsSeries(t *testing.T) {
 	}
 	sync("rebuild")
 }
+
+// Extending a generated volume's range marks it stale, and a rebuild puts the
+// new chapters into the same book instead of a new one.
+func TestExtendVolumeRange(t *testing.T) {
+	ts := newTestServer(t)
+	ctx := context.Background()
+	db := ts.app.DB
+	var shelf Shelf
+	expect(t, "create shelf", ts.do("POST", "/api/shelves", map[string]any{"name": "Books", "path": ts.shelf}, &shelf), 201)
+	if _, err := db.ExecContext(ctx, "INSERT INTO web_serials (id, url, source, title, author, status, total_chapters) VALUES (1, 'https://www.royalroad.com/fiction/1/x', 'royalroad', 'Serial', 'Author', 'ongoing', 3)"); err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 3; i++ {
+		if _, err := db.ExecContext(ctx, "INSERT INTO serial_chapters (serial_id, chapter_number, title, source_url, content, source_key) VALUES (1, ?, ?, ?, '<p>Text</p>', ?)", i, "Chapter", "https://example.com/"+itoa(int64(i)), itoa(int64(i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.ExecContext(ctx, "INSERT INTO serial_volumes (id, serial_id, volume_number, chapter_start, chapter_end, is_stale) VALUES (1, 1, 1, 1, 2, 0)"); err != nil {
+		t.Fatal(err)
+	}
+	var v Volume
+	expect(t, "generate", ts.do("POST", "/api/serials/1/volumes/1/generate?shelf_id="+itoa(shelf.ID), nil, &v), 200)
+	book, err := getBook(ctx, db, *v.BookID)
+	if err != nil || book == nil {
+		t.Fatal(err)
+	}
+	before, err := epubSpine(filepath.Join(ts.shelf, book.FilePath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Reading chapter 2 (the nav page is DocFragment 1).
+	if _, err := saveProgress(ctx, db, saveArgs{username: "reader", document: webDocument(book), progress: "/body/DocFragment[3]/body/p[1]/text().0", percentage: 0.9, device: "KOReader", bookID: &book.ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	expect(t, "bad range", ts.do("PATCH", "/api/serials/1/volumes/1", map[string]any{"chapter_end": 0}, nil), 400)
+	var ev Volume
+	expect(t, "extend", ts.do("PATCH", "/api/serials/1/volumes/1", map[string]any{"chapter_end": 3}, &ev), 200)
+	if *ev.ChapterStart != 1 || *ev.ChapterEnd != 3 || ev.ChapterCount != 3 || !ev.IsStale {
+		t.Fatalf("extended volume: start=%d end=%d count=%d stale=%v", *ev.ChapterStart, *ev.ChapterEnd, ev.ChapterCount, ev.IsStale)
+	}
+
+	var nv Volume
+	expect(t, "rebuild", ts.do("POST", "/api/serials/1/volumes/1/rebuild", nil, &nv), 200)
+	if nv.BookID == nil || *nv.BookID != *v.BookID || nv.IsStale {
+		t.Fatalf("rebuild: book %v stale %v, want book %s fresh", nv.BookID, nv.IsStale, *v.BookID)
+	}
+	book, _ = getBook(ctx, db, *v.BookID)
+	after, err := epubSpine(filepath.Join(ts.shelf, book.FilePath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(after) != len(before)+1 {
+		t.Fatalf("rebuilt spine has %d items, want %d", len(after), len(before)+1)
+	}
+	latest, err := latestProgressForBook(ctx, db, book.ID, nil)
+	if err != nil || latest == nil {
+		t.Fatal("no progress after rebuild", err)
+	}
+	if latest.Device != rebuildDevice || !strings.HasPrefix(latest.Progress, "/body/DocFragment[3]/") || latest.Percentage >= 0.9 {
+		t.Fatalf("position after rebuild: %s %s %.2f, want chapter 2 carried over", latest.Device, latest.Progress, latest.Percentage)
+	}
+}

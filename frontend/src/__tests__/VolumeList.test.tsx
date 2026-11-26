@@ -85,4 +85,55 @@ describe('VolumeList', () => {
       splits: [{ start: 1, end: 3 }],
     })
   })
+
+  it('extends a volume to the latest chapter', async () => {
+    const onRefresh = vi.fn()
+    render(
+      <TestMemoryRouter>
+        <VolumeList
+          serialId={1}
+          volumes={[
+            {
+              id: 7,
+              serial_id: 1,
+              book_id: 'book-7',
+              volume_number: 2,
+              kind: 'generated',
+              name: null,
+              cover_path: null,
+              chapter_start: 101,
+              chapter_end: 150,
+              generated_at: null,
+              is_stale: false,
+              chapter_count: 50,
+              fetched_chapter_count: 50,
+              is_partial: false,
+              stubbed_missing_count: 0,
+              estimated_pages: null,
+              total_words: null,
+            },
+          ]}
+          totalChapters={180}
+          shelves={[]}
+          onRefresh={onRefresh}
+        />
+      </TestMemoryRouter>
+    )
+
+    fireEvent.click(screen.getByTitle('Edit chapter range'))
+    expect(screen.getByLabelText('Start')).toHaveValue(101)
+    expect(screen.getByLabelText('End')).toHaveValue(150)
+    fireEvent.click(screen.getByText('To latest (180)'))
+    fireEvent.click(screen.getByText('Save'))
+
+    await waitFor(() => expect(onRefresh).toHaveBeenCalled())
+    const call = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.find(([url]) => url.toString() === '/api/serials/1/volumes/7')
+    expect((call?.[1] as RequestInit).method).toBe('PATCH')
+    expect(JSON.parse(String((call?.[1] as RequestInit).body))).toEqual({
+      chapter_start: 101,
+      chapter_end: 180,
+    })
+  })
 })
